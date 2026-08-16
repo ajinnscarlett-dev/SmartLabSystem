@@ -1,0 +1,6 @@
+@SmartLab.Server_HostAddress = http://localhost:5047
+
+GET {{SmartLab.Server_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
