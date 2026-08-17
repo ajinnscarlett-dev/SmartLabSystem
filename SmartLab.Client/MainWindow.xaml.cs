@@ -13,8 +13,8 @@ namespace SmartLab.Client
         // ==========================================
         // THIS COMPUTER'S SMARTLAB PC NUMBER
         // ==========================================
-        private readonly string _pcNumber;
 
+        private readonly string _pcNumber;
 
         public MainWindow()
         {
@@ -29,94 +29,20 @@ namespace SmartLab.Client
             // ==========================================
             // AUTH SESSION
             // ==========================================
+
             // If a token already exists, attach it.
             // Login itself is allowed anonymously, so
             // this does not prevent the login request.
 
             AuthSession.Apply(_httpClient);
 
-
             // ==========================================
-            // GET THIS COMPUTER'S SMARTLAB PC NUMBER
+            // AUTO-DETECT THIS COMPUTER
             // ==========================================
 
-            _pcNumber = GetSmartLabPcNumber();
+            _pcNumber =
+                PCConfig.PCNumber;
         }
-
-
-        // ==========================================
-        // GET SMARTLAB PC NUMBER
-        // ==========================================
-        //
-        // Examples:
-        //
-        // Windows name:
-        //     601-PC01
-        // Result:
-        //     601-PC01
-        //
-        // Windows name:
-        //     PC01
-        // Result:
-        //     601-PC01
-        //
-        // Windows name:
-        //     PC02
-        // Result:
-        //     601-PC02
-        //
-        // ==========================================
-
-        private string GetSmartLabPcNumber()
-        {
-            string machineName =
-                Environment.MachineName.Trim();
-
-
-            // ==========================================
-            // ALREADY USING SMARTLAB FORMAT
-            // ==========================================
-
-            if (machineName.StartsWith(
-                    "601-PC",
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                return machineName.ToUpper();
-            }
-
-
-            // ==========================================
-            // SIMPLE PC FORMAT
-            // Example: PC01
-            // ==========================================
-
-            if (machineName.StartsWith(
-                    "PC",
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                string numberPart =
-                    machineName.Substring(2);
-
-
-                if (int.TryParse(
-                        numberPart,
-                        out int pcNumber))
-                {
-                    return $"601-PC{pcNumber:00}";
-                }
-            }
-
-
-            // ==========================================
-            // UNKNOWN FORMAT
-            //
-            // Do not guess.
-            // Keep the actual Windows computer name.
-            // ==========================================
-
-            return machineName;
-        }
-
 
         // ==========================================
         // STUDENT / TEACHER / ADMIN LOGIN
@@ -127,8 +53,7 @@ namespace SmartLab.Client
             RoutedEventArgs e)
         {
             StatusText.Text =
-                "Logging in...";
-
+                $"Connecting to {_pcNumber}...";
 
             var loginData = new
             {
@@ -138,7 +63,6 @@ namespace SmartLab.Client
                 password =
                     PasswordBox.Password
             };
-
 
             try
             {
@@ -152,11 +76,9 @@ namespace SmartLab.Client
                         loginData
                     );
 
-
                 var responseText =
                     await response.Content
                         .ReadAsStringAsync();
-
 
                 // ==========================================
                 // LOGIN FAILED
@@ -170,7 +92,6 @@ namespace SmartLab.Client
                     return;
                 }
 
-
                 // ==========================================
                 // READ LOGIN RESPONSE
                 // ==========================================
@@ -180,12 +101,10 @@ namespace SmartLab.Client
                         responseText
                     );
 
-
                 int userId =
                     json.RootElement
                         .GetProperty("userId")
                         .GetInt32();
-
 
                 string username =
                     json.RootElement
@@ -193,13 +112,11 @@ namespace SmartLab.Client
                         .GetString()
                         ?? "";
 
-
                 string role =
                     json.RootElement
                         .GetProperty("role")
                         .GetString()
                         ?? "";
-
 
                 // ==========================================
                 // GET JWT TOKEN
@@ -211,7 +128,6 @@ namespace SmartLab.Client
                         .GetString()
                         ?? "";
 
-
                 // ==========================================
                 // SAVE AUTHENTICATED SESSION
                 // ==========================================
@@ -222,13 +138,11 @@ namespace SmartLab.Client
                     username,
                     role);
 
-
                 // ==========================================
                 // ATTACH JWT TO FUTURE API REQUESTS
                 // ==========================================
 
                 AuthSession.Apply(_httpClient);
-
 
                 // ==========================================
                 // STUDENT LOGIN
@@ -241,7 +155,6 @@ namespace SmartLab.Client
                     StatusText.Text =
                         $"Connecting to {_pcNumber}...";
 
-
                     // ==========================================
                     // LOGIN TO THIS PHYSICAL PC
                     // ==========================================
@@ -252,11 +165,9 @@ namespace SmartLab.Client
                             null
                         );
 
-
                     var pcResponseText =
                         await pcResponse.Content
                             .ReadAsStringAsync();
-
 
                     // ==========================================
                     // PC LOGIN FAILED
@@ -271,14 +182,12 @@ namespace SmartLab.Client
                                     pcResponseText
                                 );
 
-
                             string message =
                                 pcError.RootElement
                                     .GetProperty("message")
                                     .GetString()
                                     ??
                                     $"Unable to login to {_pcNumber}.";
-
 
                             StatusText.Text =
                                 message;
@@ -289,13 +198,10 @@ namespace SmartLab.Client
                                 $"Unable to login to {_pcNumber}.";
                         }
 
-
-                        // Clear the token if PC login failed.
                         AuthSession.Clear();
 
                         return;
                     }
-
 
                     // ==========================================
                     // READ PC INFORMATION
@@ -306,27 +212,16 @@ namespace SmartLab.Client
                             pcResponseText
                         );
 
-
-                    // ==========================================
-                    // GET PC ID
-                    // ==========================================
-
                     int pcId =
                         pcJson.RootElement
                             .GetProperty("pcId")
                             .GetInt32();
-
-
-                    // ==========================================
-                    // GET PC NUMBER
-                    // ==========================================
 
                     string pcNumber =
                         pcJson.RootElement
                             .GetProperty("pcNumber")
                             .GetString()
                             ?? _pcNumber;
-
 
                     // ==========================================
                     // OPEN SMARTLAB WIDGET
@@ -340,9 +235,7 @@ namespace SmartLab.Client
                             pcId
                         );
 
-
                     widget.Show();
-
 
                     // ==========================================
                     // CLOSE LOGIN WINDOW
@@ -350,7 +243,6 @@ namespace SmartLab.Client
 
                     Close();
                 }
-
 
                 // ==========================================
                 // TEACHER LOGIN
@@ -366,13 +258,10 @@ namespace SmartLab.Client
                             userId
                         );
 
-
                     dashboard.Show();
-
 
                     Close();
                 }
-
 
                 // ==========================================
                 // ADMIN LOGIN
@@ -382,24 +271,15 @@ namespace SmartLab.Client
                     "Admin",
                     StringComparison.OrdinalIgnoreCase))
                 {
-                    // Normally Admin users should enter
-                    // through the hidden Admin/MIS button.
-                    //
-                    // This check is kept here as a safety
-                    // fallback.
-
                     AdminDashboard dashboard =
                         new AdminDashboard(
                             username
                         );
 
-
                     dashboard.Show();
-
 
                     Close();
                 }
-
 
                 // ==========================================
                 // OTHER ROLE
@@ -418,12 +298,9 @@ namespace SmartLab.Client
                 StatusText.Text =
                     $"Connection error: {ex.Message}";
 
-                // If login/session setup fails,
-                // don't leave an old token around.
                 AuthSession.Clear();
             }
         }
-
 
         // ==========================================
         // ADMIN / MANAGEMENT LOGIN
@@ -448,7 +325,6 @@ namespace SmartLab.Client
                     $"Unable to open Admin Login: {ex.Message}";
             }
         }
-
 
         // ==========================================
         // CLEANUP
