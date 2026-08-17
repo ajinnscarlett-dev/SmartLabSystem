@@ -18,23 +18,47 @@ namespace SmartLab.Server.Controllers
         private sealed class PcCommand
         {
             public long CommandId { get; set; }
+
             public int PCId { get; set; }
+
             public int RequestedByUserId { get; set; }
-            public string CommandType { get; set; } = string.Empty;
+
+            public string CommandType { get; set; } =
+                string.Empty;
+
             public string? Message { get; set; }
+
             public DateTime CreatedAt { get; set; }
+
             public DateTime? CompletedAt { get; set; }
-            public string Status { get; set; } = "Pending";
+
+            public string Status { get; set; } =
+                "Pending";
+
             public string? Result { get; set; }
         }
 
-        private static readonly ConcurrentDictionary<long, PcCommand> Commands = new();
-        private static readonly ConcurrentDictionary<int, long> PendingCommandByPc = new();
+        private static readonly ConcurrentDictionary<
+            long,
+            PcCommand>
+            Commands =
+                new();
 
-        public PCCommandController(AppDbContext context)
+        private static readonly ConcurrentDictionary<
+            int,
+            long>
+            PendingCommandByPc =
+                new();
+
+        public PCCommandController(
+            AppDbContext context)
         {
             _context = context;
         }
+
+        // ==========================================================
+        // SEND MESSAGE
+        // ==========================================================
 
         [Authorize(Roles = "Admin,Teacher")]
         [HttpPost("{pcId}/send-message")]
@@ -42,70 +66,167 @@ namespace SmartLab.Server.Controllers
             int pcId,
             [FromBody] SendMessageRequest request)
         {
-            string message = request.Message?.Trim() ?? string.Empty;
+            string message =
+                request.Message?.Trim() ?? string.Empty;
 
             if (string.IsNullOrWhiteSpace(message))
-                return BadRequest(new { message = "Message is required." });
+            {
+                return BadRequest(new
+                {
+                    message = "Message is required."
+                });
+            }
 
             if (message.Length > 1000)
-                return BadRequest(new { message = "Message cannot exceed 1000 characters." });
+            {
+                return BadRequest(new
+                {
+                    message = "Message cannot exceed 1000 characters."
+                });
+            }
 
-            PC? pc = await _context.PCs
-                .AsNoTracking()
-                .FirstOrDefaultAsync(p => p.PCId == pcId);
+            return await QueuePcCommandAsync(
+                pcId,
+                "SEND_MESSAGE",
+                message);
+        }
+
+        // ==========================================================
+        // LOCK COMPUTER
+        // ==========================================================
+
+        [Authorize(Roles = "Admin,Teacher")]
+        [HttpPost("{pcId}/lock")]
+        public async Task<IActionResult> LockComputer(
+            int pcId)
+        {
+            return await QueuePcCommandAsync(
+                pcId,
+                "LOCK_COMPUTER",
+                null);
+        }
+
+        // ==========================================================
+        // GENERIC COMMAND QUEUE
+        // ==========================================================
+
+        private async Task<IActionResult>
+            QueuePcCommandAsync(
+                int pcId,
+                string commandType,
+                string? message)
+        {
+            PC? pc =
+                await _context.PCs
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(
+                        p => p.PCId == pcId);
 
             if (pc == null)
-                return NotFound(new { message = "PC not found." });
+            {
+                return NotFound(new
+                {
+                    message = "PC not found."
+                });
+            }
 
             if (!pc.IsEnabled)
-                return Conflict(new { message = $"PC {pc.PCNumber} is disabled." });
+            {
+                return Conflict(new
+                {
+                    message =
+                        $"PC {pc.PCNumber} is disabled."
+                });
+            }
 
             bool occupied =
-                pc.Status.Equals("Occupied", StringComparison.OrdinalIgnoreCase) ||
-                pc.Status.Equals("In Use", StringComparison.OrdinalIgnoreCase);
+                pc.Status.Equals(
+                    "Occupied",
+                    StringComparison.OrdinalIgnoreCase)
+                ||
+                pc.Status.Equals(
+                    "In Use",
+                    StringComparison.OrdinalIgnoreCase);
 
-            if (!occupied || !pc.CurrentUserId.HasValue)
+            if (!occupied ||
+                !pc.CurrentUserId.HasValue)
+            {
                 return Conflict(new
                 {
-                    message = "A student must be logged in to this PC before a message can be sent."
+                    message =
+                        "A student must be logged in to this PC."
                 });
+            }
 
             if (PendingCommandByPc.ContainsKey(pcId))
+            {
                 return Conflict(new
                 {
-                    message = "There is already a pending command for this PC."
+                    message =
+                        "There is already a pending command for this PC."
                 });
+            }
 
             string? claimUserId =
-                User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                User.FindFirst(
+                    ClaimTypes.NameIdentifier)
+                ?.Value;
 
-            if (!int.TryParse(claimUserId, out int requestedByUserId))
+            if (!int.TryParse(
+                claimUserId,
+                out int requestedByUserId))
+            {
                 return Unauthorized(new
                 {
-                    message = "Unable to determine the requesting user."
+                    message =
+                        "Unable to determine the requesting user."
                 });
+            }
 
-            long commandId = Interlocked.Increment(ref _nextCommandId);
+            long commandId =
+                Interlocked.Increment(
+                    ref _nextCommandId);
 
-            PcCommand command = new PcCommand
+            PcCommand command =
+                new PcCommand
+                {
+                    CommandId =
+                        commandId,
+
+                    PCId =
+                        pcId,
+
+                    RequestedByUserId =
+                        requestedByUserId,
+
+                    CommandType =
+                        commandType,
+
+                    Message =
+                        message,
+
+                    CreatedAt =
+                        DateTime.Now,
+
+                    Status =
+                        "Pending"
+                };
+
+            Commands[commandId] =
+                command;
+
+            if (!PendingCommandByPc.TryAdd(
+                    pcId,
+                    commandId))
             {
-                CommandId = commandId,
-                PCId = pcId,
-                RequestedByUserId = requestedByUserId,
-                CommandType = "SEND_MESSAGE",
-                Message = message,
-                CreatedAt = DateTime.Now,
-                Status = "Pending"
-            };
+                Commands.TryRemove(
+                    commandId,
+                    out _);
 
-            Commands[commandId] = command;
-
-            if (!PendingCommandByPc.TryAdd(pcId, commandId))
-            {
-                Commands.TryRemove(commandId, out _);
                 return Conflict(new
                 {
-                    message = "Another command is already pending for this PC."
+                    message =
+                        "Another command is already pending for this PC."
                 });
             }
 
@@ -113,103 +234,199 @@ namespace SmartLab.Server.Controllers
                 requestedByUserId,
                 pcId,
                 "PC Command Sent",
-                $"SEND_MESSAGE command #{commandId} was sent to PC {pc.PCNumber}."
+                $"{commandType} command #{commandId} was sent to PC {pc.PCNumber}."
             );
 
             return Ok(new
             {
-                message = "Message command queued successfully.",
+                message =
+                    $"{commandType} command queued successfully.",
+
                 commandId,
+
                 pcId,
-                pcNumber = pc.PCNumber,
-                commandType = command.CommandType,
-                status = command.Status,
-                createdAt = command.CreatedAt
+
+                pcNumber =
+                    pc.PCNumber,
+
+                commandType,
+
+                status =
+                    command.Status,
+
+                createdAt =
+                    command.CreatedAt
             });
         }
+
+        // ==========================================================
+        // STUDENT - GET PENDING COMMAND
+        // ==========================================================
 
         [Authorize(Roles = "Student")]
         [HttpGet("pending")]
-        public async Task<IActionResult> GetPendingCommand()
+        public async Task<IActionResult>
+            GetPendingCommand()
         {
             string? claimUserId =
-                User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                User.FindFirst(
+                    ClaimTypes.NameIdentifier)
+                ?.Value;
 
-            if (!int.TryParse(claimUserId, out int userId))
+            if (!int.TryParse(
+                claimUserId,
+                out int userId))
+            {
                 return Unauthorized();
+            }
 
-            PC? pc = await _context.PCs
-                .AsNoTracking()
-                .FirstOrDefaultAsync(
-                    p => p.CurrentUserId == userId && p.IsEnabled);
+            PC? pc =
+                await _context.PCs
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(
+                        p =>
+                            p.CurrentUserId == userId &&
+                            p.IsEnabled);
 
             if (pc == null)
-                return NoContent();
-
-            if (!PendingCommandByPc.TryGetValue(pc.PCId, out long commandId))
-                return NoContent();
-
-            if (!Commands.TryGetValue(commandId, out PcCommand? command))
             {
-                PendingCommandByPc.TryRemove(pc.PCId, out _);
                 return NoContent();
             }
 
-            if (!command.Status.Equals("Pending", StringComparison.OrdinalIgnoreCase))
+            if (!PendingCommandByPc.TryGetValue(
+                    pc.PCId,
+                    out long commandId))
+            {
                 return NoContent();
+            }
+
+            if (!Commands.TryGetValue(
+                    commandId,
+                    out PcCommand? command))
+            {
+                PendingCommandByPc.TryRemove(
+                    pc.PCId,
+                    out _);
+
+                return NoContent();
+            }
+
+            if (!command.Status.Equals(
+                    "Pending",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return NoContent();
+            }
 
             if (command.PCId != pc.PCId)
+            {
                 return NoContent();
+            }
 
             return Ok(new
             {
-                commandId = command.CommandId,
-                pcId = command.PCId,
-                commandType = command.CommandType,
-                message = command.Message,
-                createdAt = command.CreatedAt
+                commandId =
+                    command.CommandId,
+
+                pcId =
+                    command.PCId,
+
+                commandType =
+                    command.CommandType,
+
+                message =
+                    command.Message,
+
+                createdAt =
+                    command.CreatedAt
             });
         }
 
+        // ==========================================================
+        // STUDENT - COMPLETE COMMAND
+        // ==========================================================
+
         [Authorize(Roles = "Student")]
         [HttpPost("{commandId}/complete")]
-        public async Task<IActionResult> CompleteCommand(
-            long commandId,
-            [FromBody] CompleteCommandRequest request)
+        public async Task<IActionResult>
+            CompleteCommand(
+                long commandId,
+                [FromBody] CompleteCommandRequest request)
         {
             string? claimUserId =
-                User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                User.FindFirst(
+                    ClaimTypes.NameIdentifier)
+                ?.Value;
 
-            if (!int.TryParse(claimUserId, out int userId))
+            if (!int.TryParse(
+                claimUserId,
+                out int userId))
+            {
                 return Unauthorized();
+            }
 
-            if (!Commands.TryGetValue(commandId, out PcCommand? command))
-                return NotFound(new { message = "Command not found." });
+            if (!Commands.TryGetValue(
+                    commandId,
+                    out PcCommand? command))
+            {
+                return NotFound(new
+                {
+                    message =
+                        "Command not found."
+                });
+            }
 
-            PC? pc = await _context.PCs
-                .AsNoTracking()
-                .FirstOrDefaultAsync(p => p.PCId == command.PCId);
+            PC? pc =
+                await _context.PCs
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(
+                        p =>
+                            p.PCId == command.PCId);
 
-            if (pc == null || pc.CurrentUserId != userId)
+            if (pc == null ||
+                pc.CurrentUserId != userId)
+            {
                 return Forbid();
+            }
 
-            if (!command.Status.Equals("Pending", StringComparison.OrdinalIgnoreCase))
+            if (!command.Status.Equals(
+                    "Pending",
+                    StringComparison.OrdinalIgnoreCase))
+            {
                 return Conflict(new
                 {
-                    message = "Command has already been completed."
+                    message =
+                        "Command has already been completed."
                 });
+            }
 
-            command.CompletedAt = DateTime.Now;
-            command.Status = request.Success ? "Completed" : "Failed";
-            command.Result = string.IsNullOrWhiteSpace(request.Result)
-                ? null
-                : request.Result.Trim();
+            command.CompletedAt =
+                DateTime.Now;
 
-            PendingCommandByPc.TryRemove(command.PCId, out _);
+            command.Status =
+                request.Success
+                    ? "Completed"
+                    : "Failed";
 
-            string resultText = command.Status;
-            if (!string.IsNullOrWhiteSpace(command.Result))
-                resultText += $" - {command.Result}";
+            command.Result =
+                string.IsNullOrWhiteSpace(
+                    request.Result)
+                    ? null
+                    : request.Result.Trim();
+
+            PendingCommandByPc.TryRemove(
+                command.PCId,
+                out _);
+
+            string resultText =
+                command.Status;
+
+            if (!string.IsNullOrWhiteSpace(
+                command.Result))
+            {
+                resultText +=
+                    $" - {command.Result}";
+            }
 
             await LogActivityAsync(
                 userId,
@@ -220,30 +437,66 @@ namespace SmartLab.Server.Controllers
 
             return Ok(new
             {
-                message = "Command result recorded.",
-                commandId = command.CommandId,
-                status = command.Status,
-                completedAt = command.CompletedAt
+                message =
+                    "Command result recorded.",
+
+                commandId =
+                    command.CommandId,
+
+                status =
+                    command.Status,
+
+                completedAt =
+                    command.CompletedAt
             });
         }
 
+        // ==========================================================
+        // ADMIN / TEACHER - COMMAND STATUS
+        // ==========================================================
+
         [Authorize(Roles = "Admin,Teacher")]
         [HttpGet("{commandId}")]
-        public IActionResult GetCommandStatus(long commandId)
+        public IActionResult
+            GetCommandStatus(
+                long commandId)
         {
-            if (!Commands.TryGetValue(commandId, out PcCommand? command))
-                return NotFound(new { message = "Command not found." });
+            if (!Commands.TryGetValue(
+                    commandId,
+                    out PcCommand? command))
+            {
+                return NotFound(new
+                {
+                    message =
+                        "Command not found."
+                });
+            }
 
             return Ok(new
             {
-                commandId = command.CommandId,
-                pcId = command.PCId,
-                commandType = command.CommandType,
-                status = command.Status,
-                message = command.Message,
-                createdAt = command.CreatedAt,
-                completedAt = command.CompletedAt,
-                result = command.Result
+                commandId =
+                    command.CommandId,
+
+                pcId =
+                    command.PCId,
+
+                commandType =
+                    command.CommandType,
+
+                status =
+                    command.Status,
+
+                message =
+                    command.Message,
+
+                createdAt =
+                    command.CreatedAt,
+
+                completedAt =
+                    command.CompletedAt,
+
+                result =
+                    command.Result
             });
         }
 
@@ -253,16 +506,27 @@ namespace SmartLab.Server.Controllers
             string action,
             string details)
         {
-            ActivityLog log = new ActivityLog
-            {
-                UserId = userId,
-                PCId = pcId,
-                Action = action,
-                Details = details,
-                CreatedAt = DateTime.Now
-            };
+            ActivityLog log =
+                new ActivityLog
+                {
+                    UserId =
+                        userId,
+
+                    PCId =
+                        pcId,
+
+                    Action =
+                        action,
+
+                    Details =
+                        details,
+
+                    CreatedAt =
+                        DateTime.Now
+                };
 
             _context.ActivityLogs.Add(log);
+
             await _context.SaveChangesAsync();
         }
 
@@ -274,6 +538,7 @@ namespace SmartLab.Server.Controllers
         public class CompleteCommandRequest
         {
             public bool Success { get; set; }
+
             public string? Result { get; set; }
         }
     }
