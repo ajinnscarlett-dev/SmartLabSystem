@@ -816,7 +816,7 @@
                                     Content="SEND MESSAGE"
                                     Style="{StaticResource ActionButton}"
                                     Height="30"
-                                    Click="UnsupportedQuickActionButton_Click"
+                                    Click="SendMessageButton_Click"
                                     Margin="0,0,0,5"/>
 
                             <Button x:Name="BlankScreenButton"
