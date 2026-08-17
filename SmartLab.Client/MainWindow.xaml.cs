@@ -1,6 +1,10 @@
 ﻿using System;
+using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using System.Text.Json;
 using System.Windows;
 
@@ -30,10 +34,6 @@ namespace SmartLab.Client
             // AUTH SESSION
             // ==========================================
 
-            // If a token already exists, attach it.
-            // Login itself is allowed anonymously, so
-            // this does not prevent the login request.
-
             AuthSession.Apply(_httpClient);
 
             // ==========================================
@@ -42,6 +42,181 @@ namespace SmartLab.Client
 
             _pcNumber =
                 PCConfig.PCNumber;
+        }
+
+        // ==========================================
+        // GET ACTIVE MAC ADDRESS
+        // ==========================================
+
+        private static string? GetMacAddress()
+        {
+            try
+            {
+                foreach (NetworkInterface networkInterface
+                    in NetworkInterface.GetAllNetworkInterfaces())
+                {
+                    if (networkInterface.OperationalStatus !=
+                        OperationalStatus.Up)
+                    {
+                        continue;
+                    }
+
+                    if (networkInterface.NetworkInterfaceType ==
+                        NetworkInterfaceType.Loopback)
+                    {
+                        continue;
+                    }
+
+                    PhysicalAddress physicalAddress =
+                        networkInterface.GetPhysicalAddress();
+
+                    byte[] bytes =
+                        physicalAddress.GetAddressBytes();
+
+                    if (bytes.Length == 6)
+                    {
+                        return string.Join(
+                            "-",
+                            bytes.Select(
+                                b => b.ToString("X2")));
+                    }
+                }
+            }
+            catch
+            {
+                // Network identity is best-effort.
+            }
+
+            return null;
+        }
+
+        // ==========================================
+        // GET ACTIVE LOCAL IPV4
+        // ==========================================
+
+        private static string? GetLocalIPv4Address()
+        {
+            try
+            {
+                foreach (NetworkInterface networkInterface
+                    in NetworkInterface.GetAllNetworkInterfaces())
+                {
+                    if (networkInterface.OperationalStatus !=
+                        OperationalStatus.Up)
+                    {
+                        continue;
+                    }
+
+                    if (networkInterface.NetworkInterfaceType ==
+                        NetworkInterfaceType.Loopback)
+                    {
+                        continue;
+                    }
+
+                    IPInterfaceProperties properties =
+                        networkInterface.GetIPProperties();
+
+                    foreach (UnicastIPAddressInformation address
+                        in properties.UnicastAddresses)
+                    {
+                        if (address.Address.AddressFamily ==
+                            AddressFamily.InterNetwork)
+                        {
+                            string ip =
+                                address.Address.ToString();
+
+                            if (!ip.StartsWith("169.254."))
+                            {
+                                return ip;
+                            }
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // Network identity is best-effort.
+            }
+
+            return null;
+        }
+
+        // ==========================================
+        // REGISTER THIS PC'S NETWORK IDENTITY
+        // ==========================================
+
+        private async Task<bool> RegisterThisPcNetworkIdentity(
+            int userId)
+        {
+            string? macAddress =
+                GetMacAddress();
+
+            string? ipAddress =
+                GetLocalIPv4Address();
+
+            if (string.IsNullOrWhiteSpace(macAddress))
+            {
+                StatusText.Text =
+                    "PC connected, but MAC address could not be detected.";
+
+                return false;
+            }
+
+            var registrationData = new
+            {
+                userId,
+                pcNumber = _pcNumber,
+                macAddress,
+                ipAddress
+            };
+
+            try
+            {
+                var response =
+                    await _httpClient.PostAsJsonAsync(
+                        "api/PCRegistration/register",
+                        registrationData
+                    );
+
+                if (response.IsSuccessStatusCode)
+                {
+                    return true;
+                }
+
+                string errorText =
+                    await response.Content
+                        .ReadAsStringAsync();
+
+                try
+                {
+                    using JsonDocument errorJson =
+                        JsonDocument.Parse(errorText);
+
+                    string message =
+                        errorJson.RootElement
+                            .GetProperty("message")
+                            .GetString()
+                            ??
+                            "PC network registration failed.";
+
+                    StatusText.Text =
+                        message;
+                }
+                catch
+                {
+                    StatusText.Text =
+                        "PC network registration failed.";
+                }
+
+                return false;
+            }
+            catch (Exception ex)
+            {
+                StatusText.Text =
+                    $"PC network registration error: {ex.Message}";
+
+                return false;
+            }
         }
 
         // ==========================================
@@ -222,6 +397,17 @@ namespace SmartLab.Client
                             .GetProperty("pcNumber")
                             .GetString()
                             ?? _pcNumber;
+
+                    // ==========================================
+                    // REGISTER MAC + IP
+                    // ==========================================
+
+                    StatusText.Text =
+                        "Registering PC network identity...";
+
+                    await RegisterThisPcNetworkIdentity(
+                        userId
+                    );
 
                     // ==========================================
                     // OPEN SMARTLAB WIDGET
