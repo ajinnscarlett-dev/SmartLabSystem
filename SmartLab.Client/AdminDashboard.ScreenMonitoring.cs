@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
-using System.Threading;
+using System.Net.Http.Json;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -14,40 +14,38 @@ using System.Windows.Threading;
 namespace SmartLab.Client
 {
     // ==========================================================
-    // ADMIN DASHBOARD - STABLE LIVE SCREEN REFRESH
-    // ==========================================================
+    // ADMIN DASHBOARD - STABLE LIVE PC THUMBNAILS
+    // STEP 26
     //
-    // STEP 24
+    // Root cause addressed:
+    // The previous code treated an old LastSeen value as a reason
+    // to stop screen monitoring. StopMonitoring clears the server's
+    // latest frame. That can leave the Admin with an old cached image
+    // while GET /meta returns 404.
     //
-    // We are intentionally NOT downloading all PC images in parallel.
-    // The previous parallel approach could keep several network/image
-    // operations alive at the same time and make a WPF dashboard
-    // progressively less responsive.
+    // New rule:
+    // - If a PC is IN USE/OCCUPIED, keep monitoring.
+    // - Do NOT stop monitoring only because LastSeen is temporarily
+    //   stale in the Admin's current PC list.
+    // - Stop monitoring when the PC is no longer occupied.
     //
-    // New approach:
-    // - One visible PC frame at a time.
-    // - ~1.2 second refresh cadence.
-    // - Per-request timeout.
-    // - JPEG decode happens off the UI thread.
-    // - Existing Image control is reused.
-    // - Last good frame stays visible when a request fails.
-    // - No PC grid rebuild.
-    //
-    // This favors stability and smoothness over maximum FPS.
-    //
+    // This avoids deleting the current frame because of a transient
+    // heartbeat/dashboard refresh delay.
     // ==========================================================
 
     public partial class AdminDashboard
     {
         private DispatcherTimer? _screenThumbnailTimer;
-
         private bool _screenThumbnailRefreshRunning;
-
         private int _screenRefreshIndex;
 
         private readonly HashSet<int>
             _screenMonitoringStarted =
                 new HashSet<int>();
+
+        private readonly Dictionary<int, long>
+            _screenVersions =
+                new Dictionary<int, long>();
 
         private readonly Dictionary<int, byte[]>
             _latestScreenImages =
@@ -59,15 +57,7 @@ namespace SmartLab.Client
 
         private static readonly TimeSpan
             ScreenRefreshInterval =
-                TimeSpan.FromMilliseconds(1200);
-
-        private static readonly TimeSpan
-            ScreenRequestTimeout =
-                TimeSpan.FromMilliseconds(1500);
-
-        // ==========================================================
-        // INITIALIZE
-        // ==========================================================
+                TimeSpan.FromMilliseconds(1000);
 
         private void InitializeScreenMonitoring()
         {
@@ -88,29 +78,17 @@ namespace SmartLab.Client
 
             _screenThumbnailTimer.Start();
 
-            _ = RefreshOneScreenAsync();
+            _ = RefreshScreenMetadataAsync();
         }
-
-        // ==========================================================
-        // TIMER
-        // ==========================================================
 
         private async void ScreenThumbnailTimer_Tick(
             object? sender,
             EventArgs e)
         {
-            await RefreshOneScreenAsync();
+            await RefreshScreenMetadataAsync();
         }
 
-        // ==========================================================
-        // REFRESH ONE SCREEN
-        // ==========================================================
-        //
-        // One frame only per cycle.
-        // This prevents a burst of concurrent downloads/decodes.
-        // ==========================================================
-
-        private async Task RefreshOneScreenAsync()
+        private async Task RefreshScreenMetadataAsync()
         {
             if (_screenThumbnailRefreshRunning ||
                 !IsLoaded)
@@ -129,11 +107,10 @@ namespace SmartLab.Client
                             .Where(
                                 b => b.Tag is PCInfo)
                             .Select(
-                                b =>
-                                    (
-                                        b,
-                                        (PCInfo)b.Tag
-                                    ))
+                                b => (
+                                    b,
+                                    (PCInfo)b.Tag
+                                ))
                             .ToList();
 
                 if (visibleCards.Count == 0)
@@ -142,19 +119,18 @@ namespace SmartLab.Client
                     return;
                 }
 
-                // Make sure the index is still inside the current
-                // visible-card range.
                 if (_screenRefreshIndex >=
                     visibleCards.Count)
                 {
                     _screenRefreshIndex = 0;
                 }
 
-                // Start/stop monitoring based on current state.
+                // IMPORTANT:
+                // Monitoring state now follows PC usage state,
+                // not LastSeen freshness.
                 await SynchronizeMonitoringStatesAsync(
                     visibleCards);
 
-                // Find the next occupied + online PC.
                 int attempts =
                     visibleCards.Count;
 
@@ -168,13 +144,12 @@ namespace SmartLab.Client
                         (_screenRefreshIndex + 1) %
                         visibleCards.Count;
 
-                    if (!IsPcOccupied(item.PC) ||
-                        !IsPcOnline(item.PC))
+                    if (!IsPcOccupied(item.PC))
                     {
                         continue;
                     }
 
-                    await DownloadAndApplyOneFrameAsync(
+                    await RefreshOnePcFrameAsync(
                         item.Card,
                         item.PC);
 
@@ -188,46 +163,43 @@ namespace SmartLab.Client
             }
             finally
             {
-                _screenThumbnailRefreshRunning = false;
+                _screenThumbnailRefreshRunning =
+                    false;
             }
         }
 
         // ==========================================================
-        // SYNC MONITORING STATES
+        // MONITORING STATE
         // ==========================================================
 
-        private async Task SynchronizeMonitoringStatesAsync(
-            List<(Border Card, PCInfo PC)> visibleCards)
+        private async Task
+            SynchronizeMonitoringStatesAsync(
+                List<(Border Card, PCInfo PC)>
+                    visibleCards)
         {
             foreach (var item in visibleCards)
             {
-                PCInfo pc =
-                    item.PC;
-
                 bool occupied =
-                    IsPcOccupied(pc);
+                    IsPcOccupied(item.PC);
 
-                bool online =
-                    IsPcOnline(pc);
-
-                if (occupied && online)
+                if (occupied)
                 {
+                    // Do not require a fresh LastSeen value here.
+                    // The Student client is the one uploading frames,
+                    // and a temporary dashboard heartbeat delay should
+                    // not cause us to delete the current frame.
                     await EnsureMonitoringStartedAsync(
-                        pc.PcId);
+                        item.PC.PcId);
                 }
                 else if (
                     _screenMonitoringStarted.Contains(
-                        pc.PcId))
+                        item.PC.PcId))
                 {
                     await StopMonitoringAsync(
-                        pc.PcId);
+                        item.PC.PcId);
                 }
             }
         }
-
-        // ==========================================================
-        // PC STATE
-        // ==========================================================
 
         private static bool IsPcOccupied(
             PCInfo pc)
@@ -242,25 +214,9 @@ namespace SmartLab.Client
                     StringComparison.OrdinalIgnoreCase);
         }
 
-        private static bool IsPcOnline(
-            PCInfo pc)
-        {
-            if (!pc.LastSeen.HasValue)
-            {
-                return false;
-            }
-
-            return
-                (DateTime.Now -
-                 pc.LastSeen.Value).TotalSeconds <= 10;
-        }
-
-        // ==========================================================
-        // START MONITORING
-        // ==========================================================
-
-        private async Task EnsureMonitoringStartedAsync(
-            int pcId)
+        private async Task
+            EnsureMonitoringStartedAsync(
+                int pcId)
         {
             if (_screenMonitoringStarted.Contains(
                 pcId))
@@ -283,16 +239,13 @@ namespace SmartLab.Client
             }
             catch
             {
-                // Try again during a later cycle.
+                // Retry on the next cycle.
             }
         }
 
-        // ==========================================================
-        // STOP MONITORING
-        // ==========================================================
-
-        private async Task StopMonitoringAsync(
-            int pcId)
+        private async Task
+            StopMonitoringAsync(
+                int pcId)
         {
             try
             {
@@ -306,6 +259,9 @@ namespace SmartLab.Client
                     _screenMonitoringStarted.Remove(
                         pcId);
 
+                    _screenVersions.Remove(
+                        pcId);
+
                     _latestScreenImages.Remove(
                         pcId);
 
@@ -315,32 +271,42 @@ namespace SmartLab.Client
             }
             catch
             {
-                // Try again during a later cycle.
+                // Retry on the next cycle.
             }
         }
 
         // ==========================================================
-        // DOWNLOAD ONE FRAME
+        // GET LATEST FRAME
         // ==========================================================
 
         private async Task
-            DownloadAndApplyOneFrameAsync(
+            RefreshOnePcFrameAsync(
                 Border card,
                 PCInfo pc)
         {
             try
             {
-                using CancellationTokenSource timeoutCts =
-                    new CancellationTokenSource(
-                        ScreenRequestTimeout);
+                ScreenFrameMetadata? metadata =
+                    await _httpClient
+                        .GetFromJsonAsync<
+                            ScreenFrameMetadata>(
+                                $"api/ScreenMonitor/{pc.PcId}/meta");
 
-                HttpResponseMessage response =
-                    await _httpClient.GetAsync(
-                        $"api/ScreenMonitor/{pc.PcId}",
-                        HttpCompletionOption.ResponseHeadersRead,
-                        timeoutCts.Token);
+                if (metadata == null)
+                {
+                    ApplyCachedScreenToCard(
+                        card,
+                        pc.PcId);
 
-                if (!response.IsSuccessStatusCode)
+                    return;
+                }
+
+                _screenVersions.TryGetValue(
+                    pc.PcId,
+                    out long knownVersion);
+
+                if (metadata.Version <=
+                    knownVersion)
                 {
                     ApplyCachedScreenToCard(
                         card,
@@ -350,16 +316,12 @@ namespace SmartLab.Client
                 }
 
                 byte[] imageBytes =
-                    await response.Content
-                        .ReadAsByteArrayAsync(
-                            timeoutCts.Token);
+                    await _httpClient.GetByteArrayAsync(
+                        $"api/ScreenMonitor/{pc.PcId}" +
+                        $"?version={knownVersion}");
 
                 if (imageBytes.Length == 0)
                 {
-                    ApplyCachedScreenToCard(
-                        card,
-                        pc.PcId);
-
                     return;
                 }
 
@@ -371,15 +333,13 @@ namespace SmartLab.Client
 
                 if (image == null)
                 {
-                    ApplyCachedScreenToCard(
-                        card,
-                        pc.PcId);
-
                     return;
                 }
 
-                _latestScreenImages[
-                    pc.PcId] =
+                _screenVersions[pc.PcId] =
+                    metadata.Version;
+
+                _latestScreenImages[pc.PcId] =
                     imageBytes;
 
                 ApplyScreenImage(
@@ -388,8 +348,7 @@ namespace SmartLab.Client
             }
             catch
             {
-                // A timeout/network hiccup must not freeze the
-                // refresh loop. Keep the last successful frame.
+                // Keep the previous good frame.
                 ApplyCachedScreenToCard(
                     card,
                     pc.PcId);
@@ -397,7 +356,7 @@ namespace SmartLab.Client
         }
 
         // ==========================================================
-        // DECODE OFF UI THREAD
+        // IMAGE DECODE
         // ==========================================================
 
         private static ImageSource?
@@ -434,18 +393,16 @@ namespace SmartLab.Client
         }
 
         // ==========================================================
-        // APPLY NEW FRAME
+        // DISPLAY NEW FRAME
         // ==========================================================
 
         private void ApplyScreenImage(
             int pcId,
             ImageSource imageSource)
         {
-            Image? imageControl = null;
-
             if (!_screenImageControls.TryGetValue(
                 pcId,
-                out imageControl))
+                out Image? imageControl))
             {
                 Border? card =
                     PcGrid.Children
@@ -493,7 +450,7 @@ namespace SmartLab.Client
         }
 
         // ==========================================================
-        // APPLY CACHED FRAME
+        // DISPLAY CACHED FRAME
         // ==========================================================
 
         private void ApplyCachedScreenToCard(
@@ -516,34 +473,9 @@ namespace SmartLab.Client
                 return;
             }
 
-            Border? monitorFrame =
-                FindMonitorFrame(card);
-
-            if (monitorFrame == null)
-            {
-                return;
-            }
-
-            Image imageControl =
-                new Image
-                {
-                    Source = image,
-
-                    Stretch =
-                        Stretch.UniformToFill,
-
-                    HorizontalAlignment =
-                        HorizontalAlignment.Stretch,
-
-                    VerticalAlignment =
-                        VerticalAlignment.Stretch
-                };
-
-            _screenImageControls[pcId] =
-                imageControl;
-
-            monitorFrame.Child =
-                imageControl;
+            ApplyScreenImage(
+                pcId,
+                image);
         }
 
         // ==========================================================
@@ -565,14 +497,16 @@ namespace SmartLab.Client
         }
 
         // ==========================================================
-        // RESULT-FREE IMPLEMENTATION
+        // VERSION METADATA MODEL
         // ==========================================================
-        //
-        // No Task.WhenAll here.
-        // No parallel image decode.
-        // No 500ms DispatcherTimer.
-        // One frame per cycle, with timeout.
-        //
-        // ==========================================================
+
+        private sealed class ScreenFrameMetadata
+        {
+            public int PcId { get; set; }
+
+            public long Version { get; set; }
+
+            public DateTime UpdatedAt { get; set; }
+        }
     }
 }
