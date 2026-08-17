@@ -8,22 +8,20 @@
 
   <ItemGroup>
 
-    <PackageReference Include="Microsoft.AspNetCore.Identity"
-                      Version="2.3.12" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.29" />
 
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer"
-                      Version="8.0.29" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity" Version="2.3.12" />
 
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools"
-                      Version="8.0.29">
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.29" />
+
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.29">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>
         runtime; build; native; contentfiles; analyzers; buildtransitive
       </IncludeAssets>
     </PackageReference>
 
-    <PackageReference Include="Swashbuckle.AspNetCore"
-                      Version="6.6.2" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
 
   </ItemGroup>
 

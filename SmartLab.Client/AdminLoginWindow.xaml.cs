@@ -10,14 +10,22 @@ namespace SmartLab.Client
     {
         private readonly HttpClient _httpClient;
 
+
         public AdminLoginWindow()
         {
             InitializeComponent();
 
             _httpClient = new HttpClient
             {
-                BaseAddress = new Uri("https://localhost:7277/")
+                BaseAddress =
+                    new Uri("https://localhost:7277/")
             };
+
+            // ==========================================
+            // APPLY EXISTING AUTH SESSION
+            // ==========================================
+
+            AuthSession.Apply(_httpClient);
         }
 
 
@@ -29,14 +37,21 @@ namespace SmartLab.Client
             object sender,
             RoutedEventArgs e)
         {
-            StatusText.Text = "Logging in...";
+            StatusText.Text =
+                "Logging in...";
+
             LoginButton.IsEnabled = false;
+
 
             var loginData = new
             {
-                username = UsernameTextBox.Text.Trim(),
-                password = PasswordBox.Password
+                username =
+                    UsernameTextBox.Text.Trim(),
+
+                password =
+                    PasswordBox.Password
             };
+
 
             try
             {
@@ -50,8 +65,10 @@ namespace SmartLab.Client
                         loginData
                     );
 
+
                 var responseText =
-                    await response.Content.ReadAsStringAsync();
+                    await response.Content
+                        .ReadAsStringAsync();
 
 
                 // ==========================================
@@ -64,6 +81,9 @@ namespace SmartLab.Client
                         "Invalid admin username or password.";
 
                     LoginButton.IsEnabled = true;
+
+                    AuthSession.Clear();
+
                     return;
                 }
 
@@ -73,7 +93,16 @@ namespace SmartLab.Client
                 // ==========================================
 
                 using JsonDocument json =
-                    JsonDocument.Parse(responseText);
+                    JsonDocument.Parse(
+                        responseText
+                    );
+
+
+                int userId =
+                    json.RootElement
+                        .GetProperty("userId")
+                        .GetInt32();
+
 
                 string username =
                     json.RootElement
@@ -81,9 +110,17 @@ namespace SmartLab.Client
                         .GetString()
                         ?? "";
 
+
                 string role =
                     json.RootElement
                         .GetProperty("role")
+                        .GetString()
+                        ?? "";
+
+
+                string token =
+                    json.RootElement
+                        .GetProperty("token")
                         .GetString()
                         ?? "";
 
@@ -100,8 +137,29 @@ namespace SmartLab.Client
                         "Access denied. Admin account required.";
 
                     LoginButton.IsEnabled = true;
+
+                    AuthSession.Clear();
+
                     return;
                 }
+
+
+                // ==========================================
+                // SAVE AUTHENTICATED SESSION
+                // ==========================================
+
+                AuthSession.SetSession(
+                    token,
+                    userId,
+                    username,
+                    role);
+
+
+                // ==========================================
+                // APPLY JWT TO HTTP CLIENT
+                // ==========================================
+
+                AuthSession.Apply(_httpClient);
 
 
                 // ==========================================
@@ -109,9 +167,17 @@ namespace SmartLab.Client
                 // ==========================================
 
                 AdminDashboard dashboard =
-                    new AdminDashboard(username);
+                    new AdminDashboard(
+                        username
+                    );
+
 
                 dashboard.Show();
+
+
+                // ==========================================
+                // CLOSE ADMIN LOGIN
+                // ==========================================
 
                 Close();
             }
@@ -121,6 +187,8 @@ namespace SmartLab.Client
                     $"Connection error: {ex.Message}";
 
                 LoginButton.IsEnabled = true;
+
+                AuthSession.Clear();
             }
         }
 

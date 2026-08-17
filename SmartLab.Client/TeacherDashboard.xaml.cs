@@ -47,6 +47,12 @@ namespace SmartLab.Client
                 BaseAddress = new Uri("https://localhost:7277/")
             };
 
+            // ==========================================
+            // AUTHENTICATED HTTP SESSION
+            // ==========================================
+
+            AuthSession.Apply(_httpClient);
+
             TeacherNameText.Text = $"Teacher: {_username}";
 
             _refreshTimer = new DispatcherTimer
@@ -617,6 +623,8 @@ namespace SmartLab.Client
             RoutedEventArgs e)
         {
             _refreshTimer.Stop();
+
+            AuthSession.Clear();
 
             MainWindow loginWindow =
                 new MainWindow();

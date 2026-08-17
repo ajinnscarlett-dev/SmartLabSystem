@@ -1,10 +1,12 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace SmartLab.Server.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize(Roles = "Admin")]
     public class ActivityLogController : ControllerBase
     {
         private readonly AppDbContext _context;
@@ -13,10 +15,6 @@ namespace SmartLab.Server.Controllers
         {
             _context = context;
         }
-
-        // ==========================================
-        // GET ALL ACTIVITY LOGS
-        // ==========================================
 
         [HttpGet]
         public async Task<IActionResult> GetActivityLogs()

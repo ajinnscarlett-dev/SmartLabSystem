@@ -94,6 +94,12 @@ namespace SmartLab.Client
                     )
             };
 
+            // ==========================================
+            // AUTHENTICATED HTTP SESSION
+            // ==========================================
+
+            AuthSession.Apply(_httpClient);
+
 
             // ==========================================
             // SCREEN CAPTURE SERVICE
@@ -593,6 +599,14 @@ namespace SmartLab.Client
                 // ==========================================
                 // OPEN LOGIN AGAIN
                 // ==========================================
+
+                // ==========================================
+                // CLEAR AUTHENTICATED SESSION
+                // ==========================================
+
+                AuthSession.Clear();
+
+
 
                 MainWindow loginWindow =
                     new MainWindow();

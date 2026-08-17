@@ -1,6 +1,7 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace SmartLab.Server.Controllers
 {
@@ -10,11 +11,15 @@ namespace SmartLab.Server.Controllers
     {
         private readonly AppDbContext _context;
         private readonly PasswordHasher<User> _passwordHasher;
+        private readonly AuthTokenService _tokenService;
 
-        public AuthController(AppDbContext context)
+        public AuthController(
+            AppDbContext context,
+            AuthTokenService tokenService)
         {
             _context = context;
             _passwordHasher = new PasswordHasher<User>();
+            _tokenService = tokenService;
         }
 
 
@@ -22,214 +27,227 @@ namespace SmartLab.Server.Controllers
         // LOGIN
         // =========================================================
 
+        [AllowAnonymous]
         [HttpPost("login")]
-        public async Task<IActionResult> Login([FromBody] LoginRequest request)
+        public async Task<IActionResult> Login(
+            [FromBody] LoginRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.Username) ||
                 string.IsNullOrWhiteSpace(request.Password))
             {
                 return BadRequest(new
                 {
-                    message = "Username and password are required."
+                    message =
+                        "Username and password are required."
                 });
             }
 
+            var user =
+                await _context.Users
+                    .FirstOrDefaultAsync(
+                        u => u.Username == request.Username);
 
-            // FIND USER
-            var user = await _context.Users
-                .FirstOrDefaultAsync(u => u.Username == request.Username);
-
-
-            // USER NOT FOUND
             if (user == null)
             {
-                // Log failed login attempt
-                var failedLog = new ActivityLog
-                {
-                    UserId = null,
-                    PCId = null,
-                    Action = "Login Failed",
-                    Details = $"Failed login attempt for username: {request.Username}",
-                    CreatedAt = DateTime.Now
-                };
+                _context.ActivityLogs.Add(
+                    new ActivityLog
+                    {
+                        UserId = null,
+                        PCId = null,
+                        Action = "Login Failed",
+                        Details =
+                            $"Failed login attempt for username: {request.Username}",
+                        CreatedAt = DateTime.Now
+                    });
 
-                _context.ActivityLogs.Add(failedLog);
                 await _context.SaveChangesAsync();
 
                 return Unauthorized(new
                 {
-                    message = "Invalid username or password."
+                    message =
+                        "Invalid username or password."
                 });
             }
 
+            PasswordVerificationResult result =
+                _passwordHasher.VerifyHashedPassword(
+                    user,
+                    user.PasswordHash,
+                    request.Password);
 
-            // VERIFY PASSWORD
-            var result = _passwordHasher.VerifyHashedPassword(
-                user,
-                user.PasswordHash,
-                request.Password
-            );
-
-
-            // WRONG PASSWORD
             if (result == PasswordVerificationResult.Failed)
             {
-                // Log failed login attempt
-                var failedLog = new ActivityLog
+                _context.ActivityLogs.Add(
+                    new ActivityLog
+                    {
+                        UserId = user.UserId,
+                        PCId = null,
+                        Action = "Login Failed",
+                        Details =
+                            $"Failed login attempt for user: {user.Username}",
+                        CreatedAt = DateTime.Now
+                    });
+
+                await _context.SaveChangesAsync();
+
+                return Unauthorized(new
+                {
+                    message =
+                        "Invalid username or password."
+                });
+            }
+
+            string token =
+                _tokenService.CreateToken(user);
+
+            _context.ActivityLogs.Add(
+                new ActivityLog
                 {
                     UserId = user.UserId,
                     PCId = null,
-                    Action = "Login Failed",
-                    Details = $"Failed login attempt for user: {user.Username}",
+                    Action = "Login",
+                    Details =
+                        $"User {user.Username} logged in successfully.",
                     CreatedAt = DateTime.Now
-                };
-
-                _context.ActivityLogs.Add(failedLog);
-                await _context.SaveChangesAsync();
-
-                return Unauthorized(new
-                {
-                    message = "Invalid username or password."
                 });
-            }
-
-
-            // =====================================================
-            // SUCCESSFUL LOGIN
-            // =====================================================
-
-            var loginLog = new ActivityLog
-            {
-                UserId = user.UserId,
-                PCId = null,
-                Action = "Login",
-                Details = $"User {user.Username} logged in successfully.",
-                CreatedAt = DateTime.Now
-            };
-
-            _context.ActivityLogs.Add(loginLog);
 
             await _context.SaveChangesAsync();
 
+            return Ok(
+                new
+                {
+                    message =
+                        "Login successful!",
 
-            return Ok(new
-            {
-                message = "Login successful!",
-                userId = user.UserId,
-                username = user.Username,
-                role = user.Role
-            });
+                    token,
+
+                    expiresInHours = 8,
+
+                    userId =
+                        user.UserId,
+
+                    username =
+                        user.Username,
+
+                    role =
+                        user.Role
+                });
         }
 
 
         // =========================================================
         // REGISTER
         // =========================================================
+        //
+        // Public registration is intentionally limited to Student.
+        // Admin/Teacher accounts must be created through the
+        // protected UserController after authentication is added.
+        //
 
+        [AllowAnonymous]
         [HttpPost("register")]
-        public async Task<IActionResult> Register([FromBody] RegisterRequest request)
+        public async Task<IActionResult> Register(
+            [FromBody] RegisterRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.Username) ||
                 string.IsNullOrWhiteSpace(request.Password))
             {
                 return BadRequest(new
                 {
-                    message = "Username and password are required."
+                    message =
+                        "Username and password are required."
                 });
             }
 
-
-            // CHECK EXISTING USER
-            var existingUser = await _context.Users
-                .FirstOrDefaultAsync(u => u.Username == request.Username);
-
+            var existingUser =
+                await _context.Users
+                    .FirstOrDefaultAsync(
+                        u => u.Username == request.Username);
 
             if (existingUser != null)
             {
                 return Conflict(new
                 {
-                    message = "Username already exists."
+                    message =
+                        "Username already exists."
                 });
             }
 
+            var user =
+                new User
+                {
+                    Username =
+                        request.Username.Trim(),
 
-            // CREATE USER
-            var user = new User
-            {
-                Username = request.Username,
+                    Role = "Student",
 
-                Role = string.IsNullOrWhiteSpace(request.Role)
-                    ? "Student"
-                    : request.Role,
+                    CreatedAt =
+                        DateTime.Now
+                };
 
-                CreatedAt = DateTime.Now
-            };
+            user.PasswordHash =
+                _passwordHasher.HashPassword(
+                    user,
+                    request.Password);
 
-
-            // HASH PASSWORD
-            user.PasswordHash = _passwordHasher.HashPassword(
-                user,
-                request.Password
-            );
-
-
-            // SAVE USER
             _context.Users.Add(user);
 
             await _context.SaveChangesAsync();
 
-
-            // =====================================================
-            // ACTIVITY LOG - REGISTRATION
-            // =====================================================
-
-            var registrationLog = new ActivityLog
-            {
-                UserId = user.UserId,
-                PCId = null,
-                Action = "Registration",
-                Details = $"New {user.Role} account created: {user.Username}",
-                CreatedAt = DateTime.Now
-            };
-
-            _context.ActivityLogs.Add(registrationLog);
+            _context.ActivityLogs.Add(
+                new ActivityLog
+                {
+                    UserId = user.UserId,
+                    PCId = null,
+                    Action = "Registration",
+                    Details =
+                        $"New Student account created: {user.Username}",
+                    CreatedAt = DateTime.Now
+                });
 
             await _context.SaveChangesAsync();
 
+            return Ok(
+                new
+                {
+                    message =
+                        "Registration successful!",
 
-            return Ok(new
-            {
-                message = "Registration successful!",
-                userId = user.UserId,
-                username = user.Username,
-                role = user.Role
-            });
+                    userId =
+                        user.UserId,
+
+                    username =
+                        user.Username,
+
+                    role =
+                        user.Role
+                });
         }
     }
 
 
-    // =============================================================
-    // LOGIN REQUEST
-    // =============================================================
-
     public class LoginRequest
     {
-        public string Username { get; set; } = string.Empty;
+        public string Username { get; set; } =
+            string.Empty;
 
-        public string Password { get; set; } = string.Empty;
+        public string Password { get; set; } =
+            string.Empty;
     }
 
 
-    // =============================================================
-    // REGISTER REQUEST
-    // =============================================================
-
     public class RegisterRequest
     {
-        public string Username { get; set; } = string.Empty;
+        public string Username { get; set; } =
+            string.Empty;
 
-        public string Password { get; set; } = string.Empty;
+        public string Password { get; set; } =
+            string.Empty;
 
-        public string Role { get; set; } = "Student";
+        // Kept for compatibility with the existing client.
+        // Server intentionally ignores this value and always
+        // creates public registrations as Student.
+        public string Role { get; set; } =
+            "Student";
     }
 }

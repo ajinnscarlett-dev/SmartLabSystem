@@ -1,10 +1,12 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace SmartLab.Server.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize(Roles = "Admin")]
     public class AdminServiceDeskController : ControllerBase
     {
         private readonly AppDbContext _context;
@@ -13,10 +15,6 @@ namespace SmartLab.Server.Controllers
         {
             _context = context;
         }
-
-        // ==========================================
-        // GET ACTIVE TEACHER SERVICE DESK TICKETS
-        // ==========================================
 
         [HttpGet]
         public async Task<IActionResult> GetAllTickets()
@@ -48,11 +46,6 @@ namespace SmartLab.Server.Controllers
             return Ok(tickets);
         }
 
-
-        // ==========================================
-        // RESPOND / RESOLVE
-        // ==========================================
-
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateTicket(
             int id,
@@ -82,11 +75,6 @@ namespace SmartLab.Server.Controllers
                 });
             }
 
-
-            // ==========================================
-            // STORE MIS RESPONSE
-            // ==========================================
-
             ticket.ResolutionNotes =
                 request.Message.Trim();
 
@@ -95,11 +83,6 @@ namespace SmartLab.Server.Controllers
                     request.AssignedToUsername)
                     ? null
                     : request.AssignedToUsername.Trim();
-
-
-            // ==========================================
-            // RESPOND / IN PROGRESS
-            // ==========================================
 
             if (!request.Resolved)
             {
@@ -113,12 +96,6 @@ namespace SmartLab.Server.Controllers
 
                 ticket.ResolvedAt = null;
             }
-
-
-            // ==========================================
-            // RESOLVE
-            // ==========================================
-
             else
             {
                 ticket.Status = "Resolved";
@@ -133,9 +110,7 @@ namespace SmartLab.Server.Controllers
                     DateTime.Now;
             }
 
-
             await _context.SaveChangesAsync();
-
 
             return Ok(new
             {
@@ -150,11 +125,6 @@ namespace SmartLab.Server.Controllers
             });
         }
     }
-
-
-    // ==========================================
-    // SERVICE DESK UPDATE REQUEST
-    // ==========================================
 
     public class ServiceDeskUpdateRequest
     {

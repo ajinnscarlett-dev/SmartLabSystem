@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -6,6 +7,7 @@ namespace SmartLab.Server.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize(Roles = "Admin")]
     public class UserController : ControllerBase
     {
         private readonly AppDbContext _context;
@@ -16,11 +18,6 @@ namespace SmartLab.Server.Controllers
             _context = context;
             _passwordHasher = new PasswordHasher<User>();
         }
-
-
-        // ==========================================
-        // GET ALL USERS
-        // ==========================================
 
         [HttpGet]
         public async Task<IActionResult> GetUsers()
@@ -38,11 +35,6 @@ namespace SmartLab.Server.Controllers
 
             return Ok(users);
         }
-
-
-        // ==========================================
-        // GET ONE USER
-        // ==========================================
 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetUser(int id)
@@ -69,11 +61,6 @@ namespace SmartLab.Server.Controllers
             return Ok(user);
         }
 
-
-        // ==========================================
-        // ADD USER
-        // ==========================================
-
         [HttpPost]
         public async Task<IActionResult> AddUser(
             [FromBody] CreateUserRequest request)
@@ -87,11 +74,6 @@ namespace SmartLab.Server.Controllers
             string role =
                 request.Role?.Trim() ?? "Student";
 
-
-            // ==========================================
-            // VALIDATE USERNAME
-            // ==========================================
-
             if (string.IsNullOrWhiteSpace(username))
             {
                 return BadRequest(new
@@ -99,11 +81,6 @@ namespace SmartLab.Server.Controllers
                     message = "Username is required."
                 });
             }
-
-
-            // ==========================================
-            // VALIDATE PASSWORD
-            // ==========================================
 
             if (string.IsNullOrWhiteSpace(password))
             {
@@ -121,11 +98,6 @@ namespace SmartLab.Server.Controllers
                         "Password must be at least 6 characters."
                 });
             }
-
-
-            // ==========================================
-            // VALIDATE ROLE
-            // ==========================================
 
             if (!role.Equals(
                     "Student",
@@ -146,8 +118,6 @@ namespace SmartLab.Server.Controllers
                 });
             }
 
-
-            // Normalize role
             if (role.Equals(
                     "Admin",
                     StringComparison.OrdinalIgnoreCase))
@@ -165,11 +135,6 @@ namespace SmartLab.Server.Controllers
                 role = "Student";
             }
 
-
-            // ==========================================
-            // CHECK DUPLICATE USERNAME
-            // ==========================================
-
             bool usernameExists =
                 await _context.Users.AnyAsync(
                     u => u.Username.ToLower() ==
@@ -184,11 +149,6 @@ namespace SmartLab.Server.Controllers
                 });
             }
 
-
-            // ==========================================
-            // CREATE USER
-            // ==========================================
-
             var user = new User
             {
                 Username = username,
@@ -196,25 +156,14 @@ namespace SmartLab.Server.Controllers
                 CreatedAt = DateTime.Now
             };
 
-
-            // ==========================================
-            // HASH PASSWORD
-            // ==========================================
-
             user.PasswordHash =
                 _passwordHasher.HashPassword(
                     user,
                     password);
 
-
             _context.Users.Add(user);
 
             await _context.SaveChangesAsync();
-
-
-            // ==========================================
-            // ACTIVITY LOG
-            // ==========================================
 
             _context.ActivityLogs.Add(
                 new ActivityLog
@@ -229,11 +178,6 @@ namespace SmartLab.Server.Controllers
 
             await _context.SaveChangesAsync();
 
-
-            // ==========================================
-            // RESPONSE
-            // ==========================================
-
             return Ok(new
             {
                 message = "User added successfully.",
@@ -244,11 +188,6 @@ namespace SmartLab.Server.Controllers
             });
         }
 
-
-        // ==========================================
-        // CHANGE USER ROLE
-        // ==========================================
-
         [HttpPut("{id}/role")]
         public async Task<IActionResult> ChangeRole(
             int id,
@@ -256,11 +195,6 @@ namespace SmartLab.Server.Controllers
         {
             string newRole =
                 request.Role?.Trim() ?? string.Empty;
-
-
-            // ==========================================
-            // VALIDATE ROLE
-            // ==========================================
 
             if (!newRole.Equals(
                     "Student",
@@ -281,8 +215,6 @@ namespace SmartLab.Server.Controllers
                 });
             }
 
-
-            // Normalize role
             if (newRole.Equals(
                     "Admin",
                     StringComparison.OrdinalIgnoreCase))
@@ -300,11 +232,6 @@ namespace SmartLab.Server.Controllers
                 newRole = "Student";
             }
 
-
-            // ==========================================
-            // FIND USER
-            // ==========================================
-
             var user =
                 await _context.Users
                     .FirstOrDefaultAsync(
@@ -318,11 +245,6 @@ namespace SmartLab.Server.Controllers
                 });
             }
 
-
-            // ==========================================
-            // NO CHANGE
-            // ==========================================
-
             if (user.Role.Equals(
                     newRole,
                     StringComparison.OrdinalIgnoreCase))
@@ -334,22 +256,11 @@ namespace SmartLab.Server.Controllers
                 });
             }
 
-
             string oldRole = user.Role;
-
-
-            // ==========================================
-            // UPDATE ROLE
-            // ==========================================
 
             user.Role = newRole;
 
             await _context.SaveChangesAsync();
-
-
-            // ==========================================
-            // ACTIVITY LOG
-            // ==========================================
 
             _context.ActivityLogs.Add(
                 new ActivityLog
@@ -364,7 +275,6 @@ namespace SmartLab.Server.Controllers
 
             await _context.SaveChangesAsync();
 
-
             return Ok(new
             {
                 message =
@@ -375,11 +285,6 @@ namespace SmartLab.Server.Controllers
             });
         }
 
-
-        // ==========================================
-        // RESET PASSWORD
-        // ==========================================
-
         [HttpPut("{id}/password")]
         public async Task<IActionResult> ResetPassword(
             int id,
@@ -387,11 +292,6 @@ namespace SmartLab.Server.Controllers
         {
             string newPassword =
                 request.NewPassword ?? string.Empty;
-
-
-            // ==========================================
-            // VALIDATE PASSWORD
-            // ==========================================
 
             if (string.IsNullOrWhiteSpace(newPassword))
             {
@@ -411,11 +311,6 @@ namespace SmartLab.Server.Controllers
                 });
             }
 
-
-            // ==========================================
-            // FIND USER
-            // ==========================================
-
             var user =
                 await _context.Users
                     .FirstOrDefaultAsync(
@@ -429,23 +324,12 @@ namespace SmartLab.Server.Controllers
                 });
             }
 
-
-            // ==========================================
-            // HASH NEW PASSWORD
-            // ==========================================
-
             user.PasswordHash =
                 _passwordHasher.HashPassword(
                     user,
                     newPassword);
 
-
             await _context.SaveChangesAsync();
-
-
-            // ==========================================
-            // ACTIVITY LOG
-            // ==========================================
 
             _context.ActivityLogs.Add(
                 new ActivityLog
@@ -460,7 +344,6 @@ namespace SmartLab.Server.Controllers
 
             await _context.SaveChangesAsync();
 
-
             return Ok(new
             {
                 message =
@@ -470,11 +353,6 @@ namespace SmartLab.Server.Controllers
             });
         }
     }
-
-
-    // ==========================================
-    // CREATE USER REQUEST
-    // ==========================================
 
     public class CreateUserRequest
     {
@@ -488,21 +366,11 @@ namespace SmartLab.Server.Controllers
             "Student";
     }
 
-
-    // ==========================================
-    // CHANGE ROLE REQUEST
-    // ==========================================
-
     public class ChangeRoleRequest
     {
         public string Role { get; set; } =
             string.Empty;
     }
-
-
-    // ==========================================
-    // RESET PASSWORD REQUEST
-    // ==========================================
 
     public class ResetPasswordRequest
     {

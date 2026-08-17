@@ -26,6 +26,15 @@ namespace SmartLab.Client
                     new Uri("https://localhost:7277/")
             };
 
+            // ==========================================
+            // AUTH SESSION
+            // ==========================================
+            // If a token already exists, attach it.
+            // Login itself is allowed anonymously, so
+            // this does not prevent the login request.
+
+            AuthSession.Apply(_httpClient);
+
 
             // ==========================================
             // GET THIS COMPUTER'S SMARTLAB PC NUMBER
@@ -110,7 +119,7 @@ namespace SmartLab.Client
 
 
         // ==========================================
-        // STUDENT LOGIN
+        // STUDENT / TEACHER / ADMIN LOGIN
         // ==========================================
 
         private async void LoginButton_Click(
@@ -193,6 +202,35 @@ namespace SmartLab.Client
 
 
                 // ==========================================
+                // GET JWT TOKEN
+                // ==========================================
+
+                string token =
+                    json.RootElement
+                        .GetProperty("token")
+                        .GetString()
+                        ?? "";
+
+
+                // ==========================================
+                // SAVE AUTHENTICATED SESSION
+                // ==========================================
+
+                AuthSession.SetSession(
+                    token,
+                    userId,
+                    username,
+                    role);
+
+
+                // ==========================================
+                // ATTACH JWT TO FUTURE API REQUESTS
+                // ==========================================
+
+                AuthSession.Apply(_httpClient);
+
+
+                // ==========================================
                 // STUDENT LOGIN
                 // ==========================================
 
@@ -251,6 +289,9 @@ namespace SmartLab.Client
                                 $"Unable to login to {_pcNumber}.";
                         }
 
+
+                        // Clear the token if PC login failed.
+                        AuthSession.Clear();
 
                         return;
                     }
@@ -312,7 +353,7 @@ namespace SmartLab.Client
 
 
                 // ==========================================
-                // ADMIN LOGIN
+                // TEACHER LOGIN
                 // ==========================================
 
                 else if (role.Equals(
@@ -325,7 +366,9 @@ namespace SmartLab.Client
                             userId
                         );
 
+
                     dashboard.Show();
+
 
                     Close();
                 }
@@ -374,6 +417,10 @@ namespace SmartLab.Client
             {
                 StatusText.Text =
                     $"Connection error: {ex.Message}";
+
+                // If login/session setup fails,
+                // don't leave an old token around.
+                AuthSession.Clear();
             }
         }
 

@@ -30,6 +30,12 @@ namespace SmartLab.Client
                 BaseAddress = new Uri("https://localhost:7277/")
             };
 
+            // ==========================================
+            // AUTHENTICATED HTTP SESSION
+            // ==========================================
+
+            AuthSession.Apply(_httpClient);
+
             AdminNameText.Text = username;
 
             // ==========================================
@@ -3661,8 +3667,16 @@ namespace SmartLab.Client
         {
             _refreshTimer.Stop();
 
+
+
+            // ==========================================
+            // CLEAR AUTHENTICATED SESSION
+            // ==========================================
+
+            AuthSession.Clear();
+
             MainWindow loginWindow =
-                new MainWindow();
+                            new MainWindow();
 
             loginWindow.Show();
 
