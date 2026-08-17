@@ -11,25 +11,15 @@ using System.Windows.Threading;
 namespace SmartLab.Client
 {
     // ==========================================================
-    // ADMIN DASHBOARD - COMLAB SELECTOR / FILTER REFRESH FIX
+    // ADMIN DASHBOARD - COMLAB SELECTOR / FILTER REFRESH
     // ==========================================================
     //
-    // This is a PARTIAL class.
+    // This partial class owns the laboratory refresh timer.
     //
-    // IMPORTANT:
-    // Replace the previous AdminDashboard.Laboratory.cs with this
-    // version.
-    //
-    // Main fix:
-    // The original AdminDashboard has its own 5-second timer that
-    // calls LoadPCs() and briefly redraws ALL PCs. That caused the
-    // selected laboratory to blink when switching to an empty lab.
-    //
-    // This file takes control of the refresh timer:
-    // - Stop the original dashboard timer.
-    // - Use one refresh timer owned by this partial class.
-    // - Refresh the selected laboratory only.
-    // - When "All Laboratories" is selected, refresh all PCs.
+    // Important live-screen fix:
+    // The PC grid is NOT rebuilt every 5 seconds when the PC set/state
+    // has not changed. This prevents the actual screen thumbnail from
+    // disappearing and being replaced by the green placeholder.
     //
     // ==========================================================
 
@@ -45,9 +35,10 @@ namespace SmartLab.Client
 
         private bool _laboratoryRefreshInProgress;
 
-        // ==========================================================
-        // CLASS LOADED HANDLER
-        // ==========================================================
+        // Last state that was actually rendered into the PC grid.
+        private readonly Dictionary<int, string>
+            _lastRenderedPcStates =
+                new Dictionary<int, string>();
 
         static AdminDashboard()
         {
@@ -71,6 +62,9 @@ namespace SmartLab.Client
                 DispatcherPriority.Background,
                 new Action(async () =>
                 {
+                    dashboard.InitializePcSidebar();
+                    dashboard.InitializeScreenMonitoring();
+
                     await dashboard.AttachLaboratorySelectorAsync();
                 }));
         }
@@ -98,16 +92,6 @@ namespace SmartLab.Client
             }
 
             _laboratorySelectorAttached = true;
-
-            // ------------------------------------------------------
-            // Take control of refresh.
-            // The original timer is inside AdminDashboard.xaml.cs
-            // and cannot be detached because its lambda handler has
-            // no stored delegate reference.
-            //
-            // Stopping the original timer prevents it from
-            // repainting all PCs while a laboratory is selected.
-            // ------------------------------------------------------
 
             _refreshTimer.Stop();
 
@@ -214,8 +198,6 @@ namespace SmartLab.Client
                         laboratory);
                 }
 
-                // Keep the current dashboard's initial lab:
-                // ComLab 601.
                 LaboratorySelectorItem?
                     comlab601 =
                         laboratories.FirstOrDefault(
@@ -276,13 +258,13 @@ namespace SmartLab.Client
             _selectedLaboratoryId =
                 selectedLaboratory.LaboratoryId;
 
+            _lastRenderedPcStates.Clear();
+
             if (_laboratoryRefreshTimer == null)
             {
                 return;
             }
 
-            // Avoid overlapping refreshes while the selected
-            // laboratory is being changed.
             if (_laboratoryRefreshInProgress)
             {
                 return;
@@ -300,7 +282,7 @@ namespace SmartLab.Client
         }
 
         // ==========================================================
-        // OUR SINGLE REFRESH TIMER
+        // REFRESH TIMER
         // ==========================================================
 
         private async void
@@ -417,14 +399,61 @@ namespace SmartLab.Client
         }
 
         // ==========================================================
+        // CHECK WHETHER THE GRID REALLY NEEDS REBUILDING
+        // ==========================================================
+
+        private bool NeedsPcGridRebuild(
+            List<PCInfo> pcs)
+        {
+            if (_lastRenderedPcStates.Count !=
+                pcs.Count)
+            {
+                return true;
+            }
+
+            foreach (PCInfo pc in pcs)
+            {
+                string state =
+                    BuildPcRenderState(pc);
+
+                if (!_lastRenderedPcStates.TryGetValue(
+                        pc.PcId,
+                        out string? previousState))
+                {
+                    return true;
+                }
+
+                if (!string.Equals(
+                        previousState,
+                        state,
+                        StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static string BuildPcRenderState(
+            PCInfo pc)
+        {
+            return string.Join(
+                "|",
+                pc.PcId,
+                pc.PcNumber,
+                pc.Status,
+                pc.CurrentUserId?.ToString() ?? "",
+                pc.IsEnabled);
+        }
+
+        // ==========================================================
         // RENDER PC GRID
         // ==========================================================
 
         private void RenderFilteredPCGrid(
             List<PCInfo> pcs)
         {
-            PcGrid.Children.Clear();
-
             int occupied = 0;
             int available = 0;
             int maintenance = 0;
@@ -467,9 +496,37 @@ namespace SmartLab.Client
                 {
                     offline++;
                 }
+            }
 
-                PcGrid.Children.Add(
-                    CreatePcCard(pc));
+            // ------------------------------------------------------
+            // IMPORTANT:
+            // Do not clear/rebuild the visual tree if only LastSeen
+            // changed. The live screenshot remains inside the card.
+            // ------------------------------------------------------
+
+            bool rebuild =
+                NeedsPcGridRebuild(pcs);
+
+            if (rebuild)
+            {
+                PcGrid.Children.Clear();
+
+                foreach (PCInfo pc in pcs)
+                {
+                    Border card =
+                        CreatePcCard(pc);
+
+                    PcGrid.Children.Add(card);
+
+                    // Re-apply cached screenshot immediately after
+                    // the card is recreated.
+                    ApplyCachedScreenToCard(
+                        card,
+                        pc.PcId);
+
+                    _lastRenderedPcStates[pc.PcId] =
+                        BuildPcRenderState(pc);
+                }
             }
 
             TotalPcText.Text =

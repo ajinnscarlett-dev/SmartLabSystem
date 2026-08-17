@@ -1,4 +1,7 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using System.Collections.Concurrent;
 
 namespace SmartLab.Server.Controllers
@@ -7,131 +10,128 @@ namespace SmartLab.Server.Controllers
     [Route("api/[controller]")]
     public class ScreenMonitorController : ControllerBase
     {
-        // ==========================================
-        // LATEST SCREEN FRAME PER PC
-        // ==========================================
+        private readonly AppDbContext _context;
 
         private static readonly ConcurrentDictionary<int, byte[]>
             LatestScreens = new();
 
-
-        // ==========================================
-        // MONITORING STATE PER PC
-        // ==========================================
-
         private static readonly ConcurrentDictionary<int, bool>
             MonitoringStates = new();
 
+        public ScreenMonitorController(
+            AppDbContext context)
+        {
+            _context = context;
+        }
 
-        // ==========================================
+        // ==========================================================
         // GET MONITORING STATUS
+        // ==========================================================
         //
-        // GET:
-        // api/ScreenMonitor/{pcId}/status
-        // ==========================================
+        // Admin / Teacher can query any PC.
+        // Student can query only the PC currently assigned
+        // to that authenticated student.
+        //
+        // The Student client needs this endpoint to know when
+        // it should start uploading screenshots.
+        // ==========================================================
 
+        [Authorize(Roles = "Admin,Teacher,Student")]
         [HttpGet("{pcId}/status")]
-        public IActionResult GetMonitoringStatus(
+        public async Task<IActionResult> GetMonitoringStatus(
             int pcId)
         {
+            if (!await CanStudentAccessPcAsync(pcId))
+            {
+                return Forbid();
+            }
+
             bool enabled =
                 MonitoringStates.TryGetValue(
                     pcId,
-                    out bool state
-                ) && state;
-
+                    out bool state) && state;
 
             return Ok(new
             {
-                pcId = pcId,
+                pcId,
                 monitoring = enabled
             });
         }
 
-
-        // ==========================================
+        // ==========================================================
         // START MONITORING
+        // ==========================================================
         //
-        // POST:
-        // api/ScreenMonitor/{pcId}/start
-        // ==========================================
+        // Only Admin / Teacher can start monitoring.
+        // ==========================================================
 
+        [Authorize(Roles = "Admin,Teacher")]
         [HttpPost("{pcId}/start")]
         public IActionResult StartMonitoring(
             int pcId)
         {
             MonitoringStates[pcId] = true;
 
-
             return Ok(new
             {
                 message =
                     "Screen monitoring started.",
 
-                pcId = pcId,
-
+                pcId,
                 monitoring = true
             });
         }
 
-
-        // ==========================================
+        // ==========================================================
         // STOP MONITORING
+        // ==========================================================
         //
-        // POST:
-        // api/ScreenMonitor/{pcId}/stop
-        // ==========================================
+        // Only Admin / Teacher can stop monitoring.
+        // ==========================================================
 
+        [Authorize(Roles = "Admin,Teacher")]
         [HttpPost("{pcId}/stop")]
         public IActionResult StopMonitoring(
             int pcId)
         {
             MonitoringStates[pcId] = false;
 
-
-            // Remove latest screen frame.
-
             LatestScreens.TryRemove(
                 pcId,
-                out _
-            );
-
+                out _);
 
             return Ok(new
             {
                 message =
                     "Screen monitoring stopped.",
 
-                pcId = pcId,
-
+                pcId,
                 monitoring = false
             });
         }
 
-
-        // ==========================================
+        // ==========================================================
         // UPLOAD SCREEN
+        // ==========================================================
         //
-        // POST:
-        // api/ScreenMonitor/{pcId}
-        //
-        // Receives RAW JPEG bytes.
-        // ==========================================
+        // Student clients upload only their own assigned PC.
+        // Admin / Teacher are NOT allowed to upload here.
+        // ==========================================================
 
+        [Authorize(Roles = "Student")]
         [HttpPost("{pcId}")]
         public async Task<IActionResult> UploadScreen(
             int pcId)
         {
-            // ==========================================
-            // CHECK MONITORING
-            // ==========================================
+            if (!await CanStudentAccessPcAsync(pcId))
+            {
+                return Forbid();
+            }
 
             bool enabled =
                 MonitoringStates.TryGetValue(
                     pcId,
-                    out bool state
-                ) && state;
-
+                    out bool state) && state;
 
             if (!enabled)
             {
@@ -141,14 +141,8 @@ namespace SmartLab.Server.Controllers
                     {
                         message =
                             "Screen monitoring is not enabled."
-                    }
-                );
+                    });
             }
-
-
-            // ==========================================
-            // CHECK REQUEST BODY
-            // ==========================================
 
             if (Request.ContentLength == 0)
             {
@@ -159,27 +153,14 @@ namespace SmartLab.Server.Controllers
                 });
             }
 
-
-            // ==========================================
-            // READ RAW IMAGE
-            // ==========================================
-
             using MemoryStream stream =
                 new MemoryStream();
 
-
             await Request.Body.CopyToAsync(
-                stream
-            );
-
+                stream);
 
             byte[] image =
                 stream.ToArray();
-
-
-            // ==========================================
-            // VALIDATE IMAGE
-            // ==========================================
 
             if (image.Length == 0)
             {
@@ -190,34 +171,27 @@ namespace SmartLab.Server.Controllers
                 });
             }
 
-
-            // ==========================================
-            // STORE LATEST SCREEN
-            // ==========================================
-
             LatestScreens[pcId] =
                 image;
-
 
             return Ok(new
             {
                 message =
                     "Screen uploaded successfully.",
 
-                pcId = pcId,
-
+                pcId,
                 size = image.Length
             });
         }
 
-
-        // ==========================================
+        // ==========================================================
         // GET LATEST SCREEN
+        // ==========================================================
         //
-        // GET:
-        // api/ScreenMonitor/{pcId}
-        // ==========================================
+        // Admin / Teacher only.
+        // ==========================================================
 
+        [Authorize(Roles = "Admin,Teacher")]
         [HttpGet("{pcId}")]
         public IActionResult GetScreen(
             int pcId)
@@ -233,42 +207,101 @@ namespace SmartLab.Server.Controllers
                 });
             }
 
-
             return File(
                 image,
-                "image/jpeg"
-            );
+                "image/jpeg");
         }
 
-
-        // ==========================================
+        // ==========================================================
         // REMOVE SCREEN DATA
+        // ==========================================================
         //
-        // DELETE:
-        // api/ScreenMonitor/{pcId}
-        // ==========================================
+        // Admin / Teacher can remove any PC's screen.
+        // Student can remove only their own PC's screen.
+        //
+        // This keeps the existing Student logout cleanup working.
+        // ==========================================================
 
+        [Authorize(Roles = "Admin,Teacher,Student")]
         [HttpDelete("{pcId}")]
-        public IActionResult RemoveScreen(
+        public async Task<IActionResult> RemoveScreen(
             int pcId)
         {
+            if (!await CanStudentAccessPcAsync(pcId))
+            {
+                return Forbid();
+            }
+
             LatestScreens.TryRemove(
                 pcId,
-                out _
-            );
+                out _);
 
-
-            MonitoringStates[pcId] =
-                false;
-
+            // A Student clearing their own screen data should
+            // not control whether Admin monitoring is enabled.
+            //
+            // Admin / Teacher stop-monitoring endpoint is the
+            // authoritative switch.
+            if (User.IsInRole("Admin") ||
+                User.IsInRole("Teacher"))
+            {
+                MonitoringStates[pcId] = false;
+            }
 
             return Ok(new
             {
                 message =
                     "Screen monitoring data removed.",
 
-                pcId = pcId
+                pcId
             });
+        }
+
+        // ==========================================================
+        // STUDENT ACCESS CHECK
+        // ==========================================================
+        //
+        // Admin / Teacher:
+        //     allowed for every PC.
+        //
+        // Student:
+        //     allowed only when the PC's CurrentUserId is the
+        //     authenticated student's UserId.
+        // ==========================================================
+
+        private async Task<bool> CanStudentAccessPcAsync(
+            int pcId)
+        {
+            if (User.IsInRole("Admin") ||
+                User.IsInRole("Teacher"))
+            {
+                return true;
+            }
+
+            if (!User.IsInRole("Student"))
+            {
+                return false;
+            }
+
+            string? claimUserId =
+                User.FindFirst(
+                    ClaimTypes.NameIdentifier)
+                ?.Value;
+
+            if (!int.TryParse(
+                claimUserId,
+                out int authenticatedUserId))
+            {
+                return false;
+            }
+
+            return await _context.PCs
+                .AsNoTracking()
+                .AnyAsync(
+                    pc =>
+                        pc.PCId == pcId &&
+                        pc.CurrentUserId ==
+                            authenticatedUserId &&
+                        pc.IsEnabled);
         }
     }
 }
