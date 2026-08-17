@@ -14,7 +14,6 @@ namespace SmartLab.Server.Controllers
             _context = context;
         }
 
-
         // ==========================================
         // ACTIVITY LOG HELPER
         // ==========================================
@@ -35,10 +34,8 @@ namespace SmartLab.Server.Controllers
             };
 
             _context.ActivityLogs.Add(log);
-
             await _context.SaveChangesAsync();
         }
-
 
         // ==========================================
         // GET ALL PCs
@@ -49,6 +46,7 @@ namespace SmartLab.Server.Controllers
         {
             var pcs = await _context.PCs
                 .Include(p => p.CurrentUser)
+                .Include(p => p.Laboratory)
                 .OrderBy(p => p.PCId)
                 .Select(p => new
                 {
@@ -61,6 +59,14 @@ namespace SmartLab.Server.Controllers
                         ? p.CurrentUser.Username
                         : null,
 
+                    p.LaboratoryId,
+
+                    LaboratoryName = p.Laboratory != null
+                        ? p.Laboratory.LabName
+                        : null,
+
+                    p.MACAddress,
+                    p.IPAddress,
                     p.LastSeen,
                     p.IsEnabled,
                     p.MaintenanceReason,
@@ -71,7 +77,59 @@ namespace SmartLab.Server.Controllers
             return Ok(pcs);
         }
 
+        // ==========================================
+        // GET PCs BY LABORATORY
+        // ==========================================
 
+        [HttpGet("laboratory/{laboratoryId}")]
+        public async Task<IActionResult> GetPCsByLaboratory(
+            int laboratoryId)
+        {
+            var laboratory = await _context.Laboratories
+                .FirstOrDefaultAsync(l =>
+                    l.LaboratoryId == laboratoryId);
+
+            if (laboratory == null)
+            {
+                return NotFound(new
+                {
+                    message = "Laboratory not found."
+                });
+            }
+
+            var pcs = await _context.PCs
+                .Include(p => p.CurrentUser)
+                .Include(p => p.Laboratory)
+                .Where(p => p.LaboratoryId == laboratoryId)
+                .OrderBy(p => p.PCNumber)
+                .Select(p => new
+                {
+                    p.PCId,
+                    p.PCNumber,
+                    p.Status,
+                    p.CurrentUserId,
+
+                    Username = p.CurrentUser != null
+                        ? p.CurrentUser.Username
+                        : null,
+
+                    p.LaboratoryId,
+
+                    LaboratoryName = p.Laboratory != null
+                        ? p.Laboratory.LabName
+                        : null,
+
+                    p.MACAddress,
+                    p.IPAddress,
+                    p.LastSeen,
+                    p.IsEnabled,
+                    p.MaintenanceReason,
+                    p.MaintenanceStarted
+                })
+                .ToListAsync();
+
+            return Ok(pcs);
+        }
 
         // ==========================================
         // ADD NEW PC
@@ -92,10 +150,37 @@ namespace SmartLab.Server.Controllers
                 });
             }
 
+            // ==========================================
+            // VALIDATE LABORATORY IF PROVIDED
+            // ==========================================
+
+            Laboratory? laboratory = null;
+
+            if (request.LaboratoryId.HasValue)
+            {
+                laboratory = await _context.Laboratories
+                    .FirstOrDefaultAsync(l =>
+                        l.LaboratoryId ==
+                        request.LaboratoryId.Value);
+
+                if (laboratory == null)
+                {
+                    return BadRequest(new
+                    {
+                        message = "Selected laboratory does not exist."
+                    });
+                }
+            }
+
+            // ==========================================
+            // CHECK DUPLICATE PC NUMBER
+            // ==========================================
+
             var existingPC =
                 await _context.PCs
                     .FirstOrDefaultAsync(p =>
-                        p.PCNumber.ToLower() == pcNumber.ToLower());
+                        p.PCNumber.ToLower() ==
+                        pcNumber.ToLower());
 
             if (existingPC != null)
             {
@@ -106,11 +191,51 @@ namespace SmartLab.Server.Controllers
                 });
             }
 
+            // ==========================================
+            // CHECK DUPLICATE MAC
+            // ==========================================
+
+            if (!string.IsNullOrWhiteSpace(request.MACAddress))
+            {
+                string mac =
+                    request.MACAddress.Trim();
+
+                var existingMac =
+                    await _context.PCs
+                        .FirstOrDefaultAsync(p =>
+                            p.MACAddress != null &&
+                            p.MACAddress.ToLower() ==
+                            mac.ToLower());
+
+                if (existingMac != null)
+                {
+                    return Conflict(new
+                    {
+                        message =
+                            $"MAC address {mac} is already registered."
+                    });
+                }
+            }
+
+            // ==========================================
+            // CREATE PC
+            // ==========================================
+
             var pc = new PC
             {
                 PCNumber = pcNumber,
                 Status = "Available",
                 CurrentUserId = null,
+                LaboratoryId = request.LaboratoryId,
+                Laboratory = laboratory,
+                MACAddress =
+                    string.IsNullOrWhiteSpace(request.MACAddress)
+                        ? null
+                        : request.MACAddress.Trim(),
+                IPAddress =
+                    string.IsNullOrWhiteSpace(request.IPAddress)
+                        ? null
+                        : request.IPAddress.Trim(),
                 LastSeen = null,
                 IsEnabled = true,
                 MaintenanceReason = null,
@@ -134,10 +259,14 @@ namespace SmartLab.Server.Controllers
                 pcId = pc.PCId,
                 pcNumber = pc.PCNumber,
                 status = pc.Status,
+                laboratoryId = pc.LaboratoryId,
+                laboratoryName =
+                    laboratory?.LabName,
+                macAddress = pc.MACAddress,
+                ipAddress = pc.IPAddress,
                 isEnabled = pc.IsEnabled
             });
         }
-
 
         // ==========================================
         // GET ONE PC
@@ -148,6 +277,7 @@ namespace SmartLab.Server.Controllers
         {
             var pc = await _context.PCs
                 .Include(p => p.CurrentUser)
+                .Include(p => p.Laboratory)
                 .Where(p => p.PCId == id)
                 .Select(p => new
                 {
@@ -160,6 +290,14 @@ namespace SmartLab.Server.Controllers
                         ? p.CurrentUser.Username
                         : null,
 
+                    p.LaboratoryId,
+
+                    LaboratoryName = p.Laboratory != null
+                        ? p.Laboratory.LabName
+                        : null,
+
+                    p.MACAddress,
+                    p.IPAddress,
                     p.LastSeen,
                     p.IsEnabled,
                     p.MaintenanceReason,
@@ -177,8 +315,6 @@ namespace SmartLab.Server.Controllers
 
             return Ok(pc);
         }
-
-
 
         // ==========================================
         // EDIT PC NUMBER
@@ -225,7 +361,8 @@ namespace SmartLab.Server.Controllers
                 await _context.PCs
                     .FirstOrDefaultAsync(p =>
                         p.PCId != id &&
-                        p.PCNumber.ToLower() == newPcNumber.ToLower());
+                        p.PCNumber.ToLower() ==
+                        newPcNumber.ToLower());
 
             if (duplicatePC != null)
             {
@@ -260,6 +397,159 @@ namespace SmartLab.Server.Controllers
             });
         }
 
+        // ==========================================
+        // ASSIGN PC TO LABORATORY
+        // ==========================================
+
+        [HttpPut("{id}/laboratory")]
+        public async Task<IActionResult> AssignLaboratory(
+            int id,
+            [FromBody] PCLaboratoryRequest request)
+        {
+            var pc = await _context.PCs
+                .FirstOrDefaultAsync(p =>
+                    p.PCId == id);
+
+            if (pc == null)
+            {
+                return NotFound(new
+                {
+                    message = "PC not found."
+                });
+            }
+
+            Laboratory? laboratory = null;
+
+            if (request.LaboratoryId.HasValue)
+            {
+                laboratory = await _context.Laboratories
+                    .FirstOrDefaultAsync(l =>
+                        l.LaboratoryId ==
+                        request.LaboratoryId.Value);
+
+                if (laboratory == null)
+                {
+                    return BadRequest(new
+                    {
+                        message = "Laboratory not found."
+                    });
+                }
+            }
+
+            if (pc.Status == "Occupied" ||
+                pc.CurrentUserId != null)
+            {
+                return Conflict(new
+                {
+                    message =
+                        "Cannot change laboratory while the PC is occupied."
+                });
+            }
+
+            int? oldLaboratoryId =
+                pc.LaboratoryId;
+
+            pc.LaboratoryId =
+                request.LaboratoryId;
+
+            await _context.SaveChangesAsync();
+
+            await LogActivity(
+                null,
+                pc.PCId,
+                "PC Laboratory Updated",
+                $"PC {pc.PCNumber} laboratory changed from " +
+                $"{oldLaboratoryId?.ToString() ?? "None"} to " +
+                $"{request.LaboratoryId?.ToString() ?? "None"}."
+            );
+
+            return Ok(new
+            {
+                message =
+                    "PC laboratory updated successfully.",
+                pcId = pc.PCId,
+                pcNumber = pc.PCNumber,
+                laboratoryId = pc.LaboratoryId,
+                laboratoryName =
+                    laboratory?.LabName
+            });
+        }
+
+        // ==========================================
+        // UPDATE PC NETWORK IDENTITY
+        // ==========================================
+
+        [HttpPut("{id}/network")]
+        public async Task<IActionResult> UpdateNetworkIdentity(
+            int id,
+            [FromBody] PCNetworkIdentityRequest request)
+        {
+            var pc = await _context.PCs
+                .FirstOrDefaultAsync(p =>
+                    p.PCId == id);
+
+            if (pc == null)
+            {
+                return NotFound(new
+                {
+                    message = "PC not found."
+                });
+            }
+
+            string? mac =
+                string.IsNullOrWhiteSpace(request.MACAddress)
+                    ? null
+                    : request.MACAddress.Trim();
+
+            string? ip =
+                string.IsNullOrWhiteSpace(request.IPAddress)
+                    ? null
+                    : request.IPAddress.Trim();
+
+            if (mac != null)
+            {
+                var duplicateMac =
+                    await _context.PCs
+                        .FirstOrDefaultAsync(p =>
+                            p.PCId != id &&
+                            p.MACAddress != null &&
+                            p.MACAddress.ToLower() ==
+                            mac.ToLower());
+
+                if (duplicateMac != null)
+                {
+                    return Conflict(new
+                    {
+                        message =
+                            $"MAC address {mac} is already registered to another PC."
+                    });
+                }
+            }
+
+            pc.MACAddress = mac;
+            pc.IPAddress = ip;
+            pc.LastSeen = DateTime.Now;
+
+            await _context.SaveChangesAsync();
+
+            await LogActivity(
+                null,
+                pc.PCId,
+                "PC Network Identity Updated",
+                $"PC {pc.PCNumber} network identity was updated."
+            );
+
+            return Ok(new
+            {
+                message =
+                    "PC network identity updated successfully.",
+                pcId = pc.PCId,
+                pcNumber = pc.PCNumber,
+                macAddress = pc.MACAddress,
+                ipAddress = pc.IPAddress,
+                lastSeen = pc.LastSeen
+            });
+        }
 
         // ==========================================
         // LOGIN TO THIS PC
@@ -270,10 +560,6 @@ namespace SmartLab.Server.Controllers
             string pcNumber,
             int userId)
         {
-            // ==========================================
-            // FIND USER
-            // ==========================================
-
             var user = await _context.Users
                 .FirstOrDefaultAsync(u =>
                     u.UserId == userId);
@@ -286,49 +572,18 @@ namespace SmartLab.Server.Controllers
                 });
             }
 
-
-            // ==========================================
-            // FIND THIS PC
-            // ==========================================
-
             var pc = await _context.PCs
                 .FirstOrDefaultAsync(p =>
-                    p.PCNumber.ToLower() == pcNumber.ToLower());
-
-
-            // ==========================================
-            // AUTO REGISTER THIS COMPUTER
-            // ==========================================
+                    p.PCNumber == pcNumber);
 
             if (pc == null)
             {
-                pc = new PC
+                return NotFound(new
                 {
-                    PCNumber = pcNumber.Trim(),
-                    Status = "Available",
-                    CurrentUserId = null,
-                    LastSeen = DateTime.Now,
-                    IsEnabled = true,
-                    MaintenanceReason = null,
-                    MaintenanceStarted = null
-                };
-
-                _context.PCs.Add(pc);
-
-                await _context.SaveChangesAsync();
-
-                await LogActivity(
-                    userId,
-                    pc.PCId,
-                    "PC Auto Registered",
-                    $"PC {pc.PCNumber} was automatically registered by SmartLab."
-                );
+                    message =
+                        $"PC {pcNumber} is not registered."
+                });
             }
-
-
-            // ==========================================
-            // CHECK IF PC IS ENABLED
-            // ==========================================
 
             if (!pc.IsEnabled)
             {
@@ -339,11 +594,6 @@ namespace SmartLab.Server.Controllers
                 });
             }
 
-
-            // ==========================================
-            // CHECK MAINTENANCE
-            // ==========================================
-
             if (pc.Status == "Maintenance")
             {
                 return Conflict(new
@@ -352,11 +602,6 @@ namespace SmartLab.Server.Controllers
                         $"PC {pc.PCNumber} is currently under maintenance."
                 });
             }
-
-
-            // ==========================================
-            // CHECK IF PC IS ALREADY OCCUPIED
-            // ==========================================
 
             if (pc.Status == "Occupied" ||
                 pc.CurrentUserId != null)
@@ -368,24 +613,11 @@ namespace SmartLab.Server.Controllers
                 });
             }
 
-
-            // ==========================================
-            // OCCUPY THIS PC
-            // ==========================================
-
             pc.Status = "Occupied";
-
             pc.CurrentUserId = userId;
-
             pc.LastSeen = DateTime.Now;
 
-
             await _context.SaveChangesAsync();
-
-
-            // ==========================================
-            // ACTIVITY LOG
-            // ==========================================
 
             await LogActivity(
                 userId,
@@ -394,31 +626,19 @@ namespace SmartLab.Server.Controllers
                 $"User {user.Username} logged in to PC {pc.PCNumber}."
             );
 
-
-            // ==========================================
-            // RETURN PC INFORMATION
-            // ==========================================
-
             return Ok(new
             {
                 message = "PC login successful.",
-
                 pcId = pc.PCId,
-
                 pcNumber = pc.PCNumber,
-
                 status = pc.Status,
-
                 userId = user.UserId,
-
                 username = user.Username,
-
+                laboratoryId = pc.LaboratoryId,
                 lastSeen = pc.LastSeen,
-
                 isEnabled = pc.IsEnabled
             });
         }
-
 
         // ==========================================
         // OLD AUTOMATIC ASSIGN PC
@@ -446,11 +666,6 @@ namespace SmartLab.Server.Controllers
                 });
             }
 
-
-            // ==========================================
-            // CHECK IF STUDENT ALREADY HAS A PC
-            // ==========================================
-
             var existingPC = await _context.PCs
                 .FirstOrDefaultAsync(p =>
                     p.CurrentUserId == userId);
@@ -461,37 +676,26 @@ namespace SmartLab.Server.Controllers
                 {
                     message =
                         "Student already has a PC.",
-
                     pcId =
                         existingPC.PCId,
-
                     pcNumber =
                         existingPC.PCNumber,
-
                     status =
                         existingPC.Status,
-
                     userId =
                         user.UserId,
-
                     username =
                         user.Username,
-
                     lastSeen =
                         existingPC.LastSeen,
-
                     isEnabled =
                         existingPC.IsEnabled,
-
                     maintenanceReason =
-                        existingPC.MaintenanceReason
+                        existingPC.MaintenanceReason,
+                    laboratoryId =
+                        existingPC.LaboratoryId
                 });
             }
-
-
-            // ==========================================
-            // FIND AVAILABLE + ENABLED PC
-            // ==========================================
 
             var pc = await _context.PCs
                 .OrderBy(p => p.PCId)
@@ -509,11 +713,6 @@ namespace SmartLab.Server.Controllers
                 });
             }
 
-
-            // ==========================================
-            // ASSIGN PC
-            // ==========================================
-
             pc.Status =
                 "Occupied";
 
@@ -523,13 +722,7 @@ namespace SmartLab.Server.Controllers
             pc.LastSeen =
                 DateTime.Now;
 
-
             await _context.SaveChangesAsync();
-
-
-            // ==========================================
-            // ACTIVITY LOG
-            // ==========================================
 
             await LogActivity(
                 userId,
@@ -538,35 +731,28 @@ namespace SmartLab.Server.Controllers
                 $"PC {pc.PCNumber} assigned to user {user.Username}."
             );
 
-
             return Ok(new
             {
                 message =
                     "PC assigned successfully.",
-
                 pcId =
                     pc.PCId,
-
                 pcNumber =
                     pc.PCNumber,
-
                 status =
                     pc.Status,
-
                 userId =
                     user.UserId,
-
                 username =
                     user.Username,
-
+                laboratoryId =
+                    pc.LaboratoryId,
                 lastSeen =
                     pc.LastSeen,
-
                 isEnabled =
                     pc.IsEnabled
             });
         }
-
 
         // ==========================================
         // RELEASE PC
@@ -589,15 +775,9 @@ namespace SmartLab.Server.Controllers
                 });
             }
 
-
-            // ==========================================
-            // GET USER INFORMATION
-            // ==========================================
-
             var user = await _context.Users
                 .FirstOrDefaultAsync(u =>
                     u.UserId == userId);
-
 
             string pcNumber =
                 pc.PCNumber;
@@ -605,11 +785,6 @@ namespace SmartLab.Server.Controllers
             string username =
                 user?.Username ??
                 $"User {userId}";
-
-
-            // ==========================================
-            // RELEASE PC
-            // ==========================================
 
             pc.Status =
                 "Available";
@@ -620,13 +795,7 @@ namespace SmartLab.Server.Controllers
             pc.LastSeen =
                 DateTime.Now;
 
-
             await _context.SaveChangesAsync();
-
-
-            // ==========================================
-            // ACTIVITY LOG
-            // ==========================================
 
             await LogActivity(
                 userId,
@@ -635,32 +804,26 @@ namespace SmartLab.Server.Controllers
                 $"PC {pcNumber} released by user {username}."
             );
 
-
             return Ok(new
             {
                 message =
                     "PC released successfully.",
-
                 pcId =
                     pc.PCId,
-
                 pcNumber =
                     pcNumber,
-
                 status =
                     pc.Status,
-
                 currentUserId =
                     (int?)null,
-
+                laboratoryId =
+                    pc.LaboratoryId,
                 lastSeen =
                     pc.LastSeen,
-
                 isEnabled =
                     pc.IsEnabled
             });
         }
-
 
         // ==========================================
         // HEARTBEAT
@@ -683,40 +846,29 @@ namespace SmartLab.Server.Controllers
                 });
             }
 
-
-            // ==========================================
-            // UPDATE LAST SEEN
-            // ==========================================
-
             pc.LastSeen =
                 DateTime.Now;
 
-
             await _context.SaveChangesAsync();
-
 
             return Ok(new
             {
                 message =
                     "Heartbeat received.",
-
                 pcId =
                     pc.PCId,
-
                 pcNumber =
                     pc.PCNumber,
-
+                laboratoryId =
+                    pc.LaboratoryId,
                 status =
                     pc.Status,
-
                 lastSeen =
                     pc.LastSeen,
-
                 isEnabled =
                     pc.IsEnabled
             });
         }
-
 
         // ==========================================
         // ENABLE / DISABLE PC
@@ -735,15 +887,9 @@ namespace SmartLab.Server.Controllers
             {
                 return NotFound(new
                 {
-                    message =
-                        "PC not found."
+                    message = "PC not found."
                 });
             }
-
-
-            // ==========================================
-            // CANNOT DISABLE OCCUPIED PC
-            // ==========================================
 
             if (!request.IsEnabled &&
                 pc.Status == "Occupied" &&
@@ -756,14 +902,8 @@ namespace SmartLab.Server.Controllers
                 });
             }
 
-
             pc.IsEnabled =
                 request.IsEnabled;
-
-
-            // ==========================================
-            // DISABLE AVAILABLE PC
-            // ==========================================
 
             if (!pc.IsEnabled &&
                 pc.Status == "Available")
@@ -772,11 +912,6 @@ namespace SmartLab.Server.Controllers
                     "Maintenance";
             }
 
-
-            // ==========================================
-            // ENABLE MAINTENANCE PC
-            // ==========================================
-
             if (pc.IsEnabled &&
                 pc.Status == "Maintenance" &&
                 pc.CurrentUserId == null)
@@ -784,11 +919,6 @@ namespace SmartLab.Server.Controllers
                 pc.Status =
                     "Available";
             }
-
-
-            // ==========================================
-            // CLEAR MAINTENANCE DATA WHEN ENABLED
-            // ==========================================
 
             if (pc.IsEnabled)
             {
@@ -799,17 +929,10 @@ namespace SmartLab.Server.Controllers
                     null;
             }
 
-
             pc.LastSeen =
                 DateTime.Now;
 
-
             await _context.SaveChangesAsync();
-
-
-            // ==========================================
-            // ACTIVITY LOG
-            // ==========================================
 
             string action =
                 pc.IsEnabled
@@ -821,7 +944,6 @@ namespace SmartLab.Server.Controllers
                     ? $"PC {pc.PCNumber} was enabled."
                     : $"PC {pc.PCNumber} was disabled.";
 
-
             await LogActivity(
                 null,
                 pc.PCId,
@@ -829,37 +951,30 @@ namespace SmartLab.Server.Controllers
                 details
             );
 
-
             return Ok(new
             {
                 message =
                     pc.IsEnabled
                         ? "PC enabled successfully."
                         : "PC disabled successfully.",
-
                 pcId =
                     pc.PCId,
-
                 pcNumber =
                     pc.PCNumber,
-
+                laboratoryId =
+                    pc.LaboratoryId,
                 status =
                     pc.Status,
-
                 isEnabled =
                     pc.IsEnabled,
-
                 maintenanceReason =
                     pc.MaintenanceReason,
-
                 maintenanceStarted =
                     pc.MaintenanceStarted,
-
                 lastSeen =
                     pc.LastSeen
             });
         }
-
 
         // ==========================================
         // SET PC TO MAINTENANCE
@@ -878,15 +993,9 @@ namespace SmartLab.Server.Controllers
             {
                 return NotFound(new
                 {
-                    message =
-                        "PC not found."
+                    message = "PC not found."
                 });
             }
-
-
-            // ==========================================
-            // CANNOT PUT OCCUPIED PC INTO MAINTENANCE
-            // ==========================================
 
             if (pc.Status == "Occupied" &&
                 pc.CurrentUserId != null)
@@ -898,11 +1007,6 @@ namespace SmartLab.Server.Controllers
                 });
             }
 
-
-            // ==========================================
-            // VALIDATE REASON
-            // ==========================================
-
             if (string.IsNullOrWhiteSpace(
                 request.Reason))
             {
@@ -912,11 +1016,6 @@ namespace SmartLab.Server.Controllers
                         "Maintenance reason is required."
                 });
             }
-
-
-            // ==========================================
-            // SET MAINTENANCE
-            // ==========================================
 
             pc.Status =
                 "Maintenance";
@@ -936,13 +1035,7 @@ namespace SmartLab.Server.Controllers
             pc.LastSeen =
                 DateTime.Now;
 
-
             await _context.SaveChangesAsync();
-
-
-            // ==========================================
-            // ACTIVITY LOG
-            // ==========================================
 
             await LogActivity(
                 null,
@@ -951,35 +1044,28 @@ namespace SmartLab.Server.Controllers
                 $"PC {pc.PCNumber} placed under maintenance. Reason: {pc.MaintenanceReason}"
             );
 
-
             return Ok(new
             {
                 message =
                     "PC placed under maintenance.",
-
                 pcId =
                     pc.PCId,
-
                 pcNumber =
                     pc.PCNumber,
-
+                laboratoryId =
+                    pc.LaboratoryId,
                 status =
                     pc.Status,
-
                 isEnabled =
                     pc.IsEnabled,
-
                 maintenanceReason =
                     pc.MaintenanceReason,
-
                 maintenanceStarted =
                     pc.MaintenanceStarted,
-
                 lastSeen =
                     pc.LastSeen
             });
         }
-
 
         // ==========================================
         // CLEAR MAINTENANCE
@@ -997,15 +1083,9 @@ namespace SmartLab.Server.Controllers
             {
                 return NotFound(new
                 {
-                    message =
-                        "PC not found."
+                    message = "PC not found."
                 });
             }
-
-
-            // ==========================================
-            // CLEAR MAINTENANCE
-            // ==========================================
 
             pc.Status =
                 "Available";
@@ -1025,13 +1105,7 @@ namespace SmartLab.Server.Controllers
             pc.LastSeen =
                 DateTime.Now;
 
-
             await _context.SaveChangesAsync();
-
-
-            // ==========================================
-            // ACTIVITY LOG
-            // ==========================================
 
             await LogActivity(
                 null,
@@ -1040,35 +1114,28 @@ namespace SmartLab.Server.Controllers
                 $"Maintenance cleared for PC {pc.PCNumber}. PC is now available."
             );
 
-
             return Ok(new
             {
                 message =
                     "PC maintenance cleared.",
-
                 pcId =
                     pc.PCId,
-
                 pcNumber =
                     pc.PCNumber,
-
+                laboratoryId =
+                    pc.LaboratoryId,
                 status =
                     pc.Status,
-
                 isEnabled =
                     pc.IsEnabled,
-
                 maintenanceReason =
                     pc.MaintenanceReason,
-
                 maintenanceStarted =
                     pc.MaintenanceStarted,
-
                 lastSeen =
                     pc.LastSeen
             });
         }
-
 
         // ==========================================
         // MANUAL STATUS UPDATE
@@ -1087,25 +1154,26 @@ namespace SmartLab.Server.Controllers
             {
                 return NotFound(new
                 {
-                    message =
-                        "PC not found."
+                    message = "PC not found."
                 });
             }
 
+            if (string.IsNullOrWhiteSpace(
+                request.Status))
+            {
+                return BadRequest(new
+                {
+                    message = "PC status is required."
+                });
+            }
 
             pc.Status =
-                request.Status;
+                request.Status.Trim();
 
             pc.LastSeen =
                 DateTime.Now;
 
-
             await _context.SaveChangesAsync();
-
-
-            // ==========================================
-            // ACTIVITY LOG
-            // ==========================================
 
             await LogActivity(
                 null,
@@ -1114,31 +1182,25 @@ namespace SmartLab.Server.Controllers
                 $"PC {pc.PCNumber} status changed to {pc.Status}."
             );
 
-
             return Ok(new
             {
                 message =
                     "PC status updated successfully.",
-
                 pcId =
                     pc.PCId,
-
                 pcNumber =
                     pc.PCNumber,
-
+                laboratoryId =
+                    pc.LaboratoryId,
                 status =
                     pc.Status,
-
                 lastSeen =
                     pc.LastSeen,
-
                 isEnabled =
                     pc.IsEnabled
             });
         }
     }
-
-
 
     // ==========================================
     // ADD PC REQUEST
@@ -1148,8 +1210,13 @@ namespace SmartLab.Server.Controllers
     {
         public string PCNumber { get; set; } =
             string.Empty;
-    }
 
+        public int? LaboratoryId { get; set; }
+
+        public string? MACAddress { get; set; }
+
+        public string? IPAddress { get; set; }
+    }
 
     // ==========================================
     // UPDATE PC NUMBER REQUEST
@@ -1161,6 +1228,25 @@ namespace SmartLab.Server.Controllers
             string.Empty;
     }
 
+    // ==========================================
+    // PC LABORATORY REQUEST
+    // ==========================================
+
+    public class PCLaboratoryRequest
+    {
+        public int? LaboratoryId { get; set; }
+    }
+
+    // ==========================================
+    // PC NETWORK IDENTITY REQUEST
+    // ==========================================
+
+    public class PCNetworkIdentityRequest
+    {
+        public string? MACAddress { get; set; }
+
+        public string? IPAddress { get; set; }
+    }
 
     // ==========================================
     // PC STATUS REQUEST
@@ -1172,7 +1258,6 @@ namespace SmartLab.Server.Controllers
             string.Empty;
     }
 
-
     // ==========================================
     // ENABLE / DISABLE REQUEST
     // ==========================================
@@ -1181,7 +1266,6 @@ namespace SmartLab.Server.Controllers
     {
         public bool IsEnabled { get; set; }
     }
-
 
     // ==========================================
     // MAINTENANCE REQUEST

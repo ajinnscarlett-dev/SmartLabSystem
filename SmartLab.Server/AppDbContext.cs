@@ -14,9 +14,14 @@ namespace SmartLab.Server
 
         public DbSet<PC> PCs { get; set; }
 
-        public DbSet<ActivityLog> ActivityLogs { get; set; }
+        public DbSet<Laboratory> Laboratories
+        { get; set; }
 
-        public DbSet<Announcement> Announcements { get; set; }
+        public DbSet<ActivityLog> ActivityLogs
+        { get; set; }
+
+        public DbSet<Announcement> Announcements
+        { get; set; }
 
         public DbSet<ServiceDeskTicket>
             ServiceDeskTickets
