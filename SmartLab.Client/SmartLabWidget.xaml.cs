@@ -34,6 +34,10 @@ namespace SmartLab.Client
 
         private readonly DispatcherTimer _screenMonitorTimer;
 
+        // Fast thumbnail upload timer. This runs only while Admin/Teacher
+        // screen monitoring is active.
+        private readonly DispatcherTimer _screenUploadTimer;
+
         private readonly ScreenCaptureService _screenCaptureService;
 
         private bool _screenMonitoringActive = false;
@@ -187,6 +191,23 @@ namespace SmartLab.Client
 
 
             // ==========================================
+            // FAST SCREEN UPLOAD TIMER
+            // ==========================================
+            // Approximately 1.25 thumbnail frames per second.
+            // This is independent from the 2-second monitoring-status check.
+
+            _screenUploadTimer =
+                new DispatcherTimer
+                {
+                    Interval =
+                        TimeSpan.FromMilliseconds(800)
+                };
+
+            _screenUploadTimer.Tick +=
+                ScreenUploadTimer_Tick;
+
+
+            // ==========================================
             // NOTIFICATION TIMER
             // ==========================================
 
@@ -335,8 +356,11 @@ namespace SmartLab.Client
                         "SmartLab - Screen Monitoring ACTIVE";
 
 
-                    // Send first screenshot immediately.
+                    // Start the faster thumbnail upload loop.
+                    _screenUploadTimer.Start();
 
+
+                    // Send first screenshot immediately.
                     await UploadCurrentScreen();
                 }
 
@@ -355,23 +379,35 @@ namespace SmartLab.Client
                         "SmartLab";
 
 
+                    // Stop thumbnail uploads immediately.
+                    _screenUploadTimer.Stop();
+
+
                     await RemoveScreenFromServer();
-                }
-
-
-                // ==========================================
-                // MONITORING ACTIVE
-                // ==========================================
-
-                if (_screenMonitoringActive)
-                {
-                    await UploadCurrentScreen();
                 }
             }
             catch
             {
                 // Do not interrupt student's session.
             }
+        }
+
+
+        // ==========================================
+        // FAST SCREEN UPLOAD TIMER
+        // ==========================================
+
+        private async void ScreenUploadTimer_Tick(
+            object? sender,
+            EventArgs e)
+        {
+            if (_isLoggingOut ||
+                !_screenMonitoringActive)
+            {
+                return;
+            }
+
+            await UploadCurrentScreen();
         }
 
 
@@ -448,6 +484,9 @@ namespace SmartLab.Client
                 {
                     _screenMonitoringActive =
                         false;
+
+
+                    _screenUploadTimer.Stop();
 
 
                     Title =
@@ -530,6 +569,8 @@ namespace SmartLab.Client
 
             _screenMonitorTimer.Stop();
 
+            _screenUploadTimer.Stop();
+
 
             try
             {
@@ -574,6 +615,11 @@ namespace SmartLab.Client
                     _heartbeatTimer.Start();
 
                     _screenMonitorTimer.Start();
+
+                    if (_screenMonitoringActive)
+                    {
+                        _screenUploadTimer.Start();
+                    }
 
 
                     MessageBox.Show(
@@ -628,6 +674,11 @@ namespace SmartLab.Client
                 _heartbeatTimer.Start();
 
                 _screenMonitorTimer.Start();
+
+                if (_screenMonitoringActive)
+                {
+                    _screenUploadTimer.Start();
+                }
 
 
                 MessageBox.Show(
@@ -1092,6 +1143,7 @@ namespace SmartLab.Client
             // Stop screen monitoring.
 
             _screenMonitorTimer.Stop();
+            _screenUploadTimer.Stop();
 
             _notificationTimer.Stop();
 

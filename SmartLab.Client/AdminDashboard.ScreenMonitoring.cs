@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -13,13 +14,26 @@ using System.Windows.Threading;
 namespace SmartLab.Client
 {
     // ==========================================================
-    // ADMIN DASHBOARD - LIVE PC THUMBNAILS
+    // ADMIN DASHBOARD - STABLE LIVE SCREEN REFRESH
     // ==========================================================
     //
-    // Screen frames are cached in memory so the 5-second PC status
-    // refresh does not make the actual thumbnail disappear.
+    // STEP 24
     //
-    // The PC grid is also rebuilt only when PC identity/status changes.
+    // We are intentionally NOT downloading all PC images in parallel.
+    // The previous parallel approach could keep several network/image
+    // operations alive at the same time and make a WPF dashboard
+    // progressively less responsive.
+    //
+    // New approach:
+    // - One visible PC frame at a time.
+    // - ~1.2 second refresh cadence.
+    // - Per-request timeout.
+    // - JPEG decode happens off the UI thread.
+    // - Existing Image control is reused.
+    // - Last good frame stays visible when a request fails.
+    // - No PC grid rebuild.
+    //
+    // This favors stability and smoothness over maximum FPS.
     //
     // ==========================================================
 
@@ -29,6 +43,8 @@ namespace SmartLab.Client
 
         private bool _screenThumbnailRefreshRunning;
 
+        private int _screenRefreshIndex;
+
         private readonly HashSet<int>
             _screenMonitoringStarted =
                 new HashSet<int>();
@@ -37,8 +53,20 @@ namespace SmartLab.Client
             _latestScreenImages =
                 new Dictionary<int, byte[]>();
 
+        private readonly Dictionary<int, Image>
+            _screenImageControls =
+                new Dictionary<int, Image>();
+
+        private static readonly TimeSpan
+            ScreenRefreshInterval =
+                TimeSpan.FromMilliseconds(1200);
+
+        private static readonly TimeSpan
+            ScreenRequestTimeout =
+                TimeSpan.FromMilliseconds(1500);
+
         // ==========================================================
-        // INITIALIZE SCREEN MONITORING
+        // INITIALIZE
         // ==========================================================
 
         private void InitializeScreenMonitoring()
@@ -52,7 +80,7 @@ namespace SmartLab.Client
                 new DispatcherTimer
                 {
                     Interval =
-                        TimeSpan.FromSeconds(3)
+                        ScreenRefreshInterval
                 };
 
             _screenThumbnailTimer.Tick +=
@@ -60,7 +88,7 @@ namespace SmartLab.Client
 
             _screenThumbnailTimer.Start();
 
-            _ = RefreshScreenThumbnailsAsync();
+            _ = RefreshOneScreenAsync();
         }
 
         // ==========================================================
@@ -71,14 +99,18 @@ namespace SmartLab.Client
             object? sender,
             EventArgs e)
         {
-            await RefreshScreenThumbnailsAsync();
+            await RefreshOneScreenAsync();
         }
 
         // ==========================================================
-        // REFRESH SCREEN THUMBNAILS
+        // REFRESH ONE SCREEN
+        // ==========================================================
+        //
+        // One frame only per cycle.
+        // This prevents a burst of concurrent downloads/decodes.
         // ==========================================================
 
-        private async Task RefreshScreenThumbnailsAsync()
+        private async Task RefreshOneScreenAsync()
         {
             if (_screenThumbnailRefreshRunning ||
                 !IsLoaded)
@@ -90,91 +122,63 @@ namespace SmartLab.Client
 
             try
             {
-                var cards =
-                    PcGrid.Children
-                        .OfType<Border>()
-                        .Where(
-                            b => b.Tag is PCInfo)
-                        .ToList();
+                List<(Border Card, PCInfo PC)>
+                    visibleCards =
+                        PcGrid.Children
+                            .OfType<Border>()
+                            .Where(
+                                b => b.Tag is PCInfo)
+                            .Select(
+                                b =>
+                                    (
+                                        b,
+                                        (PCInfo)b.Tag
+                                    ))
+                            .ToList();
 
-                if (cards.Count == 0)
+                if (visibleCards.Count == 0)
                 {
+                    _screenRefreshIndex = 0;
                     return;
                 }
 
-                List<PCInfo> pcs =
-                    cards
-                        .Select(
-                            b => (PCInfo)b.Tag)
-                        .ToList();
-
-                // --------------------------------------------------
-                // START / STOP MONITORING
-                // --------------------------------------------------
-
-                foreach (PCInfo pc in pcs)
+                // Make sure the index is still inside the current
+                // visible-card range.
+                if (_screenRefreshIndex >=
+                    visibleCards.Count)
                 {
-                    bool occupied =
-                        pc.Status.Equals(
-                            "Occupied",
-                            StringComparison.OrdinalIgnoreCase)
-                        ||
-                        pc.Status.Equals(
-                            "In Use",
-                            StringComparison.OrdinalIgnoreCase);
-
-                    bool recentHeartbeat =
-                        pc.LastSeen.HasValue &&
-                        (DateTime.Now -
-                         pc.LastSeen.Value).TotalSeconds <= 10;
-
-                    if (occupied && recentHeartbeat)
-                    {
-                        await EnsureMonitoringStartedAsync(
-                            pc.PcId);
-                    }
-                    else if (
-                        _screenMonitoringStarted.Contains(
-                            pc.PcId))
-                    {
-                        await StopMonitoringAsync(
-                            pc.PcId);
-                    }
+                    _screenRefreshIndex = 0;
                 }
 
-                // --------------------------------------------------
-                // GET LATEST FRAMES
-                // --------------------------------------------------
+                // Start/stop monitoring based on current state.
+                await SynchronizeMonitoringStatesAsync(
+                    visibleCards);
 
-                foreach (Border card in cards)
+                // Find the next occupied + online PC.
+                int attempts =
+                    visibleCards.Count;
+
+                while (attempts-- > 0)
                 {
-                    if (card.Tag is not PCInfo pc)
+                    var item =
+                        visibleCards[
+                            _screenRefreshIndex];
+
+                    _screenRefreshIndex =
+                        (_screenRefreshIndex + 1) %
+                        visibleCards.Count;
+
+                    if (!IsPcOccupied(item.PC) ||
+                        !IsPcOnline(item.PC))
                     {
                         continue;
                     }
 
-                    bool occupied =
-                        pc.Status.Equals(
-                            "Occupied",
-                            StringComparison.OrdinalIgnoreCase)
-                        ||
-                        pc.Status.Equals(
-                            "In Use",
-                            StringComparison.OrdinalIgnoreCase);
+                    await DownloadAndApplyOneFrameAsync(
+                        item.Card,
+                        item.PC);
 
-                    bool recentHeartbeat =
-                        pc.LastSeen.HasValue &&
-                        (DateTime.Now -
-                         pc.LastSeen.Value).TotalSeconds <= 10;
-
-                    if (!occupied || !recentHeartbeat)
-                    {
-                        continue;
-                    }
-
-                    await UpdateCardWithLatestScreenAsync(
-                        card,
-                        pc);
+                    break;
                 }
             }
             catch (Exception ex)
@@ -186,6 +190,69 @@ namespace SmartLab.Client
             {
                 _screenThumbnailRefreshRunning = false;
             }
+        }
+
+        // ==========================================================
+        // SYNC MONITORING STATES
+        // ==========================================================
+
+        private async Task SynchronizeMonitoringStatesAsync(
+            List<(Border Card, PCInfo PC)> visibleCards)
+        {
+            foreach (var item in visibleCards)
+            {
+                PCInfo pc =
+                    item.PC;
+
+                bool occupied =
+                    IsPcOccupied(pc);
+
+                bool online =
+                    IsPcOnline(pc);
+
+                if (occupied && online)
+                {
+                    await EnsureMonitoringStartedAsync(
+                        pc.PcId);
+                }
+                else if (
+                    _screenMonitoringStarted.Contains(
+                        pc.PcId))
+                {
+                    await StopMonitoringAsync(
+                        pc.PcId);
+                }
+            }
+        }
+
+        // ==========================================================
+        // PC STATE
+        // ==========================================================
+
+        private static bool IsPcOccupied(
+            PCInfo pc)
+        {
+            return
+                pc.Status.Equals(
+                    "Occupied",
+                    StringComparison.OrdinalIgnoreCase)
+                ||
+                pc.Status.Equals(
+                    "In Use",
+                    StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsPcOnline(
+            PCInfo pc)
+        {
+            if (!pc.LastSeen.HasValue)
+            {
+                return false;
+            }
+
+            return
+                (DateTime.Now -
+                 pc.LastSeen.Value).TotalSeconds <= 10;
         }
 
         // ==========================================================
@@ -216,7 +283,7 @@ namespace SmartLab.Client
             }
             catch
             {
-                // Retry on the next refresh cycle.
+                // Try again during a later cycle.
             }
         }
 
@@ -241,28 +308,37 @@ namespace SmartLab.Client
 
                     _latestScreenImages.Remove(
                         pcId);
+
+                    _screenImageControls.Remove(
+                        pcId);
                 }
             }
             catch
             {
-                // Retry on the next refresh cycle.
+                // Try again during a later cycle.
             }
         }
 
         // ==========================================================
-        // GET LATEST SCREEN
+        // DOWNLOAD ONE FRAME
         // ==========================================================
 
         private async Task
-            UpdateCardWithLatestScreenAsync(
+            DownloadAndApplyOneFrameAsync(
                 Border card,
                 PCInfo pc)
         {
             try
             {
+                using CancellationTokenSource timeoutCts =
+                    new CancellationTokenSource(
+                        ScreenRequestTimeout);
+
                 HttpResponseMessage response =
                     await _httpClient.GetAsync(
-                        $"api/ScreenMonitor/{pc.PcId}");
+                        $"api/ScreenMonitor/{pc.PcId}",
+                        HttpCompletionOption.ResponseHeadersRead,
+                        timeoutCts.Token);
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -275,7 +351,8 @@ namespace SmartLab.Client
 
                 byte[] imageBytes =
                     await response.Content
-                        .ReadAsByteArrayAsync();
+                        .ReadAsByteArrayAsync(
+                            timeoutCts.Token);
 
                 if (imageBytes.Length == 0)
                 {
@@ -286,17 +363,33 @@ namespace SmartLab.Client
                     return;
                 }
 
-                _latestScreenImages[pc.PcId] =
+                ImageSource? image =
+                    await Task.Run(
+                        () =>
+                            DecodeFrozenImage(
+                                imageBytes));
+
+                if (image == null)
+                {
+                    ApplyCachedScreenToCard(
+                        card,
+                        pc.PcId);
+
+                    return;
+                }
+
+                _latestScreenImages[
+                    pc.PcId] =
                     imageBytes;
 
-                ApplyCachedScreenToCard(
-                    card,
-                    pc.PcId);
+                ApplyScreenImage(
+                    pc.PcId,
+                    image);
             }
             catch
             {
-                // Keep the most recent successfully downloaded
-                // screenshot visible.
+                // A timeout/network hiccup must not freeze the
+                // refresh loop. Keep the last successful frame.
                 ApplyCachedScreenToCard(
                     card,
                     pc.PcId);
@@ -304,7 +397,103 @@ namespace SmartLab.Client
         }
 
         // ==========================================================
-        // APPLY CACHED SCREEN TO CARD
+        // DECODE OFF UI THREAD
+        // ==========================================================
+
+        private static ImageSource?
+            DecodeFrozenImage(
+                byte[] imageBytes)
+        {
+            try
+            {
+                BitmapImage bitmap =
+                    new BitmapImage();
+
+                using MemoryStream stream =
+                    new MemoryStream(
+                        imageBytes);
+
+                bitmap.BeginInit();
+
+                bitmap.CacheOption =
+                    BitmapCacheOption.OnLoad;
+
+                bitmap.StreamSource =
+                    stream;
+
+                bitmap.EndInit();
+
+                bitmap.Freeze();
+
+                return bitmap;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        // ==========================================================
+        // APPLY NEW FRAME
+        // ==========================================================
+
+        private void ApplyScreenImage(
+            int pcId,
+            ImageSource imageSource)
+        {
+            Image? imageControl = null;
+
+            if (!_screenImageControls.TryGetValue(
+                pcId,
+                out imageControl))
+            {
+                Border? card =
+                    PcGrid.Children
+                        .OfType<Border>()
+                        .FirstOrDefault(
+                            border =>
+                                border.Tag is PCInfo pc &&
+                                pc.PcId == pcId);
+
+                if (card == null)
+                {
+                    return;
+                }
+
+                Border? monitorFrame =
+                    FindMonitorFrame(card);
+
+                if (monitorFrame == null)
+                {
+                    return;
+                }
+
+                imageControl =
+                    new Image
+                    {
+                        Stretch =
+                            Stretch.UniformToFill,
+
+                        HorizontalAlignment =
+                            HorizontalAlignment.Stretch,
+
+                        VerticalAlignment =
+                            VerticalAlignment.Stretch
+                    };
+
+                _screenImageControls[pcId] =
+                    imageControl;
+
+                monitorFrame.Child =
+                    imageControl;
+            }
+
+            imageControl.Source =
+                imageSource;
+        }
+
+        // ==========================================================
+        // APPLY CACHED FRAME
         // ==========================================================
 
         private void ApplyCachedScreenToCard(
@@ -312,8 +501,17 @@ namespace SmartLab.Client
             int pcId)
         {
             if (!_latestScreenImages.TryGetValue(
-                    pcId,
-                    out byte[]? imageBytes))
+                pcId,
+                out byte[]? imageBytes))
+            {
+                return;
+            }
+
+            ImageSource? image =
+                DecodeFrozenImage(
+                    imageBytes);
+
+            if (image == null)
             {
                 return;
             }
@@ -326,50 +524,26 @@ namespace SmartLab.Client
                 return;
             }
 
+            Image imageControl =
+                new Image
+                {
+                    Source = image,
+
+                    Stretch =
+                        Stretch.UniformToFill,
+
+                    HorizontalAlignment =
+                        HorizontalAlignment.Stretch,
+
+                    VerticalAlignment =
+                        VerticalAlignment.Stretch
+                };
+
+            _screenImageControls[pcId] =
+                imageControl;
+
             monitorFrame.Child =
-                CreateScreenImage(
-                    imageBytes);
-        }
-
-        // ==========================================================
-        // CREATE IMAGE
-        // ==========================================================
-
-        private static Image CreateScreenImage(
-            byte[] imageBytes)
-        {
-            BitmapImage bitmap =
-                new BitmapImage();
-
-            using MemoryStream stream =
-                new MemoryStream(
-                    imageBytes);
-
-            bitmap.BeginInit();
-
-            bitmap.CacheOption =
-                BitmapCacheOption.OnLoad;
-
-            bitmap.StreamSource =
-                stream;
-
-            bitmap.EndInit();
-
-            bitmap.Freeze();
-
-            return new Image
-            {
-                Source = bitmap,
-
-                Stretch =
-                    Stretch.UniformToFill,
-
-                HorizontalAlignment =
-                    HorizontalAlignment.Stretch,
-
-                VerticalAlignment =
-                    VerticalAlignment.Stretch
-            };
+                imageControl;
         }
 
         // ==========================================================
@@ -389,5 +563,16 @@ namespace SmartLab.Client
                         Math.Abs(
                             border.Height - 47) < 0.5);
         }
+
+        // ==========================================================
+        // RESULT-FREE IMPLEMENTATION
+        // ==========================================================
+        //
+        // No Task.WhenAll here.
+        // No parallel image decode.
+        // No 500ms DispatcherTimer.
+        // One frame per cycle, with timeout.
+        //
+        // ==========================================================
     }
 }
