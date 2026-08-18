@@ -89,6 +89,7 @@ namespace SmartLab.Client
 
         private const uint EwxLogoff = 0x00000000;
         private const uint EwxReboot = 0x00000002;
+        private const uint EwxShutdown = 0x00000001;
         private const uint TokenAdjustPrivileges = 0x0020;
         private const uint TokenQuery = 0x0008;
         private const uint SePrivilegeEnabled = 0x00000002;
@@ -336,6 +337,30 @@ namespace SmartLab.Client
                         "Local Windows sign-in is required.";
                 }
 
+
+                else if (string.Equals(
+                    command.CommandType,
+                    "SHUTDOWN_COMPUTER",
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    if (TryStartWindowsShutdown(
+                        out string shutdownError))
+                    {
+                        success = true;
+
+                        result =
+                            "Windows shutdown request accepted. " +
+                            "The computer will shut down.";
+                    }
+                    else
+                    {
+                        success = false;
+
+                        result =
+                            "Windows shutdown request failed. " +
+                            shutdownError;
+                    }
+                }
                 else if (string.Equals(
                     command.CommandType,
                     "RESTART_COMPUTER",
@@ -420,6 +445,111 @@ namespace SmartLab.Client
                 {
                     // If Windows rejects the logoff request, no
                     // additional UI action is attempted here.
+                }
+            }
+        }
+
+        private static bool TryStartWindowsShutdown(
+            out string error)
+        {
+            error = string.Empty;
+
+            IntPtr tokenHandle = IntPtr.Zero;
+
+            try
+            {
+                const uint desiredAccess =
+                    TokenAdjustPrivileges |
+                    TokenQuery;
+
+                if (!OpenProcessToken(
+                    GetCurrentProcess(),
+                    desiredAccess,
+                    out tokenHandle))
+                {
+                    error =
+                        "OpenProcessToken failed. Win32 error: " +
+                        Marshal.GetLastWin32Error();
+
+                    return false;
+                }
+
+                if (!LookupPrivilegeValue(
+                    null,
+                    SeShutdownName,
+                    out Luid shutdownLuid))
+                {
+                    error =
+                        "LookupPrivilegeValue failed. Win32 error: " +
+                        Marshal.GetLastWin32Error();
+
+                    return false;
+                }
+
+                TokenPrivileges privileges =
+                    new TokenPrivileges
+                    {
+                        PrivilegeCount = 1,
+                        Privileges =
+                            new LuidAndAttributes
+                            {
+                                Luid = shutdownLuid,
+                                Attributes =
+                                    SePrivilegeEnabled
+                            }
+                    };
+
+                if (!AdjustTokenPrivileges(
+                    tokenHandle,
+                    false,
+                    ref privileges,
+                    0,
+                    IntPtr.Zero,
+                    IntPtr.Zero))
+                {
+                    error =
+                        "AdjustTokenPrivileges failed. Win32 error: " +
+                        Marshal.GetLastWin32Error();
+
+                    return false;
+                }
+
+                int privilegeError =
+                    Marshal.GetLastWin32Error();
+
+                if (privilegeError != 0)
+                {
+                    error =
+                        "Windows could not enable SeShutdownPrivilege. " +
+                        "Win32 error: " +
+                        privilegeError;
+
+                    return false;
+                }
+
+                if (!ExitWindowsEx(
+                    EwxShutdown,
+                    0))
+                {
+                    error =
+                        "ExitWindowsEx(EWX_SHUTDOWN) failed. Win32 error: " +
+                        Marshal.GetLastWin32Error();
+
+                    return false;
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                return false;
+            }
+            finally
+            {
+                if (tokenHandle != IntPtr.Zero)
+                {
+                    CloseHandle(tokenHandle);
                 }
             }
         }
