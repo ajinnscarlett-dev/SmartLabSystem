@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Net.Http.Json;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -8,14 +9,7 @@ namespace SmartLab.Client
 {
     // ==========================================================
     // ADMIN DASHBOARD - PC COMMANDS
-    // STEP 28 FINAL COMBINED FILE
-    //
-    // Contains BOTH:
-    //   1. SEND MESSAGE
-    //   2. LOCK COMPUTER
-    //
-    // This prevents the two command handlers from being split
-    // across files and accidentally removed during replacement.
+    // STEP 29 - SEND MESSAGE + LOCK + BLANK SCREEN
     // ==========================================================
 
     public partial class AdminDashboard
@@ -394,11 +388,82 @@ namespace SmartLab.Client
                 return;
             }
 
+            await QueueSimplePcCommandAsync(
+                "lock",
+                "Lock Computer");
+        }
+
+        // ==========================================================
+        // BLANK SCREEN
+        // ==========================================================
+
+        private async void BlankScreenButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            if (_selectedPc == null)
+            {
+                MessageBox.Show(
+                    "Select a PC first.",
+                    "SmartLab - Blank Screen",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+
+                return;
+            }
+
+            bool occupied =
+                _selectedPc.Status.Equals(
+                    "Occupied",
+                    StringComparison.OrdinalIgnoreCase)
+                ||
+                _selectedPc.Status.Equals(
+                    "In Use",
+                    StringComparison.OrdinalIgnoreCase);
+
+            if (!occupied ||
+                !_selectedPc.CurrentUserId.HasValue)
+            {
+                MessageBox.Show(
+                    "A student must be logged in to this PC.",
+                    "SmartLab - Blank Screen",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+
+                return;
+            }
+
+            MessageBoxResult confirm =
+                MessageBox.Show(
+                    $"Blank {_selectedPc.PcNumber} screen now?\n\n" +
+                    "The student's display will temporarily be covered by a blank screen.",
+                    "SmartLab - Blank Screen",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning);
+
+            if (confirm != MessageBoxResult.Yes)
+            {
+                return;
+            }
+
+            await QueueSimplePcCommandAsync(
+                "blank-screen",
+                "Blank Screen");
+        }
+
+        // ==========================================================
+        // SIMPLE PC COMMAND QUEUE
+        // ==========================================================
+
+        private async Task QueueSimplePcCommandAsync(
+            string endpoint,
+            string commandName)
+        {
             try
             {
                 var response =
                     await _httpClient.PostAsJsonAsync(
-                        $"api/PCCommand/{_selectedPc.PcId}/lock",
+                        $"api/PCCommand/{_selectedPc!.PcId}/{endpoint}",
                         new { });
 
                 string responseText =
@@ -409,7 +474,7 @@ namespace SmartLab.Client
                 {
                     MessageBox.Show(
                         responseText,
-                        "SmartLab - Lock Computer",
+                        $"SmartLab - {commandName}",
                         MessageBoxButton.OK,
                         MessageBoxImage.Warning);
 
@@ -423,10 +488,10 @@ namespace SmartLab.Client
 
                 MessageBox.Show(
                     result == null
-                        ? "Lock command queued."
-                        : $"Lock command queued successfully.\n\nCommand ID: {result.CommandId}",
+                        ? $"{commandName} command queued."
+                        : $"{commandName} command queued successfully.\n\nCommand ID: {result.CommandId}",
 
-                    "SmartLab - Lock Computer",
+                    $"SmartLab - {commandName}",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
 
@@ -435,10 +500,10 @@ namespace SmartLab.Client
             catch (Exception ex)
             {
                 MessageBox.Show(
-                    "Unable to send the lock command.\n\n" +
+                    $"Unable to send the {commandName.ToLowerInvariant()} command.\n\n" +
                     ex.Message,
 
-                    "SmartLab - Lock Computer",
+                    $"SmartLab - {commandName}",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
             }

@@ -3,23 +3,15 @@ using System.Net.Http.Json;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Threading;
 
 namespace SmartLab.Client
 {
     // ==========================================================
     // STUDENT PC COMMAND RECEIVER
-    // STEP 28 - COMPLETE VERSION
-    //
-    // IMPORTANT:
-    // This file includes BOTH the Step 27 SEND_MESSAGE command
-    // receiver and the Step 28 LOCK_COMPUTER command.
-    //
-    // It also restores the missing:
-    //   PCCommandPendingResponse
-    //   ShowStudentCommandMessage()
-    //
-    // Keep the existing SmartLabWidget.xaml.cs unchanged.
+    // STEP 29 - SEND MESSAGE + LOCK COMPUTER + BLANK SCREEN
     // ==========================================================
 
     public partial class SmartLabWidget
@@ -32,6 +24,16 @@ namespace SmartLab.Client
             "user32.dll",
             SetLastError = true)]
         private static extern bool LockWorkStation();
+
+        // ==========================================================
+        // BLANK SCREEN OVERLAY
+        // ==========================================================
+
+        private Window? _blankScreenWindow;
+
+        private bool _blankScreenActive;
+
+        private bool _closingBlankScreen;
 
         // ==========================================================
         // COMMAND POLLING
@@ -178,8 +180,8 @@ namespace SmartLab.Client
                     return;
                 }
 
-                // Prevent processing the exact same command twice
-                // while the acknowledgement is being completed.
+                // Prevent processing the exact same
+                // command multiple times.
                 if (_lastProcessedPcCommandId ==
                     command.CommandId)
                 {
@@ -194,8 +196,8 @@ namespace SmartLab.Client
             }
             catch
             {
-                // Temporary network/server failures should never
-                // terminate the Student session.
+                // Temporary network/server failures should
+                // never terminate the Student session.
             }
             finally
             {
@@ -267,10 +269,29 @@ namespace SmartLab.Client
                             false;
 
                         result =
-                            $"Windows LockWorkStation failed. " +
-                            $"Win32 error: " +
-                            $"{Marshal.GetLastWin32Error()}";
+                            "Windows LockWorkStation failed. " +
+                            "Win32 error: " +
+                            Marshal.GetLastWin32Error();
                     }
+                }
+
+                // --------------------------------------------------
+                // BLANK SCREEN
+                // --------------------------------------------------
+
+                else if (
+                    string.Equals(
+                        command.CommandType,
+                        "BLANK_SCREEN",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    ShowBlankScreen();
+
+                    success =
+                        true;
+
+                    result =
+                        "Student display blanked successfully.";
                 }
 
                 // --------------------------------------------------
@@ -314,8 +335,168 @@ namespace SmartLab.Client
             }
             catch
             {
-                // Temporary acknowledgement failure should not
-                // crash or close the Student client.
+                // Temporary acknowledgement failure should
+                // not crash or close the Student client.
+            }
+        }
+
+        // ==========================================================
+        // SHOW BLANK SCREEN
+        // ==========================================================
+
+        private void ShowBlankScreen()
+        {
+            if (_blankScreenActive &&
+                _blankScreenWindow != null)
+            {
+                _blankScreenWindow.Activate();
+
+                return;
+            }
+
+            _blankScreenActive =
+                true;
+
+            _closingBlankScreen =
+                false;
+
+            Window overlay =
+                new Window
+                {
+                    WindowStyle =
+                        WindowStyle.None,
+
+                    ResizeMode =
+                        ResizeMode.NoResize,
+
+                    ShowInTaskbar =
+                        false,
+
+                    ShowActivated =
+                        true,
+
+                    Topmost =
+                        true,
+
+                    Background =
+                        Brushes.Black,
+
+                    AllowsTransparency =
+                        false,
+
+                    WindowStartupLocation =
+                        WindowStartupLocation.Manual,
+
+                    Left =
+                        SystemParameters.VirtualScreenLeft,
+
+                    Top =
+                        SystemParameters.VirtualScreenTop,
+
+                    Width =
+                        SystemParameters.VirtualScreenWidth,
+
+                    Height =
+                        SystemParameters.VirtualScreenHeight,
+
+                    Title =
+                        "SmartLab - Screen Blank"
+                };
+
+            overlay.Closing +=
+                BlankScreenWindow_Closing;
+
+            overlay.PreviewKeyDown +=
+                BlankScreenWindow_PreviewKeyDown;
+
+            overlay.PreviewMouseDown +=
+                BlankScreenWindow_PreviewMouseDown;
+
+            _blankScreenWindow =
+                overlay;
+
+            overlay.Show();
+
+            overlay.Activate();
+
+            overlay.Focus();
+        }
+
+        // ==========================================================
+        // PREVENT CLOSING
+        // ==========================================================
+
+        private void BlankScreenWindow_Closing(
+            object? sender,
+            System.ComponentModel.CancelEventArgs e)
+        {
+            if (!_closingBlankScreen)
+            {
+                e.Cancel =
+                    true;
+            }
+        }
+
+        // ==========================================================
+        // PREVENT KEYBOARD DISMISSAL
+        // ==========================================================
+
+        private void BlankScreenWindow_PreviewKeyDown(
+            object sender,
+            KeyEventArgs e)
+        {
+            e.Handled =
+                true;
+        }
+
+        // ==========================================================
+        // PREVENT MOUSE DISMISSAL
+        // ==========================================================
+
+        private void BlankScreenWindow_PreviewMouseDown(
+            object sender,
+            MouseButtonEventArgs e)
+        {
+            e.Handled =
+                true;
+        }
+
+        // ==========================================================
+        // CLOSE BLANK SCREEN
+        // ==========================================================
+
+        private void CloseBlankScreen()
+        {
+            if (_blankScreenWindow == null)
+            {
+                _blankScreenActive =
+                    false;
+
+                return;
+            }
+
+            try
+            {
+                _closingBlankScreen =
+                    true;
+
+                _blankScreenWindow.Close();
+            }
+            catch
+            {
+                // Ignore cleanup errors during
+                // logout/close.
+            }
+            finally
+            {
+                _blankScreenWindow =
+                    null;
+
+                _blankScreenActive =
+                    false;
+
+                _closingBlankScreen =
+                    false;
             }
         }
 
@@ -323,9 +504,8 @@ namespace SmartLab.Client
         // STUDENT MESSAGE
         // ==========================================================
 
-        private void
-            ShowStudentCommandMessage(
-                string message)
+        private void ShowStudentCommandMessage(
+            string message)
         {
             MessageBox.Show(
                 this,
