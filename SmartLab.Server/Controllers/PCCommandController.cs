@@ -107,6 +107,21 @@ namespace SmartLab.Server.Controllers
         }
 
         // ==========================================================
+        // BLANK SCREEN
+        // ==========================================================
+
+        [Authorize(Roles = "Admin,Teacher")]
+        [HttpPost("{pcId}/blank-screen")]
+        public async Task<IActionResult> BlankScreen(
+            int pcId)
+        {
+            return await QueuePcCommandAsync(
+                pcId,
+                "BLANK_SCREEN",
+                null);
+        }
+
+        // ==========================================================
         // GENERIC COMMAND QUEUE
         // ==========================================================
 
