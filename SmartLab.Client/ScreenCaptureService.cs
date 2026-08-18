@@ -11,13 +11,15 @@ namespace SmartLab.Client
     // SMARTLAB SCREEN CAPTURE SERVICE
     // ==========================================================
     //
-    // Purpose:
-    // - Capture the desktop.
-    // - Resize it to a lab-monitoring thumbnail size.
-    // - Encode as JPEG with controlled quality.
+    // Higher-quality monitoring frames.
     //
-    // This keeps thumbnail uploads much smaller than sending the
-    // full native desktop resolution.
+    // Changes from the current GitHub baseline:
+    // - MaxWidth: 640  -> 1280
+    // - MaxHeight: 360 -> 720
+    // - JPEG quality: 55 -> 80
+    //
+    // This improves the source image itself, so the live viewer
+    // does not need to stretch a small 640x360 image.
     //
     // ==========================================================
 
@@ -33,17 +35,16 @@ namespace SmartLab.Client
             int nIndex);
 
         // ----------------------------------------------------------
-        // THUMBNAIL SETTINGS
+        // HIGHER-QUALITY THUMBNAIL SETTINGS
         // ----------------------------------------------------------
 
-        // 640x360 is enough for a monitoring tile while keeping
-        // the upload small.
-        private const int MaxWidth = 640;
-        private const int MaxHeight = 360;
+        // 1280x720 gives the monitoring frame much more detail
+        // than the previous 640x360 source.
+        private const int MaxWidth = 1280;
+        private const int MaxHeight = 720;
 
-        // JPEG quality for monitoring thumbnails.
-        // This is intentionally lower than a normal photo export.
-        private const long JpegQuality = 55L;
+        // Higher JPEG quality for a clearer monitoring image.
+        private const long JpegQuality = 80L;
 
         // ==========================================================
         // CAPTURE SCREEN
@@ -113,16 +114,16 @@ namespace SmartLab.Client
                 CompositingMode.SourceCopy;
 
             thumbnailGraphics.CompositingQuality =
-                CompositingQuality.HighSpeed;
+                CompositingQuality.HighQuality;
 
             thumbnailGraphics.InterpolationMode =
-                InterpolationMode.HighQualityBilinear;
+                InterpolationMode.HighQualityBicubic;
 
             thumbnailGraphics.SmoothingMode =
-                SmoothingMode.HighSpeed;
+                SmoothingMode.HighQuality;
 
             thumbnailGraphics.PixelOffsetMode =
-                PixelOffsetMode.HighSpeed;
+                PixelOffsetMode.HighQuality;
 
             thumbnailGraphics.DrawImage(
                 fullScreen,
@@ -190,13 +191,15 @@ namespace SmartLab.Client
                 Math.Max(
                     1,
                     (int)Math.Round(
-                        width * scale));
+                        width *
+                        scale));
 
             int targetHeight =
                 Math.Max(
                     1,
                     (int)Math.Round(
-                        height * scale));
+                        height *
+                        scale));
 
             return new Size(
                 targetWidth,
@@ -209,7 +212,8 @@ namespace SmartLab.Client
 
         private static ImageCodecInfo? GetJpegCodec()
         {
-            foreach (ImageCodecInfo codec
+            foreach (
+                ImageCodecInfo codec
                 in ImageCodecInfo.GetImageEncoders())
             {
                 if (codec.MimeType.Equals(
