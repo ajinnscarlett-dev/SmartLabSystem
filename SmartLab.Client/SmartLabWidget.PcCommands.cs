@@ -9,11 +9,6 @@ using System.Windows.Threading;
 
 namespace SmartLab.Client
 {
-    // ==========================================================
-    // STUDENT PC COMMAND RECEIVER
-    // STEP 30 - SEND MESSAGE + LOCK + PERSISTENT BLANK SCREEN
-    // ==========================================================
-
     public partial class SmartLabWidget
     {
         // ==========================================================
@@ -77,10 +72,6 @@ namespace SmartLab.Client
             }
         }
 
-        // ==========================================================
-        // INITIALIZE
-        // ==========================================================
-
         private void InitializePcCommandPolling()
         {
             if (_pcCommandEventsInitialized)
@@ -90,20 +81,20 @@ namespace SmartLab.Client
 
             _pcCommandEventsInitialized = true;
 
-            _pcCommandTimer = new DispatcherTimer
-            {
-                Interval = TimeSpan.FromSeconds(1)
-            };
+            _pcCommandTimer =
+                new DispatcherTimer
+                {
+                    Interval =
+                        TimeSpan.FromSeconds(1)
+                };
 
-            _pcCommandTimer.Tick += PcCommandTimer_Tick;
+            _pcCommandTimer.Tick +=
+                PcCommandTimer_Tick;
+
             _pcCommandTimer.Start();
 
             _ = PollPcCommandAsync();
         }
-
-        // ==========================================================
-        // STOP
-        // ==========================================================
 
         private void StopPcCommandPolling()
         {
@@ -114,20 +105,12 @@ namespace SmartLab.Client
             _pcCommandEventsInitialized = false;
         }
 
-        // ==========================================================
-        // TIMER
-        // ==========================================================
-
         private async void PcCommandTimer_Tick(
             object? sender,
             EventArgs e)
         {
             await PollPcCommandAsync();
         }
-
-        // ==========================================================
-        // POLL PENDING COMMAND
-        // ==========================================================
 
         private async Task PollPcCommandAsync()
         {
@@ -175,7 +158,8 @@ namespace SmartLab.Client
                 _lastProcessedPcCommandId =
                     command.CommandId;
 
-                await HandlePcCommandAsync(command);
+                await HandlePcCommandAsync(
+                    command);
             }
             catch
             {
@@ -184,13 +168,10 @@ namespace SmartLab.Client
             }
             finally
             {
-                _pcCommandPollingRunning = false;
+                _pcCommandPollingRunning =
+                    false;
             }
         }
-
-        // ==========================================================
-        // HANDLE COMMAND
-        // ==========================================================
 
         private async Task HandlePcCommandAsync(
             PCCommandPendingResponse command)
@@ -200,10 +181,6 @@ namespace SmartLab.Client
 
             try
             {
-                // --------------------------------------------------
-                // SEND MESSAGE
-                // --------------------------------------------------
-
                 if (string.Equals(
                     command.CommandType,
                     "SEND_MESSAGE",
@@ -214,19 +191,14 @@ namespace SmartLab.Client
                         ?? string.Empty);
 
                     success = true;
+
                     result =
                         "Message displayed successfully.";
                 }
-
-                // --------------------------------------------------
-                // LOCK COMPUTER
-                // --------------------------------------------------
-
-                else if (
-                    string.Equals(
-                        command.CommandType,
-                        "LOCK_COMPUTER",
-                        StringComparison.OrdinalIgnoreCase))
+                else if (string.Equals(
+                    command.CommandType,
+                    "LOCK_COMPUTER",
+                    StringComparison.OrdinalIgnoreCase))
                 {
                     bool locked =
                         LockWorkStation();
@@ -234,43 +206,51 @@ namespace SmartLab.Client
                     if (locked)
                     {
                         success = true;
+
                         result =
                             "Windows workstation locked.";
                     }
                     else
                     {
                         success = false;
+
                         result =
                             "Windows LockWorkStation failed. " +
                             "Win32 error: " +
                             Marshal.GetLastWin32Error();
                     }
                 }
-
-                // --------------------------------------------------
-                // BLANK SCREEN
-                // --------------------------------------------------
-
-                else if (
-                    string.Equals(
-                        command.CommandType,
-                        "BLANK_SCREEN",
-                        StringComparison.OrdinalIgnoreCase))
+                else if (string.Equals(
+                    command.CommandType,
+                    "BLANK_SCREEN",
+                    StringComparison.OrdinalIgnoreCase))
                 {
                     ShowBlankScreen();
 
                     success = true;
+
                     result =
                         "Student display blanked successfully.";
                 }
+                else if (string.Equals(
+                    command.CommandType,
+                    "UNLOCK_REQUEST",
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    // Safe behavior:
+                    // do not attempt to bypass Windows credentials.
+                    ShowUnlockRequestMessage();
 
-                // --------------------------------------------------
-                // UNKNOWN COMMAND
-                // --------------------------------------------------
+                    success = true;
 
+                    result =
+                        "Unlock request displayed. " +
+                        "Local Windows sign-in is required.";
+                }
                 else
                 {
                     success = false;
+
                     result =
                         "Unsupported command type.";
                 }
@@ -280,10 +260,6 @@ namespace SmartLab.Client
                 success = false;
                 result = ex.Message;
             }
-
-            // ------------------------------------------------------
-            // ACKNOWLEDGE RESULT
-            // ------------------------------------------------------
 
             try
             {
@@ -302,9 +278,16 @@ namespace SmartLab.Client
             }
         }
 
-        // ==========================================================
-        // SHOW BLANK SCREEN
-        // ==========================================================
+        private void ShowUnlockRequestMessage()
+        {
+            MessageBox.Show(
+                this,
+                "Your teacher requested that you unlock this computer.\n\n" +
+                "Please sign in to Windows locally.",
+                "SmartLab - Unlock Request",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
 
         private void ShowBlankScreen()
         {
@@ -318,47 +301,48 @@ namespace SmartLab.Client
             _blankScreenActive = true;
             _closingBlankScreen = false;
 
-            Window overlay = new Window
-            {
-                WindowStyle =
-                    WindowStyle.None,
+            Window overlay =
+                new Window
+                {
+                    WindowStyle =
+                        WindowStyle.None,
 
-                ResizeMode =
-                    ResizeMode.NoResize,
+                    ResizeMode =
+                        ResizeMode.NoResize,
 
-                ShowInTaskbar =
-                    false,
+                    ShowInTaskbar =
+                        false,
 
-                ShowActivated =
-                    true,
+                    ShowActivated =
+                        true,
 
-                Topmost =
-                    true,
+                    Topmost =
+                        true,
 
-                Background =
-                    Brushes.Black,
+                    Background =
+                        Brushes.Black,
 
-                AllowsTransparency =
-                    false,
+                    AllowsTransparency =
+                        false,
 
-                WindowStartupLocation =
-                    WindowStartupLocation.Manual,
+                    WindowStartupLocation =
+                        WindowStartupLocation.Manual,
 
-                Left =
-                    SystemParameters.VirtualScreenLeft,
+                    Left =
+                        SystemParameters.VirtualScreenLeft,
 
-                Top =
-                    SystemParameters.VirtualScreenTop,
+                    Top =
+                        SystemParameters.VirtualScreenTop,
 
-                Width =
-                    SystemParameters.VirtualScreenWidth,
+                    Width =
+                        SystemParameters.VirtualScreenWidth,
 
-                Height =
-                    SystemParameters.VirtualScreenHeight,
+                    Height =
+                        SystemParameters.VirtualScreenHeight,
 
-                Title =
-                    "SmartLab - Screen Blank"
-            };
+                    Title =
+                        "SmartLab - Screen Blank"
+                };
 
             overlay.Closing +=
                 BlankScreenWindow_Closing;
@@ -377,10 +361,6 @@ namespace SmartLab.Client
             overlay.Focus();
         }
 
-        // ==========================================================
-        // PREVENT CLOSING EXCEPT EMERGENCY HOTKEY
-        // ==========================================================
-
         private void BlankScreenWindow_Closing(
             object? sender,
             System.ComponentModel.CancelEventArgs e)
@@ -390,11 +370,6 @@ namespace SmartLab.Client
                 e.Cancel = true;
             }
         }
-
-        // ==========================================================
-        // EMERGENCY RECOVERY FOR LOCAL TESTING
-        // CTRL + SHIFT + ALT + R
-        // ==========================================================
 
         private void BlankScreenWindow_PreviewKeyDown(
             object sender,
@@ -418,20 +393,12 @@ namespace SmartLab.Client
             e.Handled = true;
         }
 
-        // ==========================================================
-        // BLOCK MOUSE DISMISSAL
-        // ==========================================================
-
         private void BlankScreenWindow_PreviewMouseDown(
             object sender,
             MouseButtonEventArgs e)
         {
             e.Handled = true;
         }
-
-        // ==========================================================
-        // CLOSE BLANK SCREEN
-        // ==========================================================
 
         private void CloseBlankScreen()
         {
@@ -448,8 +415,7 @@ namespace SmartLab.Client
             }
             catch
             {
-                // Ignore cleanup errors during
-                // restore/logout/close.
+                // Ignore cleanup errors.
             }
             finally
             {
@@ -458,10 +424,6 @@ namespace SmartLab.Client
                 _closingBlankScreen = false;
             }
         }
-
-        // ==========================================================
-        // STUDENT MESSAGE
-        // ==========================================================
 
         private void ShowStudentCommandMessage(
             string message)
@@ -474,12 +436,7 @@ namespace SmartLab.Client
                 MessageBoxImage.Information);
         }
 
-        // ==========================================================
-        // COMMAND DTO
-        // ==========================================================
-
-        private sealed class
-            PCCommandPendingResponse
+        private sealed class PCCommandPendingResponse
         {
             public long CommandId { get; set; }
             public int PCId { get; set; }

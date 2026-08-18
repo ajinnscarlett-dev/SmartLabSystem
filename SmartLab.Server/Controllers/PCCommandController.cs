@@ -108,6 +108,31 @@ namespace SmartLab.Server.Controllers
                 null);
         }
 
+
+        // ==========================================================
+        // UNLOCK REQUEST
+        // ==========================================================
+        //
+        // IMPORTANT:
+        // Windows workstation unlock requires local Windows sign-in.
+        // SmartLab does not bypass Windows authentication.
+        //
+        // This command is therefore an "UNLOCK REQUEST": the Student
+        // Client receives the request and tells the student to sign in
+        // locally.
+        //
+
+        [Authorize(Roles = "Admin,Teacher")]
+        [HttpPost("{pcId}/unlock")]
+        public async Task<IActionResult> UnlockComputer(
+            int pcId)
+        {
+            return await QueuePcCommandAsync(
+                pcId,
+                "UNLOCK_REQUEST",
+                null);
+        }
+
         // ==========================================================
         // GENERIC COMMAND QUEUE
         // ==========================================================
