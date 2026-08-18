@@ -28,10 +28,14 @@ namespace SmartLab.Server.Controllers
             public string? Result { get; set; }
         }
 
-        private static readonly ConcurrentDictionary<long, PcCommand> Commands = new();
-        private static readonly ConcurrentDictionary<int, long> PendingCommandByPc = new();
+        private static readonly ConcurrentDictionary<long, PcCommand>
+            Commands = new();
 
-        public PCCommandController(AppDbContext context)
+        private static readonly ConcurrentDictionary<int, long>
+            PendingCommandByPc = new();
+
+        public PCCommandController(
+            AppDbContext context)
         {
             _context = context;
         }
@@ -46,13 +50,16 @@ namespace SmartLab.Server.Controllers
             int pcId,
             [FromBody] SendMessageRequest request)
         {
-            string message = request.Message?.Trim() ?? string.Empty;
+            string message =
+                request.Message?.Trim()
+                ?? string.Empty;
 
             if (string.IsNullOrWhiteSpace(message))
             {
                 return BadRequest(new
                 {
-                    message = "Message is required."
+                    message =
+                        "Message is required."
                 });
             }
 
@@ -60,7 +67,8 @@ namespace SmartLab.Server.Controllers
             {
                 return BadRequest(new
                 {
-                    message = "Message cannot exceed 1000 characters."
+                    message =
+                        "Message cannot exceed 1000 characters."
                 });
             }
 
@@ -76,7 +84,8 @@ namespace SmartLab.Server.Controllers
 
         [Authorize(Roles = "Admin,Teacher")]
         [HttpPost("{pcId}/lock")]
-        public async Task<IActionResult> LockComputer(int pcId)
+        public async Task<IActionResult> LockComputer(
+            int pcId)
         {
             return await QueuePcCommandAsync(
                 pcId,
@@ -90,7 +99,8 @@ namespace SmartLab.Server.Controllers
 
         [Authorize(Roles = "Admin,Teacher")]
         [HttpPost("{pcId}/blank-screen")]
-        public async Task<IActionResult> BlankScreen(int pcId)
+        public async Task<IActionResult> BlankScreen(
+            int pcId)
         {
             return await QueuePcCommandAsync(
                 pcId,
@@ -98,27 +108,30 @@ namespace SmartLab.Server.Controllers
                 null);
         }
 
-
         // ==========================================================
         // GENERIC COMMAND QUEUE
         // ==========================================================
 
-        private async Task<IActionResult> QueuePcCommandAsync(
-            int pcId,
-            string commandType,
-            string? message)
+        private async Task<IActionResult>
+            QueuePcCommandAsync(
+                int pcId,
+                string commandType,
+                string? message)
         {
             PC? pc =
                 await _context.PCs
                     .AsNoTracking()
                     .FirstOrDefaultAsync(
-                        p => p.PCId == pcId);
+                        p =>
+                            p.PCId ==
+                            pcId);
 
             if (pc == null)
             {
                 return NotFound(new
                 {
-                    message = "PC not found."
+                    message =
+                        "PC not found."
                 });
             }
 
@@ -150,14 +163,9 @@ namespace SmartLab.Server.Controllers
                 });
             }
 
-            if (PendingCommandByPc.ContainsKey(pcId))
-            {
-                return Conflict(new
-                {
-                    message =
-                        "There is already a pending command for this PC."
-                });
-            }
+            // ======================================================
+            // SERVER-SIDE TEACHER COMLAB AUTHORIZATION
+            // ======================================================
 
             string? claimUserId =
                 User.FindFirst(
@@ -175,6 +183,64 @@ namespace SmartLab.Server.Controllers
                 });
             }
 
+            bool isAdmin =
+                User.IsInRole("Admin");
+
+            bool isTeacher =
+                User.IsInRole("Teacher");
+
+            if (!isAdmin &&
+                !isTeacher)
+            {
+                return Forbid();
+            }
+
+            if (isTeacher)
+            {
+                if (!pc.LaboratoryId.HasValue)
+                {
+                    return Forbid();
+                }
+
+                await EnsureAuthorizationTableAsync();
+
+                bool authorized =
+                    await _context
+                        .TeacherLaboratoryAuthorizations
+                        .AsNoTracking()
+                        .AnyAsync(a =>
+                            a.TeacherUserId ==
+                            requestedByUserId
+                            &&
+                            a.LaboratoryId ==
+                            pc.LaboratoryId.Value);
+
+                if (!authorized)
+                {
+                    return StatusCode(
+                        StatusCodes.Status403Forbidden,
+                        new
+                        {
+                            message =
+                                "You are not authorized to control this PC's COMLAB."
+                        });
+                }
+            }
+
+            // ======================================================
+            // ONE PENDING COMMAND PER PC
+            // ======================================================
+
+            if (PendingCommandByPc.ContainsKey(
+                    pcId))
+            {
+                return Conflict(new
+                {
+                    message =
+                        "There is already a pending command for this PC."
+                });
+            }
+
             long commandId =
                 Interlocked.Increment(
                     ref _nextCommandId);
@@ -182,16 +248,30 @@ namespace SmartLab.Server.Controllers
             PcCommand command =
                 new PcCommand
                 {
-                    CommandId = commandId,
-                    PCId = pcId,
-                    RequestedByUserId = requestedByUserId,
-                    CommandType = commandType,
-                    Message = message,
-                    CreatedAt = DateTime.Now,
-                    Status = "Pending"
+                    CommandId =
+                        commandId,
+
+                    PCId =
+                        pcId,
+
+                    RequestedByUserId =
+                        requestedByUserId,
+
+                    CommandType =
+                        commandType,
+
+                    Message =
+                        message,
+
+                    CreatedAt =
+                        DateTime.Now,
+
+                    Status =
+                        "Pending"
                 };
 
-            Commands[commandId] = command;
+            Commands[commandId] =
+                command;
 
             if (!PendingCommandByPc.TryAdd(
                     pcId,
@@ -219,12 +299,21 @@ namespace SmartLab.Server.Controllers
             {
                 message =
                     $"{commandType} command queued successfully.",
+
                 commandId,
+
                 pcId,
-                pcNumber = pc.PCNumber,
+
+                pcNumber =
+                    pc.PCNumber,
+
                 commandType,
-                status = command.Status,
-                createdAt = command.CreatedAt
+
+                status =
+                    command.Status,
+
+                createdAt =
+                    command.CreatedAt
             });
         }
 
@@ -234,7 +323,8 @@ namespace SmartLab.Server.Controllers
 
         [Authorize(Roles = "Student")]
         [HttpGet("pending")]
-        public async Task<IActionResult> GetPendingCommand()
+        public async Task<IActionResult>
+            GetPendingCommand()
         {
             string? claimUserId =
                 User.FindFirst(
@@ -253,7 +343,9 @@ namespace SmartLab.Server.Controllers
                     .AsNoTracking()
                     .FirstOrDefaultAsync(
                         p =>
-                            p.CurrentUserId == userId &&
+                            p.CurrentUserId ==
+                            userId
+                            &&
                             p.IsEnabled);
 
             if (pc == null)
@@ -286,18 +378,28 @@ namespace SmartLab.Server.Controllers
                 return NoContent();
             }
 
-            if (command.PCId != pc.PCId)
+            if (command.PCId !=
+                pc.PCId)
             {
                 return NoContent();
             }
 
             return Ok(new
             {
-                commandId = command.CommandId,
-                pcId = command.PCId,
-                commandType = command.CommandType,
-                message = command.Message,
-                createdAt = command.CreatedAt
+                commandId =
+                    command.CommandId,
+
+                pcId =
+                    command.PCId,
+
+                commandType =
+                    command.CommandType,
+
+                message =
+                    command.Message,
+
+                createdAt =
+                    command.CreatedAt
             });
         }
 
@@ -307,9 +409,11 @@ namespace SmartLab.Server.Controllers
 
         [Authorize(Roles = "Student")]
         [HttpPost("{commandId}/complete")]
-        public async Task<IActionResult> CompleteCommand(
-            long commandId,
-            [FromBody] CompleteCommandRequest request)
+        public async Task<IActionResult>
+            CompleteCommand(
+                long commandId,
+                [FromBody]
+                    CompleteCommandRequest request)
         {
             string? claimUserId =
                 User.FindFirst(
@@ -329,7 +433,8 @@ namespace SmartLab.Server.Controllers
             {
                 return NotFound(new
                 {
-                    message = "Command not found."
+                    message =
+                        "Command not found."
                 });
             }
 
@@ -337,10 +442,13 @@ namespace SmartLab.Server.Controllers
                 await _context.PCs
                     .AsNoTracking()
                     .FirstOrDefaultAsync(
-                        p => p.PCId == command.PCId);
+                        p =>
+                            p.PCId ==
+                            command.PCId);
 
             if (pc == null ||
-                pc.CurrentUserId != userId)
+                pc.CurrentUserId !=
+                    userId)
             {
                 return Forbid();
             }
@@ -356,7 +464,8 @@ namespace SmartLab.Server.Controllers
                 });
             }
 
-            command.CompletedAt = DateTime.Now;
+            command.CompletedAt =
+                DateTime.Now;
 
             command.Status =
                 request.Success
@@ -364,7 +473,8 @@ namespace SmartLab.Server.Controllers
                     : "Failed";
 
             command.Result =
-                string.IsNullOrWhiteSpace(request.Result)
+                string.IsNullOrWhiteSpace(
+                    request.Result)
                     ? null
                     : request.Result.Trim();
 
@@ -375,7 +485,8 @@ namespace SmartLab.Server.Controllers
             string resultText =
                 command.Status;
 
-            if (!string.IsNullOrWhiteSpace(command.Result))
+            if (!string.IsNullOrWhiteSpace(
+                command.Result))
             {
                 resultText +=
                     $" - {command.Result}";
@@ -390,10 +501,17 @@ namespace SmartLab.Server.Controllers
 
             return Ok(new
             {
-                message = "Command result recorded.",
-                commandId = command.CommandId,
-                status = command.Status,
-                completedAt = command.CompletedAt
+                message =
+                    "Command result recorded.",
+
+                commandId =
+                    command.CommandId,
+
+                status =
+                    command.Status,
+
+                completedAt =
+                    command.CompletedAt
             });
         }
 
@@ -403,7 +521,8 @@ namespace SmartLab.Server.Controllers
 
         [Authorize(Roles = "Admin,Teacher")]
         [HttpGet("{commandId}")]
-        public IActionResult GetCommandStatus(long commandId)
+        public IActionResult GetCommandStatus(
+            long commandId)
         {
             if (!Commands.TryGetValue(
                     commandId,
@@ -411,22 +530,87 @@ namespace SmartLab.Server.Controllers
             {
                 return NotFound(new
                 {
-                    message = "Command not found."
+                    message =
+                        "Command not found."
                 });
             }
 
             return Ok(new
             {
-                commandId = command.CommandId,
-                pcId = command.PCId,
-                commandType = command.CommandType,
-                status = command.Status,
-                message = command.Message,
-                createdAt = command.CreatedAt,
-                completedAt = command.CompletedAt,
-                result = command.Result
+                commandId =
+                    command.CommandId,
+
+                pcId =
+                    command.PCId,
+
+                commandType =
+                    command.CommandType,
+
+                status =
+                    command.Status,
+
+                message =
+                    command.Message,
+
+                createdAt =
+                    command.CreatedAt,
+
+                completedAt =
+                    command.CompletedAt,
+
+                result =
+                    command.Result
             });
         }
+
+        // ==========================================================
+        // CREATE AUTHORIZATION TABLE IF NEEDED
+        // ==========================================================
+
+        private async Task
+            EnsureAuthorizationTableAsync()
+        {
+            await _context.Database
+                .ExecuteSqlRawAsync(
+                    """
+                    IF OBJECT_ID(
+                        N'dbo.TeacherLaboratoryAuthorizations',
+                        N'U'
+                    ) IS NULL
+                    BEGIN
+                        CREATE TABLE dbo.TeacherLaboratoryAuthorizations
+                        (
+                            TeacherLaboratoryAuthorizationId INT IDENTITY(1,1)
+                                NOT NULL
+                                CONSTRAINT PK_TeacherLaboratoryAuthorizations
+                                PRIMARY KEY,
+
+                            TeacherUserId INT NOT NULL,
+
+                            LaboratoryId INT NOT NULL,
+
+                            CreatedAt DATETIME2 NOT NULL
+                                CONSTRAINT DF_TeacherLaboratoryAuthorizations_CreatedAt
+                                DEFAULT(GETDATE()),
+
+                            CONSTRAINT FK_TeacherLaboratoryAuthorizations_User
+                                FOREIGN KEY (TeacherUserId)
+                                REFERENCES dbo.Users(UserId),
+
+                            CONSTRAINT FK_TeacherLaboratoryAuthorizations_Laboratory
+                                FOREIGN KEY (LaboratoryId)
+                                REFERENCES dbo.Laboratories(LaboratoryId),
+
+                            CONSTRAINT UQ_TeacherLaboratoryAuthorizations
+                                UNIQUE(TeacherUserId, LaboratoryId)
+                        );
+                    END
+                    """);
+        }
+
+        // ==========================================================
+        // ACTIVITY LOG
+        // ==========================================================
 
         private async Task LogActivityAsync(
             int? userId,
@@ -437,17 +621,30 @@ namespace SmartLab.Server.Controllers
             ActivityLog log =
                 new ActivityLog
                 {
-                    UserId = userId,
-                    PCId = pcId,
-                    Action = action,
-                    Details = details,
-                    CreatedAt = DateTime.Now
+                    UserId =
+                        userId,
+
+                    PCId =
+                        pcId,
+
+                    Action =
+                        action,
+
+                    Details =
+                        details,
+
+                    CreatedAt =
+                        DateTime.Now
                 };
 
             _context.ActivityLogs.Add(log);
 
             await _context.SaveChangesAsync();
         }
+
+        // ==========================================================
+        // REQUEST MODELS
+        // ==========================================================
 
         public class SendMessageRequest
         {
@@ -457,6 +654,7 @@ namespace SmartLab.Server.Controllers
         public class CompleteCommandRequest
         {
             public bool Success { get; set; }
+
             public string? Result { get; set; }
         }
     }

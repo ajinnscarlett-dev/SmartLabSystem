@@ -26,5 +26,9 @@ namespace SmartLab.Server
         public DbSet<ServiceDeskTicket>
             ServiceDeskTickets
         { get; set; }
+
+        public DbSet<TeacherLaboratoryAuthorization>
+            TeacherLaboratoryAuthorizations
+        { get; set; }
     }
 }
