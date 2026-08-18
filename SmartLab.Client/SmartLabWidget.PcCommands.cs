@@ -11,7 +11,7 @@ namespace SmartLab.Client
 {
     // ==========================================================
     // STUDENT PC COMMAND RECEIVER
-    // STEP 29 - SEND MESSAGE + LOCK COMPUTER + BLANK SCREEN
+    // STEP 30 - SEND MESSAGE + LOCK + PERSISTENT BLANK SCREEN
     // ==========================================================
 
     public partial class SmartLabWidget
@@ -30,9 +30,7 @@ namespace SmartLab.Client
         // ==========================================================
 
         private Window? _blankScreenWindow;
-
         private bool _blankScreenActive;
-
         private bool _closingBlankScreen;
 
         // ==========================================================
@@ -40,11 +38,8 @@ namespace SmartLab.Client
         // ==========================================================
 
         private DispatcherTimer? _pcCommandTimer;
-
         private bool _pcCommandPollingRunning;
-
         private long _lastProcessedPcCommandId;
-
         private bool _pcCommandEventsInitialized;
 
         static SmartLabWidget()
@@ -62,10 +57,9 @@ namespace SmartLab.Client
                     SmartLabWidgetUnloadedForCommands));
         }
 
-        private static void
-            SmartLabWidgetLoadedForCommands(
-                object sender,
-                RoutedEventArgs e)
+        private static void SmartLabWidgetLoadedForCommands(
+            object sender,
+            RoutedEventArgs e)
         {
             if (sender is SmartLabWidget widget)
             {
@@ -73,10 +67,9 @@ namespace SmartLab.Client
             }
         }
 
-        private static void
-            SmartLabWidgetUnloadedForCommands(
-                object sender,
-                RoutedEventArgs e)
+        private static void SmartLabWidgetUnloadedForCommands(
+            object sender,
+            RoutedEventArgs e)
         {
             if (sender is SmartLabWidget widget)
             {
@@ -95,19 +88,14 @@ namespace SmartLab.Client
                 return;
             }
 
-            _pcCommandEventsInitialized =
-                true;
+            _pcCommandEventsInitialized = true;
 
-            _pcCommandTimer =
-                new DispatcherTimer
-                {
-                    Interval =
-                        TimeSpan.FromSeconds(1)
-                };
+            _pcCommandTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(1)
+            };
 
-            _pcCommandTimer.Tick +=
-                PcCommandTimer_Tick;
-
+            _pcCommandTimer.Tick += PcCommandTimer_Tick;
             _pcCommandTimer.Start();
 
             _ = PollPcCommandAsync();
@@ -121,18 +109,18 @@ namespace SmartLab.Client
         {
             _pcCommandTimer?.Stop();
 
-            _pcCommandEventsInitialized =
-                false;
+            CloseBlankScreen();
+
+            _pcCommandEventsInitialized = false;
         }
 
         // ==========================================================
         // TIMER
         // ==========================================================
 
-        private async void
-            PcCommandTimer_Tick(
-                object? sender,
-                EventArgs e)
+        private async void PcCommandTimer_Tick(
+            object? sender,
+            EventArgs e)
         {
             await PollPcCommandAsync();
         }
@@ -141,8 +129,7 @@ namespace SmartLab.Client
         // POLL PENDING COMMAND
         // ==========================================================
 
-        private async Task
-            PollPcCommandAsync()
+        private async Task PollPcCommandAsync()
         {
             if (_pcCommandPollingRunning ||
                 _isLoggingOut)
@@ -150,8 +137,7 @@ namespace SmartLab.Client
                 return;
             }
 
-            _pcCommandPollingRunning =
-                true;
+            _pcCommandPollingRunning = true;
 
             try
             {
@@ -180,8 +166,6 @@ namespace SmartLab.Client
                     return;
                 }
 
-                // Prevent processing the exact same
-                // command multiple times.
                 if (_lastProcessedPcCommandId ==
                     command.CommandId)
                 {
@@ -191,8 +175,7 @@ namespace SmartLab.Client
                 _lastProcessedPcCommandId =
                     command.CommandId;
 
-                await HandlePcCommandAsync(
-                    command);
+                await HandlePcCommandAsync(command);
             }
             catch
             {
@@ -201,8 +184,7 @@ namespace SmartLab.Client
             }
             finally
             {
-                _pcCommandPollingRunning =
-                    false;
+                _pcCommandPollingRunning = false;
             }
         }
 
@@ -210,15 +192,11 @@ namespace SmartLab.Client
         // HANDLE COMMAND
         // ==========================================================
 
-        private async Task
-            HandlePcCommandAsync(
-                PCCommandPendingResponse command)
+        private async Task HandlePcCommandAsync(
+            PCCommandPendingResponse command)
         {
-            bool success =
-                false;
-
-            string? result =
-                null;
+            bool success = false;
+            string? result = null;
 
             try
             {
@@ -235,9 +213,7 @@ namespace SmartLab.Client
                         command.Message?.Trim()
                         ?? string.Empty);
 
-                    success =
-                        true;
-
+                    success = true;
                     result =
                         "Message displayed successfully.";
                 }
@@ -257,17 +233,13 @@ namespace SmartLab.Client
 
                     if (locked)
                     {
-                        success =
-                            true;
-
+                        success = true;
                         result =
                             "Windows workstation locked.";
                     }
                     else
                     {
-                        success =
-                            false;
-
+                        success = false;
                         result =
                             "Windows LockWorkStation failed. " +
                             "Win32 error: " +
@@ -287,9 +259,7 @@ namespace SmartLab.Client
                 {
                     ShowBlankScreen();
 
-                    success =
-                        true;
-
+                    success = true;
                     result =
                         "Student display blanked successfully.";
                 }
@@ -300,20 +270,15 @@ namespace SmartLab.Client
 
                 else
                 {
-                    success =
-                        false;
-
+                    success = false;
                     result =
                         "Unsupported command type.";
                 }
             }
             catch (Exception ex)
             {
-                success =
-                    false;
-
-                result =
-                    ex.Message;
+                success = false;
+                result = ex.Message;
             }
 
             // ------------------------------------------------------
@@ -326,11 +291,8 @@ namespace SmartLab.Client
                     $"api/PCCommand/{command.CommandId}/complete",
                     new
                     {
-                        Success =
-                            success,
-
-                        Result =
-                            result
+                        Success = success,
+                        Result = result
                     });
             }
             catch
@@ -350,58 +312,53 @@ namespace SmartLab.Client
                 _blankScreenWindow != null)
             {
                 _blankScreenWindow.Activate();
-
                 return;
             }
 
-            _blankScreenActive =
-                true;
+            _blankScreenActive = true;
+            _closingBlankScreen = false;
 
-            _closingBlankScreen =
-                false;
+            Window overlay = new Window
+            {
+                WindowStyle =
+                    WindowStyle.None,
 
-            Window overlay =
-                new Window
-                {
-                    WindowStyle =
-                        WindowStyle.None,
+                ResizeMode =
+                    ResizeMode.NoResize,
 
-                    ResizeMode =
-                        ResizeMode.NoResize,
+                ShowInTaskbar =
+                    false,
 
-                    ShowInTaskbar =
-                        false,
+                ShowActivated =
+                    true,
 
-                    ShowActivated =
-                        true,
+                Topmost =
+                    true,
 
-                    Topmost =
-                        true,
+                Background =
+                    Brushes.Black,
 
-                    Background =
-                        Brushes.Black,
+                AllowsTransparency =
+                    false,
 
-                    AllowsTransparency =
-                        false,
+                WindowStartupLocation =
+                    WindowStartupLocation.Manual,
 
-                    WindowStartupLocation =
-                        WindowStartupLocation.Manual,
+                Left =
+                    SystemParameters.VirtualScreenLeft,
 
-                    Left =
-                        SystemParameters.VirtualScreenLeft,
+                Top =
+                    SystemParameters.VirtualScreenTop,
 
-                    Top =
-                        SystemParameters.VirtualScreenTop,
+                Width =
+                    SystemParameters.VirtualScreenWidth,
 
-                    Width =
-                        SystemParameters.VirtualScreenWidth,
+                Height =
+                    SystemParameters.VirtualScreenHeight,
 
-                    Height =
-                        SystemParameters.VirtualScreenHeight,
-
-                    Title =
-                        "SmartLab - Screen Blank"
-                };
+                Title =
+                    "SmartLab - Screen Blank"
+            };
 
             overlay.Closing +=
                 BlankScreenWindow_Closing;
@@ -416,14 +373,12 @@ namespace SmartLab.Client
                 overlay;
 
             overlay.Show();
-
             overlay.Activate();
-
             overlay.Focus();
         }
 
         // ==========================================================
-        // PREVENT CLOSING
+        // PREVENT CLOSING EXCEPT EMERGENCY HOTKEY
         // ==========================================================
 
         private void BlankScreenWindow_Closing(
@@ -432,33 +387,46 @@ namespace SmartLab.Client
         {
             if (!_closingBlankScreen)
             {
-                e.Cancel =
-                    true;
+                e.Cancel = true;
             }
         }
 
         // ==========================================================
-        // PREVENT KEYBOARD DISMISSAL
+        // EMERGENCY RECOVERY FOR LOCAL TESTING
+        // CTRL + SHIFT + ALT + R
         // ==========================================================
 
         private void BlankScreenWindow_PreviewKeyDown(
             object sender,
             KeyEventArgs e)
         {
-            e.Handled =
-                true;
+            bool emergencyRecovery =
+                Keyboard.Modifiers ==
+                    (ModifierKeys.Control |
+                     ModifierKeys.Shift |
+                     ModifierKeys.Alt)
+                &&
+                e.Key == Key.R;
+
+            if (emergencyRecovery)
+            {
+                CloseBlankScreen();
+                e.Handled = true;
+                return;
+            }
+
+            e.Handled = true;
         }
 
         // ==========================================================
-        // PREVENT MOUSE DISMISSAL
+        // BLOCK MOUSE DISMISSAL
         // ==========================================================
 
         private void BlankScreenWindow_PreviewMouseDown(
             object sender,
             MouseButtonEventArgs e)
         {
-            e.Handled =
-                true;
+            e.Handled = true;
         }
 
         // ==========================================================
@@ -469,34 +437,25 @@ namespace SmartLab.Client
         {
             if (_blankScreenWindow == null)
             {
-                _blankScreenActive =
-                    false;
-
+                _blankScreenActive = false;
                 return;
             }
 
             try
             {
-                _closingBlankScreen =
-                    true;
-
+                _closingBlankScreen = true;
                 _blankScreenWindow.Close();
             }
             catch
             {
                 // Ignore cleanup errors during
-                // logout/close.
+                // restore/logout/close.
             }
             finally
             {
-                _blankScreenWindow =
-                    null;
-
-                _blankScreenActive =
-                    false;
-
-                _closingBlankScreen =
-                    false;
+                _blankScreenWindow = null;
+                _blankScreenActive = false;
+                _closingBlankScreen = false;
             }
         }
 
@@ -523,13 +482,9 @@ namespace SmartLab.Client
             PCCommandPendingResponse
         {
             public long CommandId { get; set; }
-
             public int PCId { get; set; }
-
             public string? CommandType { get; set; }
-
             public string? Message { get; set; }
-
             public DateTime CreatedAt { get; set; }
         }
     }

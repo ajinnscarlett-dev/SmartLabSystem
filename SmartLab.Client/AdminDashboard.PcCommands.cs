@@ -9,7 +9,7 @@ namespace SmartLab.Client
 {
     // ==========================================================
     // ADMIN DASHBOARD - PC COMMANDS
-    // STEP 29 - SEND MESSAGE + LOCK + BLANK SCREEN
+    // STEP 30 - SEND MESSAGE + LOCK + PERSISTENT BLANK SCREEN
     // ==========================================================
 
     public partial class AdminDashboard
@@ -59,38 +59,27 @@ namespace SmartLab.Client
                 {
                     Title =
                         $"Send Message - {_selectedPc.PcNumber}",
-
                     Width = 520,
                     Height = 360,
-
                     WindowStartupLocation =
                         WindowStartupLocation.CenterOwner,
-
-                    ResizeMode =
-                        ResizeMode.NoResize,
-
+                    ResizeMode = ResizeMode.NoResize,
                     Owner = this,
-
                     Background =
                         new SolidColorBrush(
-                            Color.FromRgb(
-                                7,
-                                16,
-                                25))
+                            Color.FromRgb(7, 16, 25))
                 };
 
             Grid root =
                 new Grid
                 {
-                    Margin =
-                        new Thickness(22)
+                    Margin = new Thickness(22)
                 };
 
             root.RowDefinitions.Add(
                 new RowDefinition
                 {
-                    Height =
-                        GridLength.Auto
+                    Height = GridLength.Auto
                 });
 
             root.RowDefinitions.Add(
@@ -105,8 +94,7 @@ namespace SmartLab.Client
             root.RowDefinitions.Add(
                 new RowDefinition
                 {
-                    Height =
-                        GridLength.Auto
+                    Height = GridLength.Auto
                 });
 
             TextBlock title =
@@ -114,15 +102,9 @@ namespace SmartLab.Client
                 {
                     Text =
                         $"Send message to {_selectedPc.PcNumber}",
-
                     FontSize = 20,
-
-                    FontWeight =
-                        FontWeights.SemiBold,
-
-                    Foreground =
-                        Brushes.White,
-
+                    FontWeight = FontWeights.SemiBold,
+                    Foreground = Brushes.White,
                     Margin =
                         new Thickness(
                             0,
@@ -138,36 +120,19 @@ namespace SmartLab.Client
                 new TextBox
                 {
                     AcceptsReturn = true,
-
-                    TextWrapping =
-                        TextWrapping.Wrap,
-
+                    TextWrapping = TextWrapping.Wrap,
                     VerticalScrollBarVisibility =
                         ScrollBarVisibility.Auto,
-
                     MaxLength = 1000,
-
                     FontSize = 13,
-
-                    Foreground =
-                        Brushes.White,
-
+                    Foreground = Brushes.White,
                     Background =
                         new SolidColorBrush(
-                            Color.FromRgb(
-                                14,
-                                28,
-                                39)),
-
+                            Color.FromRgb(14, 28, 39)),
                     BorderBrush =
                         new SolidColorBrush(
-                            Color.FromRgb(
-                                42,
-                                58,
-                                69)),
-
-                    Padding =
-                        new Thickness(10)
+                            Color.FromRgb(42, 58, 69)),
+                    Padding = new Thickness(10)
                 };
 
             Grid.SetRow(messageBox, 1);
@@ -176,12 +141,9 @@ namespace SmartLab.Client
             StackPanel buttons =
                 new StackPanel
                 {
-                    Orientation =
-                        Orientation.Horizontal,
-
+                    Orientation = Orientation.Horizontal,
                     HorizontalAlignment =
                         HorizontalAlignment.Right,
-
                     Margin =
                         new Thickness(
                             0,
@@ -193,12 +155,9 @@ namespace SmartLab.Client
             Button cancelButton =
                 new Button
                 {
-                    Content =
-                        "CANCEL",
-
+                    Content = "CANCEL",
                     Width = 90,
                     Height = 34,
-
                     Margin =
                         new Thickness(
                             0,
@@ -210,37 +169,28 @@ namespace SmartLab.Client
             Button sendButton =
                 new Button
                 {
-                    Content =
-                        "SEND",
-
+                    Content = "SEND",
                     Width = 90,
                     Height = 34,
-
                     Background =
                         new SolidColorBrush(
                             Color.FromRgb(
                                 33,
                                 93,
                                 159)),
-
-                    Foreground =
-                        Brushes.White,
-
-                    BorderThickness =
-                        new Thickness(0)
+                    Foreground = Brushes.White,
+                    BorderThickness = new Thickness(0)
                 };
 
             cancelButton.Click +=
-                (s, args) =>
-                    dialog.Close();
+                (s, args) => dialog.Close();
 
             sendButton.Click += async (s, args) =>
             {
                 string message =
                     messageBox.Text.Trim();
 
-                if (string.IsNullOrWhiteSpace(
-                    message))
+                if (string.IsNullOrWhiteSpace(message))
                 {
                     MessageBox.Show(
                         "Enter a message first.",
@@ -258,17 +208,13 @@ namespace SmartLab.Client
 
                 try
                 {
-                    var request =
-                        new PCCommandSendMessageRequest
-                        {
-                            Message =
-                                message
-                        };
-
                     var response =
                         await _httpClient.PostAsJsonAsync(
                             $"api/PCCommand/{_selectedPc.PcId}/send-message",
-                            request);
+                            new PCCommandSendMessageRequest
+                            {
+                                Message = message
+                            });
 
                     string responseText =
                         await response.Content
@@ -285,7 +231,6 @@ namespace SmartLab.Client
                         sendButton.IsEnabled = true;
                         cancelButton.IsEnabled = true;
                         sendButton.Content = "SEND";
-
                         return;
                     }
 
@@ -300,7 +245,6 @@ namespace SmartLab.Client
                         result == null
                             ? "Message command queued."
                             : $"Message queued successfully.\n\nCommand ID: {result.CommandId}",
-
                         "SmartLab - Send Message",
                         MessageBoxButton.OK,
                         MessageBoxImage.Information);
@@ -316,7 +260,6 @@ namespace SmartLab.Client
                     MessageBox.Show(
                         "Unable to send the message.\n\n" +
                         ex.Message,
-
                         "SmartLab - Send Message",
                         MessageBoxButton.OK,
                         MessageBoxImage.Error);
@@ -329,9 +272,7 @@ namespace SmartLab.Client
             Grid.SetRow(buttons, 2);
             root.Children.Add(buttons);
 
-            dialog.Content =
-                root;
-
+            dialog.Content = root;
             dialog.ShowDialog();
         }
 
@@ -350,7 +291,6 @@ namespace SmartLab.Client
                     "SmartLab - Lock Computer",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
-
                 return;
             }
 
@@ -371,7 +311,6 @@ namespace SmartLab.Client
                     "SmartLab - Lock Computer",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
-
                 return;
             }
 
@@ -436,7 +375,7 @@ namespace SmartLab.Client
             MessageBoxResult confirm =
                 MessageBox.Show(
                     $"Blank {_selectedPc.PcNumber} screen now?\n\n" +
-                    "The student's display will temporarily be covered by a blank screen.",
+                    "The student's display will stay blank until the Student client is closed or emergency recovery is used.",
                     "SmartLab - Blank Screen",
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Warning);
@@ -455,7 +394,7 @@ namespace SmartLab.Client
         // SIMPLE PC COMMAND QUEUE
         // ==========================================================
 
-        private async Task QueueSimplePcCommandAsync(
+        private async Task<bool> QueueSimplePcCommandAsync(
             string endpoint,
             string commandName)
         {
@@ -478,7 +417,7 @@ namespace SmartLab.Client
                         MessageBoxButton.OK,
                         MessageBoxImage.Warning);
 
-                    return;
+                    return false;
                 }
 
                 PCCommandSimpleResponse? result =
@@ -490,22 +429,24 @@ namespace SmartLab.Client
                     result == null
                         ? $"{commandName} command queued."
                         : $"{commandName} command queued successfully.\n\nCommand ID: {result.CommandId}",
-
                     $"SmartLab - {commandName}",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
 
                 await LoadActivityLogs();
+
+                return true;
             }
             catch (Exception ex)
             {
                 MessageBox.Show(
                     $"Unable to send the {commandName.ToLowerInvariant()} command.\n\n" +
                     ex.Message,
-
                     $"SmartLab - {commandName}",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
+
+                return false;
             }
         }
 
@@ -515,31 +456,23 @@ namespace SmartLab.Client
 
         private sealed class PCCommandSendMessageRequest
         {
-            public string Message { get; set; } =
-                string.Empty;
+            public string Message { get; set; } = string.Empty;
         }
 
         private sealed class PCCommandSendMessageResponse
         {
             public long CommandId { get; set; }
-
             public int PCId { get; set; }
-
             public string? PcNumber { get; set; }
-
             public string? Status { get; set; }
         }
 
         private sealed class PCCommandSimpleResponse
         {
             public long CommandId { get; set; }
-
             public int PCId { get; set; }
-
             public string? PcNumber { get; set; }
-
             public string? CommandType { get; set; }
-
             public string? Status { get; set; }
         }
     }
