@@ -110,6 +110,22 @@ namespace SmartLab.Server.Controllers
 
 
 
+
+        // ==========================================================
+        // RESTART COMPUTER
+        // ==========================================================
+
+        [Authorize(Roles = "Admin,Teacher")]
+        [HttpPost("{pcId}/restart")]
+        public async Task<IActionResult> RestartComputer(
+            int pcId)
+        {
+            return await QueuePcCommandAsync(
+                pcId,
+                "RESTART_COMPUTER",
+                null);
+        }
+
         // ==========================================================
         // LOG OFF USER
         // ==========================================================

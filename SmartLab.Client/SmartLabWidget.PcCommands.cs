@@ -28,6 +28,7 @@ namespace SmartLab.Client
             uint dwReason);
 
         private const uint EwxLogoff = 0x00000000;
+        private const uint EwxReboot = 0x00000002;
 
         // ==========================================================
         // BLANK SCREEN OVERLAY
@@ -188,6 +189,7 @@ namespace SmartLab.Client
             bool success = false;
             string? result = null;
             bool logoffAfterAcknowledgement = false;
+            bool restartAfterAcknowledgement = false;
 
             try
             {
@@ -269,6 +271,24 @@ namespace SmartLab.Client
                         "Unlock request displayed. " +
                         "Local Windows sign-in is required.";
                 }
+
+                else if (string.Equals(
+                    command.CommandType,
+                    "RESTART_COMPUTER",
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    // Record the command result before Windows
+                    // reboots, because the Student Client session
+                    // will terminate immediately after restart begins.
+
+                    success = true;
+
+                    result =
+                        "Windows restart request accepted. " +
+                        "The computer will restart.";
+
+                    restartAfterAcknowledgement = true;
+                }
                 else if (string.Equals(
                     command.CommandType,
                     "LOGOFF_USER",
@@ -314,6 +334,22 @@ namespace SmartLab.Client
             {
                 // Temporary acknowledgement failure should
                 // not crash or close the Student client.
+            }
+
+            if (restartAfterAcknowledgement)
+            {
+                try
+                {
+                    await Task.Delay(250);
+
+                    ExitWindowsEx(
+                        EwxReboot,
+                        0);
+                }
+                catch
+                {
+                    // The server result is already recorded.
+                }
             }
 
             if (logoffAfterAcknowledgement)
