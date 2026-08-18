@@ -193,14 +193,15 @@ namespace SmartLab.Client
             // ==========================================
             // FAST SCREEN UPLOAD TIMER
             // ==========================================
-            // Approximately 1.25 thumbnail frames per second.
+            // Approximately 2.5 thumbnail frames per second.
             // This is independent from the 2-second monitoring-status check.
 
             _screenUploadTimer =
                 new DispatcherTimer
                 {
+                    // Target interval: approximately 2.5 FPS.
                     Interval =
-                        TimeSpan.FromMilliseconds(800)
+                        TimeSpan.FromMilliseconds(400)
                 };
 
             _screenUploadTimer.Tick +=
