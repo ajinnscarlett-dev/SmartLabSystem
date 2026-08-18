@@ -12,13 +12,22 @@ namespace SmartLab.Client
     public partial class SmartLabWidget
     {
         // ==========================================================
-        // WINDOWS LOCK API
+        // WINDOWS LOCK / LOGOFF API
         // ==========================================================
 
         [DllImport(
             "user32.dll",
             SetLastError = true)]
         private static extern bool LockWorkStation();
+
+        [DllImport(
+            "user32.dll",
+            SetLastError = true)]
+        private static extern bool ExitWindowsEx(
+            uint uFlags,
+            uint dwReason);
+
+        private const uint EwxLogoff = 0x00000000;
 
         // ==========================================================
         // BLANK SCREEN OVERLAY
@@ -178,6 +187,7 @@ namespace SmartLab.Client
         {
             bool success = false;
             string? result = null;
+            bool logoffAfterAcknowledgement = false;
 
             try
             {
@@ -234,6 +244,18 @@ namespace SmartLab.Client
                 }
                 else if (string.Equals(
                     command.CommandType,
+                    "UNBLANK_SCREEN",
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    CloseBlankScreen();
+
+                    success = true;
+
+                    result =
+                        "Student display unblanked successfully.";
+                }
+                else if (string.Equals(
+                    command.CommandType,
                     "UNLOCK_REQUEST",
                     StringComparison.OrdinalIgnoreCase))
                 {
@@ -246,6 +268,23 @@ namespace SmartLab.Client
                     result =
                         "Unlock request displayed. " +
                         "Local Windows sign-in is required.";
+                }
+                else if (string.Equals(
+                    command.CommandType,
+                    "LOGOFF_USER",
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    // Record the result before signing Windows out.
+                    // This keeps the server-side Activity Log available
+                    // even though the Student session will terminate.
+
+                    success = true;
+
+                    result =
+                        "Windows logoff request accepted. " +
+                        "The current user session will be signed out.";
+
+                    logoffAfterAcknowledgement = true;
                 }
                 else
                 {
@@ -275,6 +314,23 @@ namespace SmartLab.Client
             {
                 // Temporary acknowledgement failure should
                 // not crash or close the Student client.
+            }
+
+            if (logoffAfterAcknowledgement)
+            {
+                try
+                {
+                    await Task.Delay(250);
+
+                    ExitWindowsEx(
+                        EwxLogoff,
+                        0);
+                }
+                catch
+                {
+                    // If Windows rejects the logoff request, no
+                    // additional UI action is attempted here.
+                }
             }
         }
 

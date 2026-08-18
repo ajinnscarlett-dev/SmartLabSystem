@@ -109,6 +109,37 @@ namespace SmartLab.Server.Controllers
         }
 
 
+
+        // ==========================================================
+        // LOG OFF USER
+        // ==========================================================
+
+        [Authorize(Roles = "Admin,Teacher")]
+        [HttpPost("{pcId}/logoff")]
+        public async Task<IActionResult> LogoffUser(
+            int pcId)
+        {
+            return await QueuePcCommandAsync(
+                pcId,
+                "LOGOFF_USER",
+                null);
+        }
+
+        // ==========================================================
+        // UNBLANK SCREEN
+        // ==========================================================
+
+        [Authorize(Roles = "Admin,Teacher")]
+        [HttpPost("{pcId}/unblank-screen")]
+        public async Task<IActionResult> UnblankScreen(
+            int pcId)
+        {
+            return await QueuePcCommandAsync(
+                pcId,
+                "UNBLANK_SCREEN",
+                null);
+        }
+
         // ==========================================================
         // UNLOCK REQUEST
         // ==========================================================
