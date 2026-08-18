@@ -27,8 +27,73 @@ namespace SmartLab.Client
             uint uFlags,
             uint dwReason);
 
+        [DllImport(
+            "advapi32.dll",
+            SetLastError = true)]
+        private static extern bool OpenProcessToken(
+            IntPtr processHandle,
+            uint desiredAccess,
+            out IntPtr tokenHandle);
+
+        [DllImport(
+            "advapi32.dll",
+            SetLastError = true,
+            CharSet = CharSet.Unicode)]
+        private static extern bool LookupPrivilegeValue(
+            string? lpSystemName,
+            string lpName,
+            out Luid luid);
+
+        [DllImport(
+            "advapi32.dll",
+            SetLastError = true)]
+        private static extern bool AdjustTokenPrivileges(
+            IntPtr tokenHandle,
+            bool disableAllPrivileges,
+            ref TokenPrivileges newState,
+            int bufferLength,
+            IntPtr previousState,
+            IntPtr returnLength);
+
+        [DllImport(
+            "kernel32.dll",
+            SetLastError = true)]
+        private static extern IntPtr GetCurrentProcess();
+
+        [DllImport(
+            "kernel32.dll",
+            SetLastError = true)]
+        private static extern bool CloseHandle(
+            IntPtr handle);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct Luid
+        {
+            public uint LowPart;
+            public int HighPart;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct LuidAndAttributes
+        {
+            public Luid Luid;
+            public uint Attributes;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct TokenPrivileges
+        {
+            public uint PrivilegeCount;
+            public LuidAndAttributes Privileges;
+        }
+
         private const uint EwxLogoff = 0x00000000;
         private const uint EwxReboot = 0x00000002;
+        private const uint TokenAdjustPrivileges = 0x0020;
+        private const uint TokenQuery = 0x0008;
+        private const uint SePrivilegeEnabled = 0x00000002;
+        private const string SeShutdownName =
+            "SeShutdownPrivilege";
 
         // ==========================================================
         // BLANK SCREEN OVERLAY
@@ -189,7 +254,6 @@ namespace SmartLab.Client
             bool success = false;
             string? result = null;
             bool logoffAfterAcknowledgement = false;
-            bool restartAfterAcknowledgement = false;
 
             try
             {
@@ -277,17 +341,23 @@ namespace SmartLab.Client
                     "RESTART_COMPUTER",
                     StringComparison.OrdinalIgnoreCase))
                 {
-                    // Record the command result before Windows
-                    // reboots, because the Student Client session
-                    // will terminate immediately after restart begins.
+                    if (TryStartWindowsRestart(
+                        out string restartError))
+                    {
+                        success = true;
 
-                    success = true;
+                        result =
+                            "Windows restart request accepted. " +
+                            "The computer will restart.";
+                    }
+                    else
+                    {
+                        success = false;
 
-                    result =
-                        "Windows restart request accepted. " +
-                        "The computer will restart.";
-
-                    restartAfterAcknowledgement = true;
+                        result =
+                            "Windows restart request failed. " +
+                            restartError;
+                    }
                 }
                 else if (string.Equals(
                     command.CommandType,
@@ -336,22 +406,6 @@ namespace SmartLab.Client
                 // not crash or close the Student client.
             }
 
-            if (restartAfterAcknowledgement)
-            {
-                try
-                {
-                    await Task.Delay(250);
-
-                    ExitWindowsEx(
-                        EwxReboot,
-                        0);
-                }
-                catch
-                {
-                    // The server result is already recorded.
-                }
-            }
-
             if (logoffAfterAcknowledgement)
             {
                 try
@@ -366,6 +420,111 @@ namespace SmartLab.Client
                 {
                     // If Windows rejects the logoff request, no
                     // additional UI action is attempted here.
+                }
+            }
+        }
+
+        private static bool TryStartWindowsRestart(
+            out string error)
+        {
+            error = string.Empty;
+
+            IntPtr tokenHandle = IntPtr.Zero;
+
+            try
+            {
+                const uint desiredAccess =
+                    TokenAdjustPrivileges |
+                    TokenQuery;
+
+                if (!OpenProcessToken(
+                    GetCurrentProcess(),
+                    desiredAccess,
+                    out tokenHandle))
+                {
+                    error =
+                        "OpenProcessToken failed. Win32 error: " +
+                        Marshal.GetLastWin32Error();
+
+                    return false;
+                }
+
+                if (!LookupPrivilegeValue(
+                    null,
+                    SeShutdownName,
+                    out Luid shutdownLuid))
+                {
+                    error =
+                        "LookupPrivilegeValue failed. Win32 error: " +
+                        Marshal.GetLastWin32Error();
+
+                    return false;
+                }
+
+                TokenPrivileges privileges =
+                    new TokenPrivileges
+                    {
+                        PrivilegeCount = 1,
+                        Privileges =
+                            new LuidAndAttributes
+                            {
+                                Luid = shutdownLuid,
+                                Attributes =
+                                    SePrivilegeEnabled
+                            }
+                    };
+
+                if (!AdjustTokenPrivileges(
+                    tokenHandle,
+                    false,
+                    ref privileges,
+                    0,
+                    IntPtr.Zero,
+                    IntPtr.Zero))
+                {
+                    error =
+                        "AdjustTokenPrivileges failed. Win32 error: " +
+                        Marshal.GetLastWin32Error();
+
+                    return false;
+                }
+
+                int privilegeError =
+                    Marshal.GetLastWin32Error();
+
+                if (privilegeError != 0)
+                {
+                    error =
+                        "Windows could not enable SeShutdownPrivilege. " +
+                        "Win32 error: " +
+                        privilegeError;
+
+                    return false;
+                }
+
+                if (!ExitWindowsEx(
+                    EwxReboot,
+                    0))
+                {
+                    error =
+                        "ExitWindowsEx(EWX_REBOOT) failed. Win32 error: " +
+                        Marshal.GetLastWin32Error();
+
+                    return false;
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                return false;
+            }
+            finally
+            {
+                if (tokenHandle != IntPtr.Zero)
+                {
+                    CloseHandle(tokenHandle);
                 }
             }
         }
