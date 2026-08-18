@@ -2,6 +2,7 @@
 using System.Net.Http.Json;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -112,6 +113,7 @@ namespace SmartLab.Client
         private bool _pcCommandPollingRunning;
         private long _lastProcessedPcCommandId;
         private bool _pcCommandEventsInitialized;
+        private bool _remoteControlActive;
 
         static SmartLabWidget()
         {
@@ -338,6 +340,120 @@ namespace SmartLab.Client
                 }
 
 
+
+                else if (string.Equals(
+                    command.CommandType,
+                    "REMOTE_CONTROL_START",
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    _remoteControlActive = true;
+
+                    success = true;
+                    result =
+                        "Remote control session started.";
+                }
+                else if (string.Equals(
+                    command.CommandType,
+                    "REMOTE_CONTROL_STOP",
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    _remoteControlActive = false;
+
+                    success = true;
+                    result =
+                        "Remote control session stopped.";
+                }
+                else if (string.Equals(
+                    command.CommandType,
+                    "REMOTE_KEY_PRESS",
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!_remoteControlActive)
+                    {
+                        success = false;
+                        result =
+                            "Remote control session is not active.";
+                    }
+                    else
+                    {
+                        RemoteKeyPayload? payload =
+                            JsonSerializer.Deserialize<RemoteKeyPayload>(
+                                command.Message ?? string.Empty);
+
+                        if (payload == null ||
+                            payload.KeyCode <= 0 ||
+                            payload.KeyCode > 255)
+                        {
+                            success = false;
+                            result =
+                                "Invalid remote key payload.";
+                        }
+                        else if (SendRemoteKeyPress(
+                            (ushort)payload.KeyCode))
+                        {
+                            success = true;
+                            result =
+                                "Remote key press sent.";
+                        }
+                        else
+                        {
+                            success = false;
+                            result =
+                                "Windows rejected the remote key press. " +
+                                "Win32 error: " +
+                                Marshal.GetLastWin32Error();
+                        }
+                    }
+                }
+                else if (string.Equals(
+                    command.CommandType,
+                    "REMOTE_MOUSE_CLICK",
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!_remoteControlActive)
+                    {
+                        success = false;
+                        result =
+                            "Remote control session is not active.";
+                    }
+                    else
+                    {
+                        RemoteMousePayload? payload =
+                            JsonSerializer.Deserialize<RemoteMousePayload>(
+                                command.Message ?? string.Empty);
+
+                        if (payload == null ||
+                            payload.X < 0 ||
+                            payload.X > 1 ||
+                            payload.Y < 0 ||
+                            payload.Y > 1)
+                        {
+                            success = false;
+                            result =
+                                "Invalid remote mouse payload.";
+                        }
+                        else if (SendRemoteMouseClick(
+                            payload.X,
+                            payload.Y,
+                            string.Equals(
+                                payload.Button,
+                                "RIGHT",
+                                StringComparison.OrdinalIgnoreCase)))
+                        {
+                            success = true;
+                            result =
+                                "Remote mouse click sent.";
+                        }
+                        else
+                        {
+                            success = false;
+                            result =
+                                "Windows rejected the remote mouse click. " +
+                                "Win32 error: " +
+                                Marshal.GetLastWin32Error();
+                        }
+                    }
+                }
                 else if (string.Equals(
                     command.CommandType,
                     "SHUTDOWN_COMPUTER",
@@ -447,6 +563,240 @@ namespace SmartLab.Client
                     // additional UI action is attempted here.
                 }
             }
+        }
+
+
+        // ==========================================================
+        // REMOTE INPUT
+        // ==========================================================
+
+        [DllImport(
+            "user32.dll",
+            SetLastError = true)]
+        private static extern uint SendInput(
+            uint numberOfInputs,
+            INPUT[] inputs,
+            int sizeOfInput);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct INPUT
+        {
+            public uint Type;
+            public InputUnion Data;
+        }
+
+        [StructLayout(LayoutKind.Explicit)]
+        private struct InputUnion
+        {
+            [FieldOffset(0)]
+            public MOUSEINPUT Mouse;
+
+            [FieldOffset(0)]
+            public KEYBDINPUT Keyboard;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct MOUSEINPUT
+        {
+            public int Dx;
+            public int Dy;
+            public uint MouseData;
+            public uint DwFlags;
+            public uint Time;
+            public IntPtr DwExtraInfo;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct KEYBDINPUT
+        {
+            public ushort Vk;
+            public ushort Scan;
+            public uint Flags;
+            public uint Time;
+            public IntPtr DwExtraInfo;
+        }
+
+        private const uint InputMouse = 0;
+        private const uint InputKeyboard = 1;
+
+        private const uint MouseEventfMove = 0x0001;
+        private const uint MouseEventfLeftDown = 0x0002;
+        private const uint MouseEventfLeftUp = 0x0004;
+        private const uint MouseEventfRightDown = 0x0008;
+        private const uint MouseEventfRightUp = 0x0010;
+        private const uint MouseEventfAbsolute = 0x8000;
+        private const uint MouseEventfVirtualDesk = 0x4000;
+
+        private static bool SendRemoteKeyPress(
+            ushort virtualKey)
+        {
+            INPUT[] inputs =
+            {
+                new INPUT
+                {
+                    Type = InputKeyboard,
+                    Data =
+                        new InputUnion
+                        {
+                            Keyboard =
+                                new KEYBDINPUT
+                                {
+                                    Vk = virtualKey,
+                                    Scan = 0,
+                                    Flags = 0,
+                                    Time = 0,
+                                    DwExtraInfo = IntPtr.Zero
+                                }
+                        }
+                },
+
+                new INPUT
+                {
+                    Type = InputKeyboard,
+                    Data =
+                        new InputUnion
+                        {
+                            Keyboard =
+                                new KEYBDINPUT
+                                {
+                                    Vk = virtualKey,
+                                    Scan = 0,
+                                    Flags = 0x0002,
+                                    Time = 0,
+                                    DwExtraInfo = IntPtr.Zero
+                                }
+                        }
+                }
+            };
+
+            return SendInput(
+                (uint)inputs.Length,
+                inputs,
+                Marshal.SizeOf<INPUT>())
+                == inputs.Length;
+        }
+
+        private static bool SendRemoteMouseClick(
+            double normalizedX,
+            double normalizedY,
+            bool rightButton)
+        {
+            double virtualWidth =
+                Math.Max(
+                    1,
+                    SystemParameters.VirtualScreenWidth);
+
+            double virtualHeight =
+                Math.Max(
+                    1,
+                    SystemParameters.VirtualScreenHeight);
+
+            double screenX =
+                SystemParameters.VirtualScreenLeft +
+                normalizedX * virtualWidth;
+
+            double screenY =
+                SystemParameters.VirtualScreenTop +
+                normalizedY * virtualHeight;
+
+            int absoluteX =
+                (int)Math.Round(
+                    ((screenX -
+                      SystemParameters.VirtualScreenLeft) /
+                     virtualWidth) *
+                    65535.0);
+
+            int absoluteY =
+                (int)Math.Round(
+                    ((screenY -
+                      SystemParameters.VirtualScreenTop) /
+                     virtualHeight) *
+                    65535.0);
+
+            uint down =
+                rightButton
+                    ? MouseEventfRightDown
+                    : MouseEventfLeftDown;
+
+            uint up =
+                rightButton
+                    ? MouseEventfRightUp
+                    : MouseEventfLeftUp;
+
+            INPUT[] inputs =
+            {
+                new INPUT
+                {
+                    Type = InputMouse,
+                    Data =
+                        new InputUnion
+                        {
+                            Mouse =
+                                new MOUSEINPUT
+                                {
+                                    Dx = absoluteX,
+                                    Dy = absoluteY,
+                                    MouseData = 0,
+                                    DwFlags =
+                                        MouseEventfMove |
+                                        MouseEventfAbsolute |
+                                        MouseEventfVirtualDesk,
+                                    Time = 0,
+                                    DwExtraInfo = IntPtr.Zero
+                                }
+                        }
+                },
+
+                new INPUT
+                {
+                    Type = InputMouse,
+                    Data =
+                        new InputUnion
+                        {
+                            Mouse =
+                                new MOUSEINPUT
+                                {
+                                    Dx = absoluteX,
+                                    Dy = absoluteY,
+                                    MouseData = 0,
+                                    DwFlags =
+                                        MouseEventfAbsolute |
+                                        MouseEventfVirtualDesk |
+                                        down,
+                                    Time = 0,
+                                    DwExtraInfo = IntPtr.Zero
+                                }
+                        }
+                },
+
+                new INPUT
+                {
+                    Type = InputMouse,
+                    Data =
+                        new InputUnion
+                        {
+                            Mouse =
+                                new MOUSEINPUT
+                                {
+                                    Dx = absoluteX,
+                                    Dy = absoluteY,
+                                    MouseData = 0,
+                                    DwFlags =
+                                        MouseEventfAbsolute |
+                                        MouseEventfVirtualDesk |
+                                        up,
+                                    Time = 0,
+                                    DwExtraInfo = IntPtr.Zero
+                                }
+                        }
+                }
+            };
+
+            return SendInput(
+                (uint)inputs.Length,
+                inputs,
+                Marshal.SizeOf<INPUT>())
+                == inputs.Length;
         }
 
         private static bool TryStartWindowsShutdown(
@@ -815,6 +1165,19 @@ namespace SmartLab.Client
                 "SmartLab - Message from Instructor",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
+        }
+
+
+        private sealed class RemoteKeyPayload
+        {
+            public int KeyCode { get; set; }
+        }
+
+        private sealed class RemoteMousePayload
+        {
+            public double X { get; set; }
+            public double Y { get; set; }
+            public string? Button { get; set; }
         }
 
         private sealed class PCCommandPendingResponse

@@ -34,6 +34,9 @@ namespace SmartLab.Server.Controllers
         private static readonly ConcurrentDictionary<int, long>
             PendingCommandByPc = new();
 
+        private static readonly ConcurrentDictionary<int, int>
+            RemoteControlSessions = new();
+
         public PCCommandController(
             AppDbContext context)
         {
@@ -110,6 +113,117 @@ namespace SmartLab.Server.Controllers
 
 
 
+
+
+        // ==========================================================
+        // REMOTE CONTROL - START SESSION
+        // ==========================================================
+
+        [Authorize(Roles = "Admin,Teacher")]
+        [HttpPost("{pcId}/remote-control/start")]
+        public async Task<IActionResult> StartRemoteControl(
+            int pcId)
+        {
+            return await QueuePcCommandAsync(
+                pcId,
+                "REMOTE_CONTROL_START",
+                null);
+        }
+
+        // ==========================================================
+        // REMOTE CONTROL - STOP SESSION
+        // ==========================================================
+
+        [Authorize(Roles = "Admin,Teacher")]
+        [HttpPost("{pcId}/remote-control/stop")]
+        public async Task<IActionResult> StopRemoteControl(
+            int pcId)
+        {
+            return await QueuePcCommandAsync(
+                pcId,
+                "REMOTE_CONTROL_STOP",
+                null,
+                true);
+        }
+
+        // ==========================================================
+        // REMOTE CONTROL - KEY PRESS
+        // ==========================================================
+
+        [Authorize(Roles = "Admin,Teacher")]
+        [HttpPost("{pcId}/remote-control/key")]
+        public async Task<IActionResult> RemoteKeyPress(
+            int pcId,
+            [FromBody] RemoteKeyRequest request)
+        {
+            if (request.KeyCode <= 0 ||
+                request.KeyCode > 255)
+            {
+                return BadRequest(new
+                {
+                    message = "Invalid Windows virtual-key code."
+                });
+            }
+
+            return await QueuePcCommandAsync(
+                pcId,
+                "REMOTE_KEY_PRESS",
+                System.Text.Json.JsonSerializer.Serialize(
+                    new
+                    {
+                        keyCode = request.KeyCode
+                    }),
+                true);
+        }
+
+        // ==========================================================
+        // REMOTE CONTROL - MOUSE CLICK
+        // ==========================================================
+
+        [Authorize(Roles = "Admin,Teacher")]
+        [HttpPost("{pcId}/remote-control/mouse-click")]
+        public async Task<IActionResult> RemoteMouseClick(
+            int pcId,
+            [FromBody] RemoteMouseClickRequest request)
+        {
+            if (request.X < 0 ||
+                request.X > 1 ||
+                request.Y < 0 ||
+                request.Y > 1)
+            {
+                return BadRequest(new
+                {
+                    message =
+                        "Mouse coordinates must be normalized between 0 and 1."
+                });
+            }
+
+            string button =
+                request.Button?.Trim().ToUpperInvariant()
+                ?? "LEFT";
+
+            if (button != "LEFT" &&
+                button != "RIGHT")
+            {
+                return BadRequest(new
+                {
+                    message =
+                        "Supported mouse buttons are LEFT and RIGHT."
+                });
+            }
+
+            return await QueuePcCommandAsync(
+                pcId,
+                "REMOTE_MOUSE_CLICK",
+                System.Text.Json.JsonSerializer.Serialize(
+                    new
+                    {
+                        x = request.X,
+                        y = request.Y,
+                        button
+                    }),
+                true);
+        }
 
         // ==========================================================
         // SHUTDOWN COMPUTER
@@ -188,7 +302,8 @@ namespace SmartLab.Server.Controllers
             QueuePcCommandAsync(
                 int pcId,
                 string commandType,
-                string? message)
+                string? message,
+                bool requireRemoteControlSession = false)
         {
             PC? pc =
                 await _context.PCs
@@ -296,6 +411,25 @@ namespace SmartLab.Server.Controllers
                             message =
                                 "You are not authorized to control this PC's COMLAB."
                         });
+                }
+            }
+
+            // ======================================================
+            // REMOTE CONTROL SESSION AUTHORIZATION
+            // ======================================================
+
+            if (requireRemoteControlSession)
+            {
+                if (!RemoteControlSessions.TryGetValue(
+                        pcId,
+                        out int sessionUserId) ||
+                    sessionUserId != requestedByUserId)
+                {
+                    return Conflict(new
+                    {
+                        message =
+                            "Remote control session is not active for this PC."
+                    });
                 }
             }
 
@@ -564,6 +698,27 @@ namespace SmartLab.Server.Controllers
                     $" - {command.Result}";
             }
 
+            if (command.Status.Equals(
+                    "Completed",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                if (command.CommandType.Equals(
+                        "REMOTE_CONTROL_START",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    RemoteControlSessions[command.PCId] =
+                        command.RequestedByUserId;
+                }
+                else if (command.CommandType.Equals(
+                             "REMOTE_CONTROL_STOP",
+                             StringComparison.OrdinalIgnoreCase))
+                {
+                    RemoteControlSessions.TryRemove(
+                        command.PCId,
+                        out _);
+                }
+            }
+
             await LogActivityAsync(
                 userId,
                 command.PCId,
@@ -721,6 +876,18 @@ namespace SmartLab.Server.Controllers
         public class SendMessageRequest
         {
             public string? Message { get; set; }
+        }
+
+        public class RemoteKeyRequest
+        {
+            public int KeyCode { get; set; }
+        }
+
+        public class RemoteMouseClickRequest
+        {
+            public double X { get; set; }
+            public double Y { get; set; }
+            public string? Button { get; set; }
         }
 
         public class CompleteCommandRequest
