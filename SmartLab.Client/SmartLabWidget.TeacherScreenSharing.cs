@@ -273,7 +273,7 @@ namespace SmartLab.Client
             }
 
             if (_teacherScreenShareImage != null)
-            {
+            {   
                 _teacherScreenShareImage.Source =
                     bitmap;
             }

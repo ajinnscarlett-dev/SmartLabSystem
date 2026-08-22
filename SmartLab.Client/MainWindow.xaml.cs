@@ -27,7 +27,7 @@ namespace SmartLab.Client
             _httpClient = new HttpClient
             {
                 BaseAddress =
-                    new Uri("https://localhost:7277/")
+                    new Uri(SmartLabServerConfig.BaseUrl)
             };
 
             // ==========================================
@@ -327,12 +327,16 @@ namespace SmartLab.Client
                     "Student",
                     StringComparison.OrdinalIgnoreCase))
                 {
+                    // ==========================================
+                    // LOGIN TO THIS PHYSICAL PC
+                    // SERVER AUTO-REGISTERS THE PC IF NEEDED
+                    // ==========================================
+
                     StatusText.Text =
                         $"Connecting to {_pcNumber}...";
 
-                    // ==========================================
-                    // LOGIN TO THIS PHYSICAL PC
-                    // ==========================================
+                    StatusText.Text =
+                        $"Connecting to {_pcNumber}...";
 
                     var pcResponse =
                         await _httpClient.PostAsync(
@@ -397,17 +401,6 @@ namespace SmartLab.Client
                             .GetProperty("pcNumber")
                             .GetString()
                             ?? _pcNumber;
-
-                    // ==========================================
-                    // REGISTER MAC + IP
-                    // ==========================================
-
-                    StatusText.Text =
-                        "Registering PC network identity...";
-
-                    await RegisterThisPcNetworkIdentity(
-                        userId
-                    );
 
                     // ==========================================
                     // OPEN SMARTLAB WIDGET

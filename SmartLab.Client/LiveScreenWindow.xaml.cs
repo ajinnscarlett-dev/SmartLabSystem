@@ -70,7 +70,7 @@ namespace SmartLab.Client
             {
                 BaseAddress =
                     new Uri(
-                        "https://localhost:7277/"
+                        SmartLabServerConfig.BaseUrl
                     )
             };
 

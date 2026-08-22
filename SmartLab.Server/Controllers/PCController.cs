@@ -574,15 +574,35 @@ namespace SmartLab.Server.Controllers
 
             var pc = await _context.PCs
                 .FirstOrDefaultAsync(p =>
-                    p.PCNumber == pcNumber);
+                    p.PCNumber.ToLower() == pcNumber.ToLower());
+
+            // ==========================================
+            // AUTO REGISTER THIS COMPUTER
+            // ==========================================
 
             if (pc == null)
             {
-                return NotFound(new
+                pc = new PC
                 {
-                    message =
-                        $"PC {pcNumber} is not registered."
-                });
+                    PCNumber = pcNumber.Trim(),
+                    Status = "Available",
+                    CurrentUserId = null,
+                    LastSeen = DateTime.Now,
+                    IsEnabled = true,
+                    MaintenanceReason = null,
+                    MaintenanceStarted = null
+                };
+
+                _context.PCs.Add(pc);
+
+                await _context.SaveChangesAsync();
+
+                await LogActivity(
+                    userId,
+                    pc.PCId,
+                    "PC Auto Registered",
+                    $"PC {pc.PCNumber} was automatically registered by SmartLab."
+                );
             }
 
             if (!pc.IsEnabled)

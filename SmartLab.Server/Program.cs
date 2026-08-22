@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -89,10 +89,6 @@ builder.Services
         // ==========================================
         // TEMPORARY JWT DIAGNOSTIC LOGGING
         // ==========================================
-        //
-        // This does NOT print the token itself.
-        // It only prints why validation succeeds/fails.
-        //
 
         options.Events =
             new JwtBearerEvents
@@ -222,9 +218,14 @@ if (app.Environment.IsDevelopment())
 
 // ==========================================
 // HTTPS
+// DEVELOPMENT: DO NOT FORCE HTTP → HTTPS
+// PRODUCTION: FORCE HTTPS
 // ==========================================
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 
 // ==========================================

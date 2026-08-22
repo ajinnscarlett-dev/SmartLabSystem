@@ -27,7 +27,7 @@ namespace SmartLab.Client
 
             _httpClient = new HttpClient
             {
-                BaseAddress = new Uri("https://localhost:7277/")
+                BaseAddress = new Uri(SmartLabServerConfig.BaseUrl)
             };
 
             // ==========================================
