@@ -578,6 +578,17 @@ namespace SmartLab.Client
             INPUT[] inputs,
             int sizeOfInput);
 
+        [DllImport(
+            "user32.dll",
+            SetLastError = true)]
+        private static extern int GetSystemMetrics(
+            int nIndex);
+
+        private const int SmXVirtualScreen = 76;
+        private const int SmYVirtualScreen = 77;
+        private const int SmCxVirtualScreen = 78;
+        private const int SmCyVirtualScreen = 79;
+
         [StructLayout(LayoutKind.Sequential)]
         private struct INPUT
         {
@@ -681,37 +692,82 @@ namespace SmartLab.Client
             double normalizedY,
             bool rightButton)
         {
-            double virtualWidth =
-                Math.Max(
-                    1,
-                    SystemParameters.VirtualScreenWidth);
+            // Use the actual Windows virtual desktop in physical pixels.
+            // This avoids WPF DIP/DPI scaling affecting remote click position.
 
-            double virtualHeight =
+            int virtualLeft =
+                GetSystemMetrics(
+                    SmXVirtualScreen);
+
+            int virtualTop =
+                GetSystemMetrics(
+                    SmYVirtualScreen);
+
+            int virtualWidth =
                 Math.Max(
                     1,
-                    SystemParameters.VirtualScreenHeight);
+                    GetSystemMetrics(
+                        SmCxVirtualScreen));
+
+            int virtualHeight =
+                Math.Max(
+                    1,
+                    GetSystemMetrics(
+                        SmCyVirtualScreen));
+
+            normalizedX =
+                Math.Clamp(
+                    normalizedX,
+                    0.0,
+                    1.0);
+
+            normalizedY =
+                Math.Clamp(
+                    normalizedY,
+                    0.0,
+                    1.0);
 
             double screenX =
-                SystemParameters.VirtualScreenLeft +
-                normalizedX * virtualWidth;
+                virtualLeft +
+                normalizedX *
+                Math.Max(
+                    1,
+                    virtualWidth - 1);
 
             double screenY =
-                SystemParameters.VirtualScreenTop +
-                normalizedY * virtualHeight;
+                virtualTop +
+                normalizedY *
+                Math.Max(
+                    1,
+                    virtualHeight - 1);
 
             int absoluteX =
                 (int)Math.Round(
-                    ((screenX -
-                      SystemParameters.VirtualScreenLeft) /
-                     virtualWidth) *
+                    ((screenX - virtualLeft) /
+                     Math.Max(
+                         1,
+                         virtualWidth - 1)) *
                     65535.0);
 
             int absoluteY =
                 (int)Math.Round(
-                    ((screenY -
-                      SystemParameters.VirtualScreenTop) /
-                     virtualHeight) *
+                    ((screenY - virtualTop) /
+                     Math.Max(
+                         1,
+                         virtualHeight - 1)) *
                     65535.0);
+
+            absoluteX =
+                Math.Clamp(
+                    absoluteX,
+                    0,
+                    65535);
+
+            absoluteY =
+                Math.Clamp(
+                    absoluteY,
+                    0,
+                    65535);
 
             uint down =
                 rightButton
