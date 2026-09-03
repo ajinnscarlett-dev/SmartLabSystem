@@ -1,9 +1,11 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.IO;
+using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace SmartLab.Client
@@ -11,45 +13,44 @@ namespace SmartLab.Client
     public static class SmartLabServerConfig
     {
         private const int ServerPort = 5047;
-        private const int ConnectTimeoutMilliseconds = 250;
+        private const int DiscoveryPort = 5048;
+        private const int ConnectTimeoutMilliseconds = 300;
+        private const int DiscoveryTimeoutMilliseconds = 1000;
 
-        public static string BaseUrl { get; }
+        private const string DiscoveryRequest =
+            "SMARTLAB_DISCOVERY_V1";
+
+        private const string DiscoveryResponse =
+            "SMARTLAB_SERVER_V1|5047";
+
+        public static string BaseUrl { get; private set; }
 
         static SmartLabServerConfig()
         {
-            string configuredUrl =
-                LoadConfiguredServerUrl();
-
-            // ==========================================================
-            // FIRST: TRY THE CONFIGURED SERVER
-            // ==========================================================
-
-            if (IsServerReachable(configuredUrl))
-            {
-                BaseUrl =
-                    EnsureTrailingSlash(
-                        configuredUrl);
-
-                return;
-            }
-
-            // ==========================================================
-            // SECOND: DISCOVER SERVER ON THE LOCAL /24 NETWORK
-            // ==========================================================
-
-            string? discoveredUrl =
-                DiscoverServerOnLocalNetwork();
-
-            BaseUrl =
-                !string.IsNullOrWhiteSpace(discoveredUrl)
-                    ? discoveredUrl
-                    : EnsureTrailingSlash(
-                        configuredUrl);
+            // IMPORTANT:
+            // Do not perform network discovery during startup.
+            BaseUrl = LoadConfiguredServerUrl();
         }
 
-        // ==========================================================
-        // LOAD CONFIGURED SERVER URL
-        // ==========================================================
+        public static async Task<bool> ResolveServerAsync()
+        {
+            if (IsServerReachable(BaseUrl))
+            {
+                return true;
+            }
+
+            string? discovered =
+                await DiscoverServerOnLocalNetworkAsync();
+
+            if (string.IsNullOrWhiteSpace(
+                discovered))
+            {
+                return false;
+            }
+
+            BaseUrl = discovered;
+            return true;
+        }
 
         private static string LoadConfiguredServerUrl()
         {
@@ -63,45 +64,38 @@ namespace SmartLab.Client
                         AppContext.BaseDirectory,
                         "appsettings.json");
 
-                if (!File.Exists(configPath))
+                if (File.Exists(configPath))
                 {
-                    return serverUrl;
-                }
+                    string json =
+                        File.ReadAllText(configPath);
 
-                string json =
-                    File.ReadAllText(
-                        configPath);
+                    using JsonDocument document =
+                        JsonDocument.Parse(json);
 
-                using JsonDocument document =
-                    JsonDocument.Parse(json);
-
-                if (document.RootElement.TryGetProperty(
-                    "ServerUrl",
-                    out JsonElement serverUrlElement))
-                {
-                    string? configuredUrl =
-                        serverUrlElement.GetString();
-
-                    if (!string.IsNullOrWhiteSpace(
-                        configuredUrl))
+                    if (document.RootElement.TryGetProperty(
+                        "ServerUrl",
+                        out JsonElement element))
                     {
-                        serverUrl =
-                            configuredUrl;
+                        string? configured =
+                            element.GetString();
+
+                        if (!string.IsNullOrWhiteSpace(
+                            configured))
+                        {
+                            serverUrl =
+                                configured;
+                        }
                     }
                 }
             }
             catch
             {
-                // Keep localhost default.
+                // Keep localhost fallback.
             }
 
             return EnsureTrailingSlash(
                 serverUrl);
         }
-
-        // ==========================================================
-        // CHECK ONE SERVER ADDRESS
-        // ==========================================================
 
         private static bool IsServerReachable(
             string baseUrl)
@@ -125,90 +119,179 @@ namespace SmartLab.Client
             }
         }
 
-        // ==========================================================
-        // AUTOMATIC LAN SERVER DISCOVERY
-        //
-        // IMPORTANT:
-        // This method is intentionally synchronous.
-        // It avoids blocking the WPF UI thread on async continuations
-        // during SmartLabServerConfig static initialization.
-        // ==========================================================
-
-        private static string? DiscoverServerOnLocalNetwork()
+        private static async Task<string?>
+            DiscoverServerOnLocalNetworkAsync()
         {
-            string? localIp =
-                GetActiveLocalIPv4();
+            using UdpClient udpClient =
+                new UdpClient(
+                    AddressFamily.InterNetwork);
 
-            if (string.IsNullOrWhiteSpace(localIp))
+            udpClient.EnableBroadcast = true;
+
+            byte[] requestBytes =
+                Encoding.UTF8.GetBytes(
+                    DiscoveryRequest);
+
+            foreach (
+                IPEndPoint endpoint
+                in GetBroadcastEndpoints())
             {
-                return null;
-            }
-
-            string[] parts =
-                localIp.Split('.');
-
-            if (parts.Length != 4)
-            {
-                return null;
-            }
-
-            if (!int.TryParse(
-                parts[3],
-                out int localLastOctet))
-            {
-                return null;
-            }
-
-            string networkPrefix =
-                $"{parts[0]}.{parts[1]}.{parts[2]}.";
-
-            ConcurrentBag<string> discovered =
-                new ConcurrentBag<string>();
-
-            ParallelOptions options =
-                new ParallelOptions
+                try
                 {
-                    MaxDegreeOfParallelism = 64
-                };
-
-            Parallel.For(
-                1,
-                255,
-                options,
-                (host, state) =>
+                    await udpClient.SendAsync(
+                        requestBytes,
+                        requestBytes.Length,
+                        endpoint);
+                }
+                catch
                 {
-                    if (host == localLastOctet ||
-                        !discovered.IsEmpty)
-                    {
-                        return;
-                    }
+                    // Try next endpoint.
+                }
+            }
 
-                    string candidateIp =
-                        networkPrefix + host;
+            using CancellationTokenSource timeout =
+                new CancellationTokenSource(
+                    DiscoveryTimeoutMilliseconds);
 
-                    if (CanConnectTcp(
-                        candidateIp,
-                        ServerPort))
-                    {
-                        discovered.Add(
-                            candidateIp);
-
-                        state.Stop();
-                    }
-                });
-
-            foreach (string ip in discovered)
+            while (!timeout.IsCancellationRequested)
             {
-                return
-                    $"http://{ip}:{ServerPort}/";
+                try
+                {
+                    UdpReceiveResult received =
+                        await udpClient.ReceiveAsync(
+                            timeout.Token);
+
+                    string response =
+                        Encoding.UTF8.GetString(
+                            received.Buffer);
+
+                    if (string.Equals(
+                        response,
+                        DiscoveryResponse,
+                        StringComparison.Ordinal))
+                    {
+                        return
+                            $"http://{received.RemoteEndPoint.Address}:{ServerPort}/";
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                catch
+                {
+                    break;
+                }
             }
 
             return null;
         }
 
-        // ==========================================================
-        // SYNCHRONOUS TCP CONNECT TEST
-        // ==========================================================
+        private static
+            System.Collections.Generic.List<IPEndPoint>
+            GetBroadcastEndpoints()
+        {
+            var endpoints =
+                new System.Collections.Generic.List<IPEndPoint>();
+
+            var seen =
+                new System.Collections.Generic.HashSet<string>(
+                    StringComparer.OrdinalIgnoreCase);
+
+            IPEndPoint universal =
+                new IPEndPoint(
+                    IPAddress.Broadcast,
+                    DiscoveryPort);
+
+            seen.Add(
+                universal.Address.ToString());
+
+            endpoints.Add(
+                universal);
+
+            foreach (
+                NetworkInterface networkInterface
+                in NetworkInterface.GetAllNetworkInterfaces())
+            {
+                if (networkInterface.OperationalStatus !=
+                    OperationalStatus.Up)
+                {
+                    continue;
+                }
+
+                if (networkInterface.NetworkInterfaceType ==
+                    NetworkInterfaceType.Loopback)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    IPInterfaceProperties properties =
+                        networkInterface.GetIPProperties();
+
+                    foreach (
+                        UnicastIPAddressInformation address
+                        in properties.UnicastAddresses)
+                    {
+                        if (address.Address.AddressFamily !=
+                            AddressFamily.InterNetwork)
+                        {
+                            continue;
+                        }
+
+                        IPAddress? mask =
+                            address.IPv4Mask;
+
+                        if (mask == null)
+                        {
+                            continue;
+                        }
+
+                        byte[] ipBytes =
+                            address.Address.GetAddressBytes();
+
+                        byte[] maskBytes =
+                            mask.GetAddressBytes();
+
+                        byte[] broadcastBytes =
+                            new byte[4];
+
+                        for (int i = 0;
+                             i < 4;
+                             i++)
+                        {
+                            broadcastBytes[i] =
+                                (byte)(
+                                    ipBytes[i] |
+                                    (byte)~maskBytes[i]);
+                        }
+
+                        IPAddress broadcast =
+                            new IPAddress(
+                                broadcastBytes);
+
+                        string broadcastText =
+                            broadcast.ToString();
+
+                        if (seen.Add(
+                            broadcastText))
+                        {
+                            endpoints.Add(
+                                new IPEndPoint(
+                                    broadcast,
+                                    DiscoveryPort));
+                        }
+                    }
+                }
+                catch
+                {
+                    // Ignore unsupported interfaces.
+                }
+            }
+
+            return endpoints;
+        }
 
         private static bool CanConnectTcp(
             string host,
@@ -237,66 +320,6 @@ namespace SmartLab.Client
                 return false;
             }
         }
-
-        // ==========================================================
-        // GET ACTIVE LOCAL IPV4
-        // ==========================================================
-
-        private static string? GetActiveLocalIPv4()
-        {
-            try
-            {
-                foreach (
-                    NetworkInterface networkInterface
-                    in NetworkInterface
-                        .GetAllNetworkInterfaces())
-                {
-                    if (networkInterface.OperationalStatus !=
-                        OperationalStatus.Up)
-                    {
-                        continue;
-                    }
-
-                    if (networkInterface.NetworkInterfaceType ==
-                        NetworkInterfaceType.Loopback)
-                    {
-                        continue;
-                    }
-
-                    IPInterfaceProperties properties =
-                        networkInterface.GetIPProperties();
-
-                    foreach (
-                        UnicastIPAddressInformation address
-                        in properties.UnicastAddresses)
-                    {
-                        if (address.Address.AddressFamily ==
-                            AddressFamily.InterNetwork)
-                        {
-                            string ip =
-                                address.Address.ToString();
-
-                            if (!ip.StartsWith(
-                                "169.254.",
-                                StringComparison.Ordinal))
-                            {
-                                return ip;
-                            }
-                        }
-                    }
-                }
-            }
-            catch
-            {
-                // Best effort.
-            }
-
-            return null;
-        }
-
-        // ==========================================================
-        // NORMALIZE URL
-        // ==========================================================
 
         private static string EnsureTrailingSlash(
             string url)

@@ -13,11 +13,6 @@ namespace SmartLab.Client
     public partial class MainWindow : Window
     {
         private readonly HttpClient _httpClient;
-
-        // ==========================================
-        // THIS COMPUTER'S SMARTLAB PC NUMBER
-        // ==========================================
-
         private readonly string _pcNumber;
 
         public MainWindow()
@@ -27,32 +22,23 @@ namespace SmartLab.Client
             _httpClient = new HttpClient
             {
                 BaseAddress =
-                    new Uri(SmartLabServerConfig.BaseUrl)
+                    new Uri(
+                        SmartLabServerConfig.BaseUrl)
             };
 
-            // ==========================================
-            // AUTH SESSION
-            // ==========================================
-
-            AuthSession.Apply(_httpClient);
-
-            // ==========================================
-            // AUTO-DETECT THIS COMPUTER
-            // ==========================================
+            AuthSession.Apply(
+                _httpClient);
 
             _pcNumber =
                 PCConfig.PCNumber;
         }
 
-        // ==========================================
-        // GET ACTIVE MAC ADDRESS
-        // ==========================================
-
         private static string? GetMacAddress()
         {
             try
             {
-                foreach (NetworkInterface networkInterface
+                foreach (
+                    NetworkInterface networkInterface
                     in NetworkInterface.GetAllNetworkInterfaces())
                 {
                     if (networkInterface.OperationalStatus !=
@@ -84,21 +70,17 @@ namespace SmartLab.Client
             }
             catch
             {
-                // Network identity is best-effort.
             }
 
             return null;
         }
 
-        // ==========================================
-        // GET ACTIVE LOCAL IPV4
-        // ==========================================
-
         private static string? GetLocalIPv4Address()
         {
             try
             {
-                foreach (NetworkInterface networkInterface
+                foreach (
+                    NetworkInterface networkInterface
                     in NetworkInterface.GetAllNetworkInterfaces())
                 {
                     if (networkInterface.OperationalStatus !=
@@ -116,7 +98,8 @@ namespace SmartLab.Client
                     IPInterfaceProperties properties =
                         networkInterface.GetIPProperties();
 
-                    foreach (UnicastIPAddressInformation address
+                    foreach (
+                        UnicastIPAddressInformation address
                         in properties.UnicastAddresses)
                     {
                         if (address.Address.AddressFamily ==
@@ -135,18 +118,14 @@ namespace SmartLab.Client
             }
             catch
             {
-                // Network identity is best-effort.
             }
 
             return null;
         }
 
-        // ==========================================
-        // REGISTER THIS PC'S NETWORK IDENTITY
-        // ==========================================
-
-        private async Task<bool> RegisterThisPcNetworkIdentity(
-            int userId)
+        private async Task<bool>
+            RegisterThisPcNetworkIdentity(
+                int userId)
         {
             string? macAddress =
                 GetMacAddress();
@@ -154,7 +133,8 @@ namespace SmartLab.Client
             string? ipAddress =
                 GetLocalIPv4Address();
 
-            if (string.IsNullOrWhiteSpace(macAddress))
+            if (string.IsNullOrWhiteSpace(
+                macAddress))
             {
                 StatusText.Text =
                     "PC connected, but MAC address could not be detected.";
@@ -162,21 +142,21 @@ namespace SmartLab.Client
                 return false;
             }
 
-            var registrationData = new
-            {
-                userId,
-                pcNumber = _pcNumber,
-                macAddress,
-                ipAddress
-            };
+            var registrationData =
+                new
+                {
+                    userId,
+                    pcNumber = _pcNumber,
+                    macAddress,
+                    ipAddress
+                };
 
             try
             {
                 var response =
                     await _httpClient.PostAsJsonAsync(
                         "api/PCRegistration/register",
-                        registrationData
-                    );
+                        registrationData);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -190,7 +170,8 @@ namespace SmartLab.Client
                 try
                 {
                     using JsonDocument errorJson =
-                        JsonDocument.Parse(errorText);
+                        JsonDocument.Parse(
+                            errorText);
 
                     string message =
                         errorJson.RootElement
@@ -219,45 +200,52 @@ namespace SmartLab.Client
             }
         }
 
-        // ==========================================
-        // STUDENT / TEACHER / ADMIN LOGIN
-        // ==========================================
-
         private async void LoginButton_Click(
             object sender,
             RoutedEventArgs e)
         {
             StatusText.Text =
+                "Finding SmartLab Server...";
+
+            bool serverFound =
+                await SmartLabServerConfig
+                    .ResolveServerAsync();
+
+            if (!serverFound)
+            {
+                StatusText.Text =
+                    "SmartLab Server could not be found on the local network.";
+
+                return;
+            }
+
+            _httpClient.BaseAddress =
+                new Uri(
+                    SmartLabServerConfig.BaseUrl);
+
+            StatusText.Text =
                 $"Connecting to {_pcNumber}...";
 
-            var loginData = new
-            {
-                username =
-                    UsernameTextBox.Text.Trim(),
+            var loginData =
+                new
+                {
+                    username =
+                        UsernameTextBox.Text.Trim(),
 
-                password =
-                    PasswordBox.Password
-            };
+                    password =
+                        PasswordBox.Password
+                };
 
             try
             {
-                // ==========================================
-                // SEND LOGIN REQUEST
-                // ==========================================
-
                 var response =
                     await _httpClient.PostAsJsonAsync(
                         "api/Auth/login",
-                        loginData
-                    );
+                        loginData);
 
                 var responseText =
                     await response.Content
                         .ReadAsStringAsync();
-
-                // ==========================================
-                // LOGIN FAILED
-                // ==========================================
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -267,14 +255,9 @@ namespace SmartLab.Client
                     return;
                 }
 
-                // ==========================================
-                // READ LOGIN RESPONSE
-                // ==========================================
-
                 using JsonDocument json =
                     JsonDocument.Parse(
-                        responseText
-                    );
+                        responseText);
 
                 int userId =
                     json.RootElement
@@ -293,19 +276,11 @@ namespace SmartLab.Client
                         .GetString()
                         ?? "";
 
-                // ==========================================
-                // GET JWT TOKEN
-                // ==========================================
-
                 string token =
                     json.RootElement
                         .GetProperty("token")
                         .GetString()
                         ?? "";
-
-                // ==========================================
-                // SAVE AUTHENTICATED SESSION
-                // ==========================================
 
                 AuthSession.SetSession(
                     token,
@@ -313,25 +288,13 @@ namespace SmartLab.Client
                     username,
                     role);
 
-                // ==========================================
-                // ATTACH JWT TO FUTURE API REQUESTS
-                // ==========================================
-
-                AuthSession.Apply(_httpClient);
-
-                // ==========================================
-                // STUDENT LOGIN
-                // ==========================================
+                AuthSession.Apply(
+                    _httpClient);
 
                 if (role.Equals(
                     "Student",
                     StringComparison.OrdinalIgnoreCase))
                 {
-                    // ==========================================
-                    // LOGIN TO THIS PHYSICAL PC
-                    // SERVER AUTO-REGISTERS THE PC IF NEEDED
-                    // ==========================================
-
                     StatusText.Text =
                         $"Connecting to {_pcNumber}...";
 
@@ -341,16 +304,11 @@ namespace SmartLab.Client
                     var pcResponse =
                         await _httpClient.PostAsync(
                             $"api/PC/login/{Uri.EscapeDataString(_pcNumber)}/{userId}",
-                            null
-                        );
+                            null);
 
                     var pcResponseText =
                         await pcResponse.Content
                             .ReadAsStringAsync();
-
-                    // ==========================================
-                    // PC LOGIN FAILED
-                    // ==========================================
 
                     if (!pcResponse.IsSuccessStatusCode)
                     {
@@ -358,8 +316,7 @@ namespace SmartLab.Client
                         {
                             using JsonDocument pcError =
                                 JsonDocument.Parse(
-                                    pcResponseText
-                                );
+                                    pcResponseText);
 
                             string message =
                                 pcError.RootElement
@@ -378,18 +335,12 @@ namespace SmartLab.Client
                         }
 
                         AuthSession.Clear();
-
                         return;
                     }
 
-                    // ==========================================
-                    // READ PC INFORMATION
-                    // ==========================================
-
                     using JsonDocument pcJson =
                         JsonDocument.Parse(
-                            pcResponseText
-                        );
+                            pcResponseText);
 
                     int pcId =
                         pcJson.RootElement
@@ -402,31 +353,17 @@ namespace SmartLab.Client
                             .GetString()
                             ?? _pcNumber;
 
-                    // ==========================================
-                    // OPEN SMARTLAB WIDGET
-                    // ==========================================
-
                     SmartLabWidget widget =
                         new SmartLabWidget(
                             username,
                             pcNumber,
                             userId,
-                            pcId
-                        );
+                            pcId);
 
                     widget.Show();
 
-                    // ==========================================
-                    // CLOSE LOGIN WINDOW
-                    // ==========================================
-
                     Close();
                 }
-
-                // ==========================================
-                // TEACHER LOGIN
-                // ==========================================
-
                 else if (role.Equals(
                     "Teacher",
                     StringComparison.OrdinalIgnoreCase))
@@ -434,36 +371,24 @@ namespace SmartLab.Client
                     TeacherDashboard dashboard =
                         new TeacherDashboard(
                             username,
-                            userId
-                        );
+                            userId);
 
                     dashboard.Show();
 
                     Close();
                 }
-
-                // ==========================================
-                // ADMIN LOGIN
-                // ==========================================
-
                 else if (role.Equals(
                     "Admin",
                     StringComparison.OrdinalIgnoreCase))
                 {
                     AdminDashboard dashboard =
                         new AdminDashboard(
-                            username
-                        );
+                            username);
 
                     dashboard.Show();
 
                     Close();
                 }
-
-                // ==========================================
-                // OTHER ROLE
-                // ==========================================
-
                 else
                 {
                     StatusText.Text =
@@ -480,10 +405,6 @@ namespace SmartLab.Client
                 AuthSession.Clear();
             }
         }
-
-        // ==========================================
-        // ADMIN / MANAGEMENT LOGIN
-        // ==========================================
 
         private void AdminLoginButton_Click(
             object sender,
@@ -505,15 +426,10 @@ namespace SmartLab.Client
             }
         }
 
-        // ==========================================
-        // CLEANUP
-        // ==========================================
-
         protected override void OnClosed(
             EventArgs e)
         {
             _httpClient.Dispose();
-
             base.OnClosed(e);
         }
     }

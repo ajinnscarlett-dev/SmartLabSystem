@@ -10,7 +10,6 @@ namespace SmartLab.Client
     {
         private readonly HttpClient _httpClient;
 
-
         public AdminLoginWindow()
         {
             InitializeComponent();
@@ -18,16 +17,17 @@ namespace SmartLab.Client
             _httpClient = new HttpClient
             {
                 BaseAddress =
-                    new Uri(SmartLabServerConfig.BaseUrl)
+                    new Uri(
+                        SmartLabServerConfig.BaseUrl)
             };
 
             // ==========================================
             // APPLY EXISTING AUTH SESSION
             // ==========================================
 
-            AuthSession.Apply(_httpClient);
+            AuthSession.Apply(
+                _httpClient);
         }
-
 
         // ==========================================
         // ADMIN LOGIN
@@ -38,10 +38,38 @@ namespace SmartLab.Client
             RoutedEventArgs e)
         {
             StatusText.Text =
-                "Logging in...";
+                "Finding SmartLab Server...";
 
             LoginButton.IsEnabled = false;
 
+            // ==========================================
+            // RESOLVE CURRENT SERVER IP
+            // ==========================================
+
+            bool serverFound =
+                await SmartLabServerConfig
+                    .ResolveServerAsync();
+
+            if (!serverFound)
+            {
+                StatusText.Text =
+                    "SmartLab Server could not be found on the local network.";
+
+                LoginButton.IsEnabled = true;
+
+                return;
+            }
+
+            // IMPORTANT:
+            // SmartLabServerConfig.BaseUrl may have changed
+            // after LAN discovery, so update this client too.
+
+            _httpClient.BaseAddress =
+                new Uri(
+                    SmartLabServerConfig.BaseUrl);
+
+            StatusText.Text =
+                "Logging in...";
 
             var loginData = new
             {
@@ -51,7 +79,6 @@ namespace SmartLab.Client
                 password =
                     PasswordBox.Password
             };
-
 
             try
             {
@@ -65,11 +92,9 @@ namespace SmartLab.Client
                         loginData
                     );
 
-
                 var responseText =
                     await response.Content
                         .ReadAsStringAsync();
-
 
                 // ==========================================
                 // LOGIN FAILED
@@ -87,7 +112,6 @@ namespace SmartLab.Client
                     return;
                 }
 
-
                 // ==========================================
                 // READ LOGIN RESPONSE
                 // ==========================================
@@ -97,12 +121,10 @@ namespace SmartLab.Client
                         responseText
                     );
 
-
                 int userId =
                     json.RootElement
                         .GetProperty("userId")
                         .GetInt32();
-
 
                 string username =
                     json.RootElement
@@ -110,20 +132,17 @@ namespace SmartLab.Client
                         .GetString()
                         ?? "";
 
-
                 string role =
                     json.RootElement
                         .GetProperty("role")
                         .GetString()
                         ?? "";
 
-
                 string token =
                     json.RootElement
                         .GetProperty("token")
                         .GetString()
                         ?? "";
-
 
                 // ==========================================
                 // VERIFY ADMIN ROLE
@@ -143,7 +162,6 @@ namespace SmartLab.Client
                     return;
                 }
 
-
                 // ==========================================
                 // SAVE AUTHENTICATED SESSION
                 // ==========================================
@@ -154,13 +172,12 @@ namespace SmartLab.Client
                     username,
                     role);
 
-
                 // ==========================================
                 // APPLY JWT TO HTTP CLIENT
                 // ==========================================
 
-                AuthSession.Apply(_httpClient);
-
+                AuthSession.Apply(
+                    _httpClient);
 
                 // ==========================================
                 // OPEN ADMIN DASHBOARD
@@ -171,9 +188,7 @@ namespace SmartLab.Client
                         username
                     );
 
-
                 dashboard.Show();
-
 
                 // ==========================================
                 // CLOSE ADMIN LOGIN
@@ -191,7 +206,6 @@ namespace SmartLab.Client
                 AuthSession.Clear();
             }
         }
-
 
         // ==========================================
         // CLEANUP

@@ -155,6 +155,13 @@ builder.Services.AddHostedService<PCMonitorService>();
 
 
 // ==========================================
+// LAN SERVER DISCOVERY
+// ==========================================
+
+builder.Services.AddHostedService<ServerDiscoveryService>();
+
+
+// ==========================================
 // SWAGGER
 // ==========================================
 
