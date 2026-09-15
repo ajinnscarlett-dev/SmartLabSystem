@@ -23,7 +23,11 @@ builder.Services.AddHostedService<DatabaseMigrationHostedService>();
 // CONTROLLERS
 // ==========================================
 
-builder.Services.AddControllers();
+builder.Services.AddScoped<SmartLabAuthorizationFilter>();
+builder.Services.AddControllers(options =>
+{
+    options.Filters.AddService<SmartLabAuthorizationFilter>();
+});
 
 // ==========================================
 // JWT AUTHENTICATION
