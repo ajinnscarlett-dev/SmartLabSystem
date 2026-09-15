@@ -39,7 +39,7 @@ jobs:
 
       - name: Verify EF model has no pending changes
         working-directory: SmartLab.Server
-        run: dotnet ef migrations has-pending-model-changes --no-build
+        run: dotnet ef migrations has-pending-model-changes --configuration Release --no-build
 
       - name: Test
         run: dotnet test SmartLabSystem.sln --configuration Release --no-build --verbosity normal
