@@ -189,14 +189,14 @@ namespace SmartLab.Server.Migrations
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_AssistanceRequests_LaboratoryId_Status_CreatedAt",
+                name: "IX_AssistanceRequests_LaboratoryId_CreatedAt",
                 table: "AssistanceRequests",
-                columns: new[] { "LaboratoryId", "Status", "CreatedAt" });
+                columns: new[] { "LaboratoryId", "CreatedAt" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_AssistanceRequests_PCId_Status",
+                name: "IX_AssistanceRequests_PCId",
                 table: "AssistanceRequests",
-                columns: new[] { "PCId", "Status" });
+                column: "PCId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_AssistanceRequests_StudentUserId_CreatedAt",
