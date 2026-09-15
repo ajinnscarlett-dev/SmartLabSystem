@@ -1,10 +1,6 @@
-﻿using System;
-using System.Linq;
-using System.Net;
+using System;
 using System.Net.Http;
 using System.Net.Http.Json;
-using System.Net.NetworkInformation;
-using System.Net.Sockets;
 using System.Text.Json;
 using System.Windows;
 
@@ -19,245 +15,81 @@ namespace SmartLab.Client
         {
             InitializeComponent();
 
-            _httpClient = new HttpClient
-            {
-                BaseAddress =
-                    new Uri(
-                        SmartLabServerConfig.BaseUrl)
-            };
-
-            AuthSession.Apply(
-                _httpClient);
-
-            _pcNumber =
-                PCConfig.PCNumber;
-        }
-
-        private static string? GetMacAddress()
-        {
-            try
-            {
-                foreach (
-                    NetworkInterface networkInterface
-                    in NetworkInterface.GetAllNetworkInterfaces())
-                {
-                    if (networkInterface.OperationalStatus !=
-                        OperationalStatus.Up)
-                    {
-                        continue;
-                    }
-
-                    if (networkInterface.NetworkInterfaceType ==
-                        NetworkInterfaceType.Loopback)
-                    {
-                        continue;
-                    }
-
-                    PhysicalAddress physicalAddress =
-                        networkInterface.GetPhysicalAddress();
-
-                    byte[] bytes =
-                        physicalAddress.GetAddressBytes();
-
-                    if (bytes.Length == 6)
-                    {
-                        return string.Join(
-                            "-",
-                            bytes.Select(
-                                b => b.ToString("X2")));
-                    }
-                }
-            }
-            catch
-            {
-            }
-
-            return null;
-        }
-
-        private static string? GetLocalIPv4Address()
-        {
-            try
-            {
-                foreach (
-                    NetworkInterface networkInterface
-                    in NetworkInterface.GetAllNetworkInterfaces())
-                {
-                    if (networkInterface.OperationalStatus !=
-                        OperationalStatus.Up)
-                    {
-                        continue;
-                    }
-
-                    if (networkInterface.NetworkInterfaceType ==
-                        NetworkInterfaceType.Loopback)
-                    {
-                        continue;
-                    }
-
-                    IPInterfaceProperties properties =
-                        networkInterface.GetIPProperties();
-
-                    foreach (
-                        UnicastIPAddressInformation address
-                        in properties.UnicastAddresses)
-                    {
-                        if (address.Address.AddressFamily ==
-                            AddressFamily.InterNetwork)
-                        {
-                            string ip =
-                                address.Address.ToString();
-
-                            if (!ip.StartsWith("169.254."))
-                            {
-                                return ip;
-                            }
-                        }
-                    }
-                }
-            }
-            catch
-            {
-            }
-
-            return null;
-        }
-
-        private async Task<bool>
-            RegisterThisPcNetworkIdentity(
-                int userId)
-        {
-            string? macAddress =
-                GetMacAddress();
-
-            string? ipAddress =
-                GetLocalIPv4Address();
-
-            if (string.IsNullOrWhiteSpace(
-                macAddress))
-            {
-                StatusText.Text =
-                    "PC connected, but MAC address could not be detected.";
-
-                return false;
-            }
-
-            var registrationData =
-                new
-                {
-                    userId,
-                    pcNumber = _pcNumber,
-                    macAddress,
-                    ipAddress
-                };
-
-            try
-            {
-                var response =
-                    await _httpClient.PostAsJsonAsync(
-                        "api/PCRegistration/register",
-                        registrationData);
-
-                if (response.IsSuccessStatusCode)
-                {
-                    return true;
-                }
-
-                string errorText =
-                    await response.Content
-                        .ReadAsStringAsync();
-
-                try
-                {
-                    using JsonDocument errorJson =
-                        JsonDocument.Parse(
-                            errorText);
-
-                    string message =
-                        errorJson.RootElement
-                            .GetProperty("message")
-                            .GetString()
-                            ??
-                            "PC network registration failed.";
-
-                    StatusText.Text =
-                        message;
-                }
-                catch
-                {
-                    StatusText.Text =
-                        "PC network registration failed.";
-                }
-
-                return false;
-            }
-            catch (Exception ex)
-            {
-                StatusText.Text =
-                    $"PC network registration error: {ex.Message}";
-
-                return false;
-            }
+            _httpClient = new HttpClient();
+            AuthSession.Apply(_httpClient);
+            _pcNumber = PCConfig.PCNumber;
         }
 
         private async void LoginButton_Click(
             object sender,
             RoutedEventArgs e)
         {
-            StatusText.Text =
-                "Finding SmartLab Server...";
+            StatusText.Text = "Finding SmartLab Server...";
+            LoginButton.IsEnabled = false;
 
             bool serverFound =
-                await SmartLabServerConfig
-                    .ResolveServerAsync();
+                await SmartLabServerConfig.ResolveServerAsync();
 
             if (!serverFound)
             {
                 StatusText.Text =
                     "SmartLab Server could not be found on the local network.";
-
+                LoginButton.IsEnabled = true;
                 return;
             }
-
-            _httpClient.BaseAddress =
-                new Uri(
-                    SmartLabServerConfig.BaseUrl);
 
             StatusText.Text =
                 $"Connecting to {_pcNumber}...";
 
-            var loginData =
-                new
-                {
-                    username =
-                        UsernameTextBox.Text.Trim(),
-
-                    password =
-                        PasswordBox.Password
-                };
+            var loginData = new
+            {
+                username = UsernameTextBox.Text.Trim(),
+                password = PasswordBox.Password
+            };
 
             try
             {
+                Uri loginUri =
+                    new Uri(
+                        new Uri(SmartLabServerConfig.BaseUrl),
+                        "api/Auth/login");
+
                 var response =
                     await _httpClient.PostAsJsonAsync(
-                        "api/Auth/login",
+                        loginUri,
                         loginData);
 
-                var responseText =
-                    await response.Content
-                        .ReadAsStringAsync();
+                string responseText =
+                    await response.Content.ReadAsStringAsync();
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    StatusText.Text =
+                    string message =
                         "Invalid username or password.";
 
+                    try
+                    {
+                        using JsonDocument errorJson =
+                            JsonDocument.Parse(responseText);
+
+                        message =
+                            errorJson.RootElement
+                                .GetProperty("message")
+                                .GetString()
+                            ?? message;
+                    }
+                    catch
+                    {
+                    }
+
+                    StatusText.Text = message;
+                    LoginButton.IsEnabled = true;
+                    AuthSession.Clear();
                     return;
                 }
 
                 using JsonDocument json =
-                    JsonDocument.Parse(
-                        responseText);
+                    JsonDocument.Parse(responseText);
 
                 int userId =
                     json.RootElement
@@ -268,28 +100,25 @@ namespace SmartLab.Client
                     json.RootElement
                         .GetProperty("username")
                         .GetString()
-                        ?? "";
+                    ?? string.Empty;
 
                 string role =
                     json.RootElement
                         .GetProperty("role")
                         .GetString()
-                        ?? "";
+                    ?? string.Empty;
 
                 string token =
                     json.RootElement
                         .GetProperty("token")
                         .GetString()
-                        ?? "";
+                    ?? string.Empty;
 
                 AuthSession.SetSession(
                     token,
                     userId,
                     username,
                     role);
-
-                AuthSession.Apply(
-                    _httpClient);
 
                 if (role.Equals(
                     "Student",
@@ -298,49 +127,45 @@ namespace SmartLab.Client
                     StatusText.Text =
                         $"Connecting to {_pcNumber}...";
 
-                    StatusText.Text =
-                        $"Connecting to {_pcNumber}...";
+                    var pcUri =
+                        new Uri(
+                            new Uri(SmartLabServerConfig.BaseUrl),
+                            $"api/PC/login/{Uri.EscapeDataString(_pcNumber)}/{userId}");
 
                     var pcResponse =
-                        await _httpClient.PostAsync(
-                            $"api/PC/login/{Uri.EscapeDataString(_pcNumber)}/{userId}",
-                            null);
+                        await _httpClient.PostAsync(pcUri, null);
 
-                    var pcResponseText =
-                        await pcResponse.Content
-                            .ReadAsStringAsync();
+                    string pcResponseText =
+                        await pcResponse.Content.ReadAsStringAsync();
 
                     if (!pcResponse.IsSuccessStatusCode)
                     {
+                        string message =
+                            $"Unable to login to {_pcNumber}.";
+
                         try
                         {
                             using JsonDocument pcError =
-                                JsonDocument.Parse(
-                                    pcResponseText);
+                                JsonDocument.Parse(pcResponseText);
 
-                            string message =
+                            message =
                                 pcError.RootElement
                                     .GetProperty("message")
                                     .GetString()
-                                    ??
-                                    $"Unable to login to {_pcNumber}.";
-
-                            StatusText.Text =
-                                message;
+                                ?? message;
                         }
                         catch
                         {
-                            StatusText.Text =
-                                $"Unable to login to {_pcNumber}.";
                         }
 
+                        StatusText.Text = message;
                         AuthSession.Clear();
+                        LoginButton.IsEnabled = true;
                         return;
                     }
 
                     using JsonDocument pcJson =
-                        JsonDocument.Parse(
-                            pcResponseText);
+                        JsonDocument.Parse(pcResponseText);
 
                     int pcId =
                         pcJson.RootElement
@@ -351,7 +176,7 @@ namespace SmartLab.Client
                         pcJson.RootElement
                             .GetProperty("pcNumber")
                             .GetString()
-                            ?? _pcNumber;
+                    ?? _pcNumber;
 
                     SmartLabWidget widget =
                         new SmartLabWidget(
@@ -361,7 +186,6 @@ namespace SmartLab.Client
                             pcId);
 
                     widget.Show();
-
                     Close();
                 }
                 else if (role.Equals(
@@ -374,7 +198,6 @@ namespace SmartLab.Client
                             userId);
 
                     dashboard.Show();
-
                     Close();
                 }
                 else if (role.Equals(
@@ -382,26 +205,24 @@ namespace SmartLab.Client
                     StringComparison.OrdinalIgnoreCase))
                 {
                     AdminDashboard dashboard =
-                        new AdminDashboard(
-                            username);
+                        new AdminDashboard(username);
 
                     dashboard.Show();
-
                     Close();
                 }
                 else
                 {
+                    AuthSession.Clear();
                     StatusText.Text =
-                        $"Login successful!\n" +
-                        $"Welcome, {username}!\n" +
-                        $"Role: {role}";
+                        $"Login successful, but role '{role}' is not supported by this client.";
+                    LoginButton.IsEnabled = true;
                 }
             }
             catch (Exception ex)
             {
                 StatusText.Text =
                     $"Connection error: {ex.Message}";
-
+                LoginButton.IsEnabled = true;
                 AuthSession.Clear();
             }
         }
@@ -416,7 +237,6 @@ namespace SmartLab.Client
                     new AdminLoginWindow();
 
                 adminLogin.Show();
-
                 Close();
             }
             catch (Exception ex)
@@ -426,8 +246,7 @@ namespace SmartLab.Client
             }
         }
 
-        protected override void OnClosed(
-            EventArgs e)
+        protected override void OnClosed(EventArgs e)
         {
             _httpClient.Dispose();
             base.OnClosed(e);
