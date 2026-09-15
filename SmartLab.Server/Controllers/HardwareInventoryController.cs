@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace SmartLab.Server.Controllers
 {
@@ -19,8 +20,32 @@ namespace SmartLab.Server.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            var inventory = await _context.HardwareInventories
+            var query = _context.HardwareInventories
                 .AsNoTracking()
+                .AsQueryable();
+
+            if (User.IsInRole("Teacher"))
+            {
+                if (!int.TryParse(
+                        User.FindFirstValue(ClaimTypes.NameIdentifier),
+                        out int teacherId))
+                {
+                    return Unauthorized();
+                }
+
+                var authorizedLabs = await _context.TeacherLaboratoryAuthorizations
+                    .AsNoTracking()
+                    .Where(a => a.TeacherUserId == teacherId)
+                    .Select(a => a.LaboratoryId)
+                    .ToListAsync();
+
+                query = query.Where(h =>
+                    h.PC != null &&
+                    h.PC.LaboratoryId.HasValue &&
+                    authorizedLabs.Contains(h.PC.LaboratoryId.Value));
+            }
+
+            var inventory = await query
                 .OrderBy(h => h.PCId)
                 .Select(h => new
                 {
@@ -42,8 +67,55 @@ namespace SmartLab.Server.Controllers
             return Ok(inventory);
         }
 
+        [HttpGet("{pcId:int}")]
+        public async Task<IActionResult> GetOne(int pcId)
+        {
+            var item = await _context.HardwareInventories
+                .AsNoTracking()
+                .Include(h => h.PC)
+                .FirstOrDefaultAsync(h => h.PCId == pcId);
+
+            if (item == null)
+                return NotFound(new { message = "Hardware inventory not found." });
+
+            if (User.IsInRole("Teacher"))
+            {
+                if (!int.TryParse(
+                        User.FindFirstValue(ClaimTypes.NameIdentifier),
+                        out int teacherId))
+                    return Unauthorized();
+
+                bool authorized = item.PC?.LaboratoryId.HasValue == true &&
+                    await _context.TeacherLaboratoryAuthorizations.AnyAsync(a =>
+                        a.TeacherUserId == teacherId &&
+                        a.LaboratoryId == item.PC.LaboratoryId.Value);
+
+                if (!authorized)
+                    return Forbid();
+            }
+
+            return Ok(new
+            {
+                item.HardwareInventoryId,
+                item.PCId,
+                PCNumber = item.PC?.PCNumber,
+                LaboratoryId = item.PC?.LaboratoryId,
+                item.Cpu,
+                item.Ram,
+                item.Storage,
+                item.Gpu,
+                item.OperatingSystem,
+                item.MACAddress,
+                item.IPAddress,
+                item.LastAuditedAt
+            });
+        }
+
         [HttpPut("{pcId:int}")]
-        public async Task<IActionResult> Upsert(int pcId, [FromBody] HardwareInventoryRequest request)
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> Upsert(
+            int pcId,
+            [FromBody] HardwareInventoryRequest request)
         {
             var pc = await _context.PCs.FirstOrDefaultAsync(p => p.PCId == pcId);
             if (pc == null)
