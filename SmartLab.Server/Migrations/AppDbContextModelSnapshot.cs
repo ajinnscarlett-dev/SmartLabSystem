@@ -60,11 +60,11 @@ namespace SmartLab.Server.Migrations
             {
                 b.Property<int>("PCId").ValueGeneratedOnAdd().HasColumnType("int");
                 SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("PCId"));
-                b.Property<string>("PCNumber").IsRequired().HasColumnType("nvarchar(max)");
-                b.Property<string>("Status").IsRequired().HasColumnType("nvarchar(max)");
+                b.Property<string>("PCNumber").IsRequired().HasColumnType("nvarchar(450)");
+                b.Property<string>("Status").IsRequired().HasColumnType("nvarchar(450)");
                 b.Property<int?>("CurrentUserId").HasColumnType("int");
                 b.Property<int?>("LaboratoryId").HasColumnType("int");
-                b.Property<string>("MACAddress").HasColumnType("nvarchar(max)");
+                b.Property<string>("MACAddress").HasColumnType("nvarchar(450)");
                 b.Property<string>("IPAddress").HasColumnType("nvarchar(max)");
                 b.Property<DateTime?>("LastSeen").HasColumnType("datetime2");
                 b.Property<bool>("IsEnabled").HasColumnType("bit");
@@ -73,7 +73,7 @@ namespace SmartLab.Server.Migrations
                 b.HasKey("PCId");
                 b.HasIndex("PCNumber").IsUnique();
                 b.HasIndex("MACAddress").IsUnique().HasFilter("[MACAddress] IS NOT NULL");
-                b.HasIndex("LaboratoryId", "Status"); b.HasIndex("LastSeen"); b.HasIndex("CurrentUserId"); b.HasIndex("LaboratoryId");
+                b.HasIndex("LaboratoryId", "Status"); b.HasIndex("LastSeen"); b.HasIndex("CurrentUserId");
                 b.ToTable("PCs");
                 b.HasOne(x => x.CurrentUser).WithMany().HasForeignKey("CurrentUserId");
                 b.HasOne(x => x.Laboratory).WithMany(x => x.PCs).HasForeignKey("LaboratoryId");
@@ -118,9 +118,12 @@ namespace SmartLab.Server.Migrations
                 b.Property<int>("TeacherUserId").HasColumnType("int");
                 b.Property<int>("LaboratoryId").HasColumnType("int");
                 b.Property<DateTime>("CreatedAt").HasColumnType("datetime2");
-                b.HasKey("TeacherLaboratoryAuthorizationId"); b.ToTable("TeacherLaboratoryAuthorizations");
-                b.HasOne(x => x.TeacherUser).WithMany().HasForeignKey("TeacherUserId");
-                b.HasOne(x => x.Laboratory).WithMany().HasForeignKey("LaboratoryId");
+                b.HasKey("TeacherLaboratoryAuthorizationId");
+                b.HasIndex("LaboratoryId");
+                b.HasIndex("TeacherUserId");
+                b.ToTable("TeacherLaboratoryAuthorizations");
+                b.HasOne(x => x.TeacherUser).WithMany().HasForeignKey("TeacherUserId").OnDelete(DeleteBehavior.Cascade);
+                b.HasOne(x => x.Laboratory).WithMany().HasForeignKey("LaboratoryId").OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<PcUsageHistory>(b =>
@@ -130,7 +133,7 @@ namespace SmartLab.Server.Migrations
                 b.Property<int>("PCId").HasColumnType("int"); b.Property<int>("UserId").HasColumnType("int"); b.Property<int?>("LaboratoryId").HasColumnType("int");
                 b.Property<DateTime>("LoginTime").HasColumnType("datetime2"); b.Property<DateTime?>("LogoutTime").HasColumnType("datetime2");
                 b.Property<int?>("DurationSeconds").HasColumnType("int"); b.Property<string>("EndReason").IsRequired().HasColumnType("nvarchar(max)");
-                b.HasKey("SessionId"); b.HasIndex("LaboratoryId", "LoginTime"); b.HasIndex("PCId", "LoginTime"); b.ToTable("PcUsageHistory");
+                b.HasKey("SessionId"); b.HasIndex("UserId"); b.HasIndex("LaboratoryId", "LoginTime"); b.HasIndex("PCId", "LoginTime"); b.ToTable("PcUsageHistory");
                 b.HasOne(x => x.PC).WithMany().HasForeignKey("PCId").OnDelete(DeleteBehavior.Restrict);
                 b.HasOne(x => x.User).WithMany().HasForeignKey("UserId").OnDelete(DeleteBehavior.Restrict);
                 b.HasOne(x => x.Laboratory).WithMany().HasForeignKey("LaboratoryId").OnDelete(DeleteBehavior.Restrict);
@@ -143,7 +146,7 @@ namespace SmartLab.Server.Migrations
                 b.Property<int>("PCId").HasColumnType("int"); b.Property<string>("Reason").IsRequired().HasColumnType("nvarchar(max)");
                 b.Property<DateTime>("StartedAt").HasColumnType("datetime2"); b.Property<DateTime?>("EndedAt").HasColumnType("datetime2");
                 b.Property<int?>("TechnicianUserId").HasColumnType("int"); b.Property<string>("Notes").HasColumnType("nvarchar(max)");
-                b.HasKey("MaintenanceRecordId"); b.HasIndex("PCId", "StartedAt"); b.ToTable("MaintenanceRecords");
+                b.HasKey("MaintenanceRecordId"); b.HasIndex("TechnicianUserId"); b.HasIndex("PCId", "StartedAt"); b.ToTable("MaintenanceRecords");
                 b.HasOne(x => x.PC).WithMany().HasForeignKey("PCId").OnDelete(DeleteBehavior.Restrict);
                 b.HasOne(x => x.TechnicianUser).WithMany().HasForeignKey("TechnicianUserId").OnDelete(DeleteBehavior.Restrict);
             });
@@ -179,7 +182,7 @@ namespace SmartLab.Server.Migrations
                 b.Property<string>("Status").IsRequired().HasColumnType("nvarchar(max)"); b.Property<DateTime>("CreatedAt").HasColumnType("datetime2");
                 b.Property<DateTime?>("AcknowledgedAt").HasColumnType("datetime2"); b.Property<DateTime?>("StartedAt").HasColumnType("datetime2"); b.Property<DateTime?>("ResolvedAt").HasColumnType("datetime2");
                 b.Property<DateTime?>("ClosedAt").HasColumnType("datetime2"); b.Property<int?>("ResolvedByUserId").HasColumnType("int"); b.Property<string>("ResolutionNotes").HasColumnType("nvarchar(max)");
-                b.HasKey("AssistanceRequestId"); b.HasIndex("LaboratoryId", "CreatedAt"); b.HasIndex("StudentUserId", "CreatedAt"); b.HasIndex("PCId"); b.ToTable("AssistanceRequests");
+                b.HasKey("AssistanceRequestId"); b.HasIndex("ResolvedByUserId"); b.HasIndex("LaboratoryId", "CreatedAt"); b.HasIndex("StudentUserId", "CreatedAt"); b.HasIndex("PCId"); b.ToTable("AssistanceRequests");
                 b.HasOne(x => x.StudentUser).WithMany().HasForeignKey("StudentUserId").OnDelete(DeleteBehavior.Restrict);
                 b.HasOne(x => x.PC).WithMany().HasForeignKey("PCId").OnDelete(DeleteBehavior.Restrict);
                 b.HasOne(x => x.Laboratory).WithMany().HasForeignKey("LaboratoryId").OnDelete(DeleteBehavior.Restrict);
