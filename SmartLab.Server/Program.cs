@@ -8,20 +8,12 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ==========================================
-// DATABASE
-// ==========================================
-
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(
         builder.Configuration.GetConnectionString("DefaultConnection")
     ));
 
 builder.Services.AddHostedService<DatabaseMigrationHostedService>();
-
-// ==========================================
-// CONTROLLERS
-// ==========================================
 
 builder.Services.AddScoped<SmartLabAuthorizationFilter>();
 builder.Services.AddScoped<SmartLabRequestIntegrityFilter>();
@@ -30,10 +22,6 @@ builder.Services.AddControllers(options =>
     options.Filters.AddService<SmartLabAuthorizationFilter>();
     options.Filters.AddService<SmartLabRequestIntegrityFilter>();
 });
-
-// ==========================================
-// JWT AUTHENTICATION
-// ==========================================
 
 string jwtKey =
     builder.Configuration["Jwt:Key"]
@@ -47,13 +35,8 @@ if (jwtKey.Length < 32)
         "Jwt:Key must be at least 32 characters long.");
 }
 
-string jwtIssuer =
-    builder.Configuration["Jwt:Issuer"]
-    ?? "SmartLab";
-
-string jwtAudience =
-    builder.Configuration["Jwt:Audience"]
-    ?? "SmartLab.Client";
+string jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "SmartLab";
+string jwtAudience = builder.Configuration["Jwt:Audience"] ?? "SmartLab.Client";
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -61,83 +44,61 @@ builder.Services
     {
         options.RequireHttpsMetadata = true;
         options.SaveToken = false;
-
-        options.TokenValidationParameters =
-            new TokenValidationParameters
-            {
-                ValidateIssuerSigningKey = true,
-                IssuerSigningKey =
-                    new SymmetricSecurityKey(
-                        Encoding.UTF8.GetBytes(jwtKey)),
-                ValidateIssuer = true,
-                ValidIssuer = jwtIssuer,
-                ValidateAudience = true,
-                ValidAudience = jwtAudience,
-                ValidateLifetime = true,
-                ClockSkew = TimeSpan.FromMinutes(1),
-                NameClaimType = ClaimTypes.Name,
-                RoleClaimType = ClaimTypes.Role
-            };
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+            ValidateIssuer = true,
+            ValidIssuer = jwtIssuer,
+            ValidateAudience = true,
+            ValidAudience = jwtAudience,
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromMinutes(1),
+            NameClaimType = ClaimTypes.Name,
+            RoleClaimType = ClaimTypes.Role
+        };
     });
-
-// ==========================================
-// AUTHORIZATION
-// ==========================================
 
 builder.Services.AddAuthorization();
 
-// ==========================================
-// SERVICES
-// ==========================================
-
 builder.Services.AddSingleton<AuthTokenService>();
 builder.Services.AddHostedService<PCMonitorService>();
+builder.Services.AddHostedService<CommandLifecycleHostedService>();
 builder.Services.AddHostedService<ServerDiscoveryService>();
-
-// ==========================================
-// SWAGGER
-// ==========================================
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
-    options.SwaggerDoc(
-        "v1",
-        new OpenApiInfo
-        {
-            Title = "SmartLab Server API",
-            Version = "v1"
-        });
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "SmartLab Server API",
+        Version = "v1"
+    });
 
-    options.AddSecurityDefinition(
-        "Bearer",
-        new OpenApiSecurityScheme
-        {
-            Name = "Authorization",
-            Type = SecuritySchemeType.Http,
-            Scheme = "bearer",
-            BearerFormat = "JWT",
-            In = ParameterLocation.Header,
-            Description =
-                "Paste the JWT returned by /api/Auth/login."
-        });
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Paste the JWT returned by /api/Auth/login."
+    });
 
-    options.AddSecurityRequirement(
-        new OpenApiSecurityRequirement
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
         {
+            new OpenApiSecurityScheme
             {
-                new OpenApiSecurityScheme
+                Reference = new OpenApiReference
                 {
-                    Reference =
-                        new OpenApiReference
-                        {
-                            Type = ReferenceType.SecurityScheme,
-                            Id = "Bearer"
-                        }
-                },
-                Array.Empty<string>()
-            }
-        });
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
 });
 
 var app = builder.Build();
