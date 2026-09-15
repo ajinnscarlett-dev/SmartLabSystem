@@ -20,6 +20,7 @@ namespace SmartLab.Server
         public DbSet<MaintenanceRecord> MaintenanceRecords { get; set; }
         public DbSet<HardwareInventory> HardwareInventories { get; set; }
         public DbSet<Notification> Notifications { get; set; }
+        public DbSet<AssistanceRequest> AssistanceRequests { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -55,6 +56,15 @@ namespace SmartLab.Server
 
             modelBuilder.Entity<Notification>()
                 .HasIndex(n => new { n.UserId, n.IsRead, n.CreatedAt });
+
+            modelBuilder.Entity<AssistanceRequest>()
+                .HasIndex(a => new { a.LaboratoryId, a.Status, a.CreatedAt });
+
+            modelBuilder.Entity<AssistanceRequest>()
+                .HasIndex(a => new { a.StudentUserId, a.CreatedAt });
+
+            modelBuilder.Entity<AssistanceRequest>()
+                .HasIndex(a => new { a.PCId, a.Status });
 
             modelBuilder.Entity<PcUsageHistory>()
                 .HasOne(s => s.PC)
@@ -97,11 +107,36 @@ namespace SmartLab.Server
                 .WithMany()
                 .HasForeignKey(n => n.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<AssistanceRequest>()
+                .HasOne(a => a.StudentUser)
+                .WithMany()
+                .HasForeignKey(a => a.StudentUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<AssistanceRequest>()
+                .HasOne(a => a.PC)
+                .WithMany()
+                .HasForeignKey(a => a.PCId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<AssistanceRequest>()
+                .HasOne(a => a.Laboratory)
+                .WithMany()
+                .HasForeignKey(a => a.LaboratoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<AssistanceRequest>()
+                .HasOne(a => a.ResolvedByUser)
+                .WithMany()
+                .HasForeignKey(a => a.ResolvedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
         }
 
         public override int SaveChanges()
         {
             PrepareOperationalHistory();
+            PrepareNotifications();
             return base.SaveChanges();
         }
 
@@ -109,6 +144,7 @@ namespace SmartLab.Server
             CancellationToken cancellationToken = default)
         {
             PrepareOperationalHistory();
+            PrepareNotifications();
             return await base.SaveChangesAsync(cancellationToken);
         }
 
@@ -228,6 +264,133 @@ namespace SmartLab.Server
                     if (openMaintenance != null)
                     {
                         openMaintenance.EndedAt = now;
+                    }
+                }
+            }
+        }
+
+        private void PrepareNotifications()
+        {
+            DateTime now = DateTime.Now;
+
+            foreach (var entry in ChangeTracker.Entries<Announcement>())
+            {
+                if (entry.State != EntityState.Added)
+                {
+                    continue;
+                }
+
+                string targetRole =
+                    entry.Entity.TargetRole?.Trim() ?? "All";
+
+                var recipients = Users
+                    .Where(u =>
+                        string.Equals(targetRole, "All", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(u.Role, targetRole, StringComparison.OrdinalIgnoreCase))
+                    .Select(u => u.UserId)
+                    .ToList();
+
+                foreach (int userId in recipients)
+                {
+                    Notifications.Add(new Notification
+                    {
+                        UserId = userId,
+                        Type = "Announcement",
+                        Title = entry.Entity.Title,
+                        Message = entry.Entity.Message,
+                        CreatedAt = now,
+                        IsRead = false
+                    });
+                }
+            }
+
+            foreach (var entry in ChangeTracker.Entries<ServiceDeskTicket>())
+            {
+                if (entry.State == EntityState.Added)
+                {
+                    foreach (int userId in Users
+                        .Where(u =>
+                            string.Equals(u.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+                        .Select(u => u.UserId)
+                        .ToList())
+                    {
+                        Notifications.Add(new Notification
+                        {
+                            UserId = userId,
+                            Type = "ServiceDesk",
+                            Title = "New Service Desk Ticket",
+                            Message = $"{entry.Entity.Subject} ({entry.Entity.Category})",
+                            CreatedAt = now,
+                            IsRead = false
+                        });
+                    }
+                }
+                else if (entry.State == EntityState.Modified &&
+                         entry.Property(t => t.Status).IsModified)
+                {
+                    string oldStatus =
+                        entry.Property(t => t.Status).OriginalValue ?? string.Empty;
+
+                    string newStatus =
+                        entry.Entity.Status ?? string.Empty;
+
+                    if (!string.Equals(oldStatus, newStatus, StringComparison.OrdinalIgnoreCase))
+                    {
+                        Notifications.Add(new Notification
+                        {
+                            UserId = entry.Entity.TeacherUserId,
+                            Type = "ServiceDesk",
+                            Title = "Service Desk Updated",
+                            Message = $"Ticket #{entry.Entity.ServiceDeskTicketId} is now {newStatus}.",
+                            CreatedAt = now,
+                            IsRead = false
+                        });
+                    }
+                }
+            }
+
+            foreach (var entry in ChangeTracker.Entries<AssistanceRequest>())
+            {
+                if (entry.State == EntityState.Added)
+                {
+                    foreach (int userId in Users
+                        .Where(u =>
+                            string.Equals(u.Role, "Teacher", StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(u.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+                        .Select(u => u.UserId)
+                        .ToList())
+                    {
+                        Notifications.Add(new Notification
+                        {
+                            UserId = userId,
+                            Type = "NeedAssistance",
+                            Title = "Student Needs Assistance",
+                            Message = $"PC #{entry.Entity.PCId}: {entry.Entity.Description}",
+                            CreatedAt = now,
+                            IsRead = false
+                        });
+                    }
+                }
+                else if (entry.State == EntityState.Modified &&
+                         entry.Property(a => a.Status).IsModified)
+                {
+                    string oldStatus =
+                        entry.Property(a => a.Status).OriginalValue ?? string.Empty;
+
+                    string newStatus =
+                        entry.Entity.Status ?? string.Empty;
+
+                    if (!string.Equals(oldStatus, newStatus, StringComparison.OrdinalIgnoreCase))
+                    {
+                        Notifications.Add(new Notification
+                        {
+                            UserId = entry.Entity.StudentUserId,
+                            Type = "NeedAssistance",
+                            Title = "Assistance Request Updated",
+                            Message = $"Your assistance request #{entry.Entity.AssistanceRequestId} is now {newStatus}.",
+                            CreatedAt = now,
+                            IsRead = false
+                        });
                     }
                 }
             }
