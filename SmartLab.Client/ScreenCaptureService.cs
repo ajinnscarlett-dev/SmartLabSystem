@@ -216,7 +216,8 @@ namespace SmartLab.Client
                 ImageCodecInfo codec
                 in ImageCodecInfo.GetImageEncoders())
             {
-                if (codec.MimeType.Equals(
+                if (string.Equals(
+                    codec.MimeType,
                     "image/jpeg",
                     StringComparison.OrdinalIgnoreCase))
                 {
