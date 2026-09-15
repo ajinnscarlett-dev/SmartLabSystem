@@ -27,6 +27,7 @@ namespace SmartLab.Server
             modelBuilder.Entity<PC>().HasIndex(p => p.MACAddress).IsUnique().HasFilter("[MACAddress] IS NOT NULL");
             modelBuilder.Entity<PC>().HasIndex(p => new { p.LaboratoryId, p.Status });
             modelBuilder.Entity<PC>().HasIndex(p => p.LastSeen);
+            modelBuilder.Entity<PcUsageHistory>().HasKey(s => s.SessionId);
             modelBuilder.Entity<PcUsageHistory>().HasIndex(s => new { s.LaboratoryId, s.LoginTime });
             modelBuilder.Entity<PcUsageHistory>().HasIndex(s => new { s.PCId, s.LoginTime });
             modelBuilder.Entity<MaintenanceRecord>().HasIndex(m => new { m.PCId, m.StartedAt });
