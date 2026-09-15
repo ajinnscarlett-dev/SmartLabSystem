@@ -5,32 +5,15 @@ namespace SmartLab.Server
     public sealed class PCMonitorService : BackgroundService
     {
         private readonly IServiceScopeFactory _scopeFactory;
-        private readonly TimeSpan _timeout;
-        private readonly TimeSpan _checkInterval;
+        private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(20);
+        private static readonly TimeSpan CheckInterval = TimeSpan.FromSeconds(5);
 
-        public PCMonitorService(
-            IServiceScopeFactory scopeFactory,
-            IConfiguration configuration)
+        public PCMonitorService(IServiceScopeFactory scopeFactory)
         {
             _scopeFactory = scopeFactory;
-
-            int timeoutSeconds = configuration.GetValue(
-                "SmartLab:HeartbeatTimeoutSeconds",
-                20);
-
-            int intervalSeconds = configuration.GetValue(
-                "SmartLab:MonitorIntervalSeconds",
-                5);
-
-            _timeout = TimeSpan.FromSeconds(
-                Math.Max(5, timeoutSeconds));
-
-            _checkInterval = TimeSpan.FromSeconds(
-                Math.Max(1, intervalSeconds));
         }
 
-        protected override async Task ExecuteAsync(
-            CancellationToken stoppingToken)
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             while (!stoppingToken.IsCancellationRequested)
             {
@@ -38,22 +21,18 @@ namespace SmartLab.Server
                 {
                     await CheckPCs(stoppingToken);
                 }
-                catch (OperationCanceledException) when (
-                    stoppingToken.IsCancellationRequested)
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {
                     break;
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine(
-                        $"PC Monitor Error: {ex.Message}");
+                    Console.WriteLine($"PC Monitor Error: {ex.Message}");
                 }
 
                 try
                 {
-                    await Task.Delay(
-                        _checkInterval,
-                        stoppingToken);
+                    await Task.Delay(CheckInterval, stoppingToken);
                 }
                 catch (OperationCanceledException)
                 {
@@ -62,26 +41,16 @@ namespace SmartLab.Server
             }
         }
 
-        private async Task CheckPCs(
-            CancellationToken cancellationToken)
+        private async Task CheckPCs(CancellationToken cancellationToken)
         {
-            using IServiceScope scope =
-                _scopeFactory.CreateScope();
+            using IServiceScope scope = _scopeFactory.CreateScope();
+            AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            DateTime cutoff = DateTime.Now - Timeout;
 
-            AppDbContext context =
-                scope.ServiceProvider
-                    .GetRequiredService<AppDbContext>();
-
-            DateTime cutoffTime =
-                DateTime.Now - _timeout;
-
-            // Maintenance is an explicit administrative state and must never
-            // be changed by automatic presence monitoring.
             var stalePCs = await context.PCs
-                .Where(p =>
-                    p.Status != "Maintenance" &&
-                    p.LastSeen != null &&
-                    p.LastSeen < cutoffTime)
+                .Where(p => p.Status != "Maintenance" &&
+                            p.LastSeen != null &&
+                            p.LastSeen < cutoff)
                 .ToListAsync(cancellationToken);
 
             if (stalePCs.Count == 0)
@@ -93,26 +62,25 @@ namespace SmartLab.Server
             {
                 string previousStatus = pc.Status;
 
-                // A stale occupied PC has lost its live session ownership.
-                // History persistence is handled by the session subsystem;
-                // this monitor only reconciles the operational PC state.
-                pc.CurrentUserId = null;
+                if (pc.Status == "Occupied" && pc.CurrentUserId != null)
+                {
+                    pc.CurrentUserId = null;
+                }
+
                 pc.Status = "Offline";
 
-                Console.WriteLine(
-                    $"[PC MONITOR] {pc.PCNumber} " +
-                    $"{previousStatus} -> Offline. " +
-                    $"Last heartbeat: {pc.LastSeen:O}");
-
-                context.ActivityLogs.Add(new ActivityLog
+                if (!string.Equals(previousStatus, pc.Status, StringComparison.OrdinalIgnoreCase))
                 {
-                    UserId = null,
-                    PCId = pc.PCId,
-                    Action = "PC Offline",
-                    Details =
-                        $"PC {pc.PCNumber} changed from {previousStatus} to Offline after heartbeat timeout.",
-                    CreatedAt = DateTime.Now
-                });
+                    Console.WriteLine($"[PC MONITOR] {pc.PCNumber}: {previousStatus} -> Offline");
+                    context.ActivityLogs.Add(new ActivityLog
+                    {
+                        UserId = null,
+                        PCId = pc.PCId,
+                        Action = "PC Status Changed",
+                        Details = $"PC {pc.PCNumber} changed from {previousStatus} to Offline after heartbeat timeout.",
+                        CreatedAt = DateTime.Now
+                    });
+                }
             }
 
             await context.SaveChangesAsync(cancellationToken);
