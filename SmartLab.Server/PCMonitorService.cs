@@ -5,12 +5,25 @@ namespace SmartLab.Server
     public sealed class PCMonitorService : BackgroundService
     {
         private readonly IServiceScopeFactory _scopeFactory;
-        private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(20);
-        private static readonly TimeSpan CheckInterval = TimeSpan.FromSeconds(5);
+        private readonly TimeSpan _timeout;
+        private readonly TimeSpan _checkInterval;
 
-        public PCMonitorService(IServiceScopeFactory scopeFactory)
+        public PCMonitorService(
+            IServiceScopeFactory scopeFactory,
+            IConfiguration configuration)
         {
             _scopeFactory = scopeFactory;
+
+            int timeoutSeconds = configuration.GetValue(
+                "SmartLab:HeartbeatTimeoutSeconds",
+                20);
+
+            int intervalSeconds = configuration.GetValue(
+                "SmartLab:MonitorIntervalSeconds",
+                5);
+
+            _timeout = TimeSpan.FromSeconds(Math.Max(5, timeoutSeconds));
+            _checkInterval = TimeSpan.FromSeconds(Math.Max(1, intervalSeconds));
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -32,7 +45,7 @@ namespace SmartLab.Server
 
                 try
                 {
-                    await Task.Delay(CheckInterval, stoppingToken);
+                    await Task.Delay(_checkInterval, stoppingToken);
                 }
                 catch (OperationCanceledException)
                 {
@@ -45,7 +58,7 @@ namespace SmartLab.Server
         {
             using IServiceScope scope = _scopeFactory.CreateScope();
             AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            DateTime cutoff = DateTime.Now - Timeout;
+            DateTime cutoff = DateTime.Now - _timeout;
 
             var stalePCs = await context.PCs
                 .Where(p => p.Status != "Maintenance" &&
@@ -72,6 +85,7 @@ namespace SmartLab.Server
                 if (!string.Equals(previousStatus, pc.Status, StringComparison.OrdinalIgnoreCase))
                 {
                     Console.WriteLine($"[PC MONITOR] {pc.PCNumber}: {previousStatus} -> Offline");
+
                     context.ActivityLogs.Add(new ActivityLog
                     {
                         UserId = null,
