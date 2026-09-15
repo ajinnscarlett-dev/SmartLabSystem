@@ -55,6 +55,48 @@ namespace SmartLab.Server
 
             modelBuilder.Entity<Notification>()
                 .HasIndex(n => new { n.UserId, n.IsRead, n.CreatedAt });
+
+            modelBuilder.Entity<PcUsageHistory>()
+                .HasOne(s => s.PC)
+                .WithMany()
+                .HasForeignKey(s => s.PCId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<PcUsageHistory>()
+                .HasOne(s => s.User)
+                .WithMany()
+                .HasForeignKey(s => s.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<PcUsageHistory>()
+                .HasOne(s => s.Laboratory)
+                .WithMany()
+                .HasForeignKey(s => s.LaboratoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<MaintenanceRecord>()
+                .HasOne(m => m.PC)
+                .WithMany()
+                .HasForeignKey(m => m.PCId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<MaintenanceRecord>()
+                .HasOne(m => m.TechnicianUser)
+                .WithMany()
+                .HasForeignKey(m => m.TechnicianUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<HardwareInventory>()
+                .HasOne(h => h.PC)
+                .WithMany()
+                .HasForeignKey(h => h.PCId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Notification>()
+                .HasOne(n => n.User)
+                .WithMany()
+                .HasForeignKey(n => n.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
         }
 
         public override int SaveChanges()
