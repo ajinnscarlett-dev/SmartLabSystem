@@ -190,7 +190,7 @@ namespace SmartLab.Server.Migrations
                 columns: new[] { "LaboratoryId", "Status", "CreatedAt" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_AssistanceRequests_PCIId_Status",
+                name: "IX_AssistanceRequests_PCId_Status",
                 table: "AssistanceRequests",
                 columns: new[] { "PCId", "Status" });
 
@@ -243,7 +243,6 @@ namespace SmartLab.Server.Migrations
             migrationBuilder.DropTable(name: "MaintenanceRecords");
             migrationBuilder.DropTable(name: "Notifications");
             migrationBuilder.DropTable(name: "PcUsageHistory");
-
             migrationBuilder.DropColumn(
                 name: "TargetRole",
                 table: "Announcements");
