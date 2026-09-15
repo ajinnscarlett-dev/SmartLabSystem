@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -12,14 +12,17 @@ namespace SmartLab.Server.Controllers
         private readonly AppDbContext _context;
         private readonly PasswordHasher<User> _passwordHasher;
         private readonly AuthTokenService _tokenService;
+        private readonly IHostEnvironment _environment;
 
         public AuthController(
             AppDbContext context,
-            AuthTokenService tokenService)
+            AuthTokenService tokenService,
+            IHostEnvironment environment)
         {
             _context = context;
             _passwordHasher = new PasswordHasher<User>();
             _tokenService = tokenService;
+            _environment = environment;
         }
 
 
@@ -50,6 +53,41 @@ namespace SmartLab.Server.Controllers
                 await _context.Users
                     .FirstOrDefaultAsync(
                         u => u.Username == normalizedUsername);
+
+            // Development-only first-admin bootstrap.
+            // This creates the first Admin account using the credentials
+            // the developer is currently entering, but only when there
+            // is no Admin account in the database yet. Production is
+            // never allowed to create accounts through this path.
+            if (user == null &&
+                _environment.IsDevelopment() &&
+                normalizedUsername.Equals(
+                    "admin",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                bool adminExists =
+                    await _context.Users.AnyAsync(
+                        u => u.Role == "Admin");
+
+                if (!adminExists)
+                {
+                    user = new User
+                    {
+                        Username = normalizedUsername,
+                        Role = "Admin",
+                        CreatedAt = DateTime.Now
+                    };
+
+                    user.PasswordHash =
+                        _passwordHasher.HashPassword(
+                            user,
+                            request.Password);
+
+                    _context.Users.Add(user);
+
+                    await _context.SaveChangesAsync();
+                }
+            }
 
             if (user == null)
             {
@@ -144,8 +182,8 @@ namespace SmartLab.Server.Controllers
         // =========================================================
         //
         // Public registration is intentionally limited to Student.
-        // Admin/Teacher accounts must be created through the
-        // protected UserController after authentication is added.
+        // Admin/Teacher accounts are created through the protected
+        // UserController after an Admin account exists.
         //
 
         [AllowAnonymous]
