@@ -13,18 +13,20 @@ namespace SmartLab.Server.Controllers
         private readonly PasswordHasher<User> _passwordHasher;
         private readonly AuthTokenService _tokenService;
         private readonly IHostEnvironment _environment;
+        private readonly IConfiguration _configuration;
 
         public AuthController(
             AppDbContext context,
             AuthTokenService tokenService,
-            IHostEnvironment environment)
+            IHostEnvironment environment,
+            IConfiguration configuration)
         {
             _context = context;
             _passwordHasher = new PasswordHasher<User>();
             _tokenService = tokenService;
             _environment = environment;
+            _configuration = configuration;
         }
-
 
         // =========================================================
         // LOGIN
@@ -44,50 +46,23 @@ namespace SmartLab.Server.Controllers
             {
                 return BadRequest(new
                 {
-                    message =
-                        "Username and password are required."
+                    message = "Username and password are required."
                 });
             }
 
-            var user =
-                await _context.Users
-                    .FirstOrDefaultAsync(
-                        u => u.Username == normalizedUsername);
-
-            // Development-only first-admin bootstrap.
-            // This creates the first Admin account using the credentials
-            // the developer is currently entering, but only when there
-            // is no Admin account in the database yet. Production is
-            // never allowed to create accounts through this path.
-            if (user == null &&
-                _environment.IsDevelopment() &&
-                normalizedUsername.Equals(
-                    "admin",
-                    StringComparison.OrdinalIgnoreCase))
+            // Development-only deterministic Admin bootstrap. This is
+            // enabled only by the Development launch profile and never
+            // grants Admin access in production.
+            User? user = null;
+            if (_environment.IsDevelopment() &&
+                normalizedUsername.Equals("admin", StringComparison.OrdinalIgnoreCase))
             {
-                bool adminExists =
-                    await _context.Users.AnyAsync(
-                        u => u.Role == "Admin");
-
-                if (!adminExists)
-                {
-                    user = new User
-                    {
-                        Username = normalizedUsername,
-                        Role = "Admin",
-                        CreatedAt = DateTime.Now
-                    };
-
-                    user.PasswordHash =
-                        _passwordHasher.HashPassword(
-                            user,
-                            request.Password);
-
-                    _context.Users.Add(user);
-
-                    await _context.SaveChangesAsync();
-                }
+                user = await EnsureDevelopmentAdminAsync(request.Password);
             }
+
+            user ??= await _context.Users
+                .FirstOrDefaultAsync(
+                    u => u.Username == normalizedUsername);
 
             if (user == null)
             {
@@ -106,8 +81,7 @@ namespace SmartLab.Server.Controllers
 
                 return Unauthorized(new
                 {
-                    message =
-                        "Invalid username or password."
+                    message = "Invalid username or password."
                 });
             }
 
@@ -134,8 +108,7 @@ namespace SmartLab.Server.Controllers
 
                 return Unauthorized(new
                 {
-                    message =
-                        "Invalid username or password."
+                    message = "Invalid username or password."
                 });
             }
 
@@ -155,36 +128,89 @@ namespace SmartLab.Server.Controllers
 
             await _context.SaveChangesAsync();
 
-            return Ok(
-                new
-                {
-                    message =
-                        "Login successful!",
-
-                    token,
-
-                    expiresInHours = 8,
-
-                    userId =
-                        user.UserId,
-
-                    username =
-                        user.Username,
-
-                    role =
-                        user.Role
-                });
+            return Ok(new
+            {
+                message = "Login successful!",
+                token,
+                expiresInHours = 8,
+                userId = user.UserId,
+                username = user.Username,
+                role = user.Role
+            });
         }
 
+        private async Task<User?> EnsureDevelopmentAdminAsync(string suppliedPassword)
+        {
+            bool bootstrapEnabled = _configuration.GetValue(
+                "SmartLab:EnableDevelopmentBootstrap",
+                false);
+
+            if (!bootstrapEnabled)
+            {
+                return null;
+            }
+
+            string bootstrapUsername =
+                _configuration["SmartLab:DevelopmentAdminUsername"]?.Trim()
+                ?? string.Empty;
+            string bootstrapPassword =
+                _configuration["SmartLab:DevelopmentAdminPassword"]
+                ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(bootstrapUsername) ||
+                string.IsNullOrWhiteSpace(bootstrapPassword) ||
+                !bootstrapUsername.Equals("admin", StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(suppliedPassword, bootstrapPassword, StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            User? admin = await _context.Users
+                .FirstOrDefaultAsync(u => u.Username == bootstrapUsername);
+
+            if (admin == null)
+            {
+                admin = new User
+                {
+                    Username = bootstrapUsername,
+                    Role = "Admin",
+                    CreatedAt = DateTime.Now
+                };
+
+                admin.PasswordHash = _passwordHasher.HashPassword(
+                    admin,
+                    bootstrapPassword);
+
+                _context.Users.Add(admin);
+                await _context.SaveChangesAsync();
+                return admin;
+            }
+
+            bool passwordMatches =
+                _passwordHasher.VerifyHashedPassword(
+                    admin,
+                    admin.PasswordHash,
+                    bootstrapPassword) != PasswordVerificationResult.Failed;
+
+            bool roleMatches =
+                admin.Role.Equals("Admin", StringComparison.OrdinalIgnoreCase);
+
+            if (!passwordMatches || !roleMatches)
+            {
+                admin.Role = "Admin";
+                admin.PasswordHash = _passwordHasher.HashPassword(
+                    admin,
+                    bootstrapPassword);
+
+                await _context.SaveChangesAsync();
+            }
+
+            return admin;
+        }
 
         // =========================================================
         // REGISTER
         // =========================================================
-        //
-        // Public registration is intentionally limited to Student.
-        // Admin/Teacher accounts are created through the protected
-        // UserController after an Admin account exists.
-        //
 
         [AllowAnonymous]
         [HttpPost("register")]
@@ -200,8 +226,7 @@ namespace SmartLab.Server.Controllers
             {
                 return BadRequest(new
                 {
-                    message =
-                        "Username and password are required."
+                    message = "Username and password are required."
                 });
             }
 
@@ -214,30 +239,22 @@ namespace SmartLab.Server.Controllers
             {
                 return Conflict(new
                 {
-                    message =
-                        "Username already exists."
+                    message = "Username already exists."
                 });
             }
 
-            var user =
-                new User
-                {
-                    Username =
-                        normalizedUsername,
+            var user = new User
+            {
+                Username = normalizedUsername,
+                Role = "Student",
+                CreatedAt = DateTime.Now
+            };
 
-                    Role = "Student",
-
-                    CreatedAt =
-                        DateTime.Now
-                };
-
-            user.PasswordHash =
-                _passwordHasher.HashPassword(
-                    user,
-                    request.Password);
+            user.PasswordHash = _passwordHasher.HashPassword(
+                user,
+                request.Password);
 
             _context.Users.Add(user);
-
             await _context.SaveChangesAsync();
 
             _context.ActivityLogs.Add(
@@ -253,47 +270,30 @@ namespace SmartLab.Server.Controllers
 
             await _context.SaveChangesAsync();
 
-            return Ok(
-                new
-                {
-                    message =
-                        "Registration successful!",
-
-                    userId =
-                        user.UserId,
-
-                    username =
-                        user.Username,
-
-                    role =
-                        user.Role
-                });
+            return Ok(new
+            {
+                message = "Registration successful!",
+                userId = user.UserId,
+                username = user.Username,
+                role = user.Role
+            });
         }
     }
 
-
     public class LoginRequest
     {
-        public string Username { get; set; } =
-            string.Empty;
-
-        public string Password { get; set; } =
-            string.Empty;
+        public string Username { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
     }
-
 
     public class RegisterRequest
     {
-        public string Username { get; set; } =
-            string.Empty;
-
-        public string Password { get; set; } =
-            string.Empty;
+        public string Username { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
 
         // Kept for compatibility with the existing client.
         // Server intentionally ignores this value and always
         // creates public registrations as Student.
-        public string Role { get; set; } =
-            "Student";
+        public string Role { get; set; } = "Student";
     }
 }
