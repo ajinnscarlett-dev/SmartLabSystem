@@ -7,12 +7,10 @@ namespace SmartLab.Client
 {
     public partial class AdminDashboard
     {
-        private readonly bool _operationsNavigationAttached = AttachOperationsNavigation();
-
-        private bool AttachOperationsNavigation()
+        protected override void OnInitialized(EventArgs e)
         {
+            base.OnInitialized(e);
             AddHandler(Button.ClickEvent, new RoutedEventHandler(OperationsNavigation_Click));
-            return true;
         }
 
         private void OperationsNavigation_Click(object sender, RoutedEventArgs e)
@@ -64,10 +62,7 @@ namespace SmartLab.Client
                 }
             }
 
-            new AdminOperationsWindow(AdminNameText.Text)
-            {
-                Owner = this
-            }.Show();
+            new AdminOperationsWindow(AdminNameText.Text) { Owner = this }.Show();
         }
 
         private void OpenServiceDeskCenter()
@@ -81,10 +76,7 @@ namespace SmartLab.Client
                 }
             }
 
-            new AdminServiceDeskWindow
-            {
-                Owner = this
-            }.Show();
+            new AdminServiceDeskWindow { Owner = this }.Show();
         }
     }
 }
