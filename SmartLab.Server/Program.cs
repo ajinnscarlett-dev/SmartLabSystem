@@ -17,6 +17,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
         builder.Configuration.GetConnectionString("DefaultConnection")
     ));
 
+builder.Services.AddHostedService<DatabaseMigrationHostedService>();
+
 // ==========================================
 // CONTROLLERS
 // ==========================================
@@ -79,21 +81,11 @@ builder.Services
 builder.Services.AddAuthorization();
 
 // ==========================================
-// TOKEN SERVICE
+// SERVICES
 // ==========================================
 
 builder.Services.AddSingleton<AuthTokenService>();
-
-// ==========================================
-// AUTOMATIC PC HEARTBEAT MONITOR
-// ==========================================
-
 builder.Services.AddHostedService<PCMonitorService>();
-
-// ==========================================
-// LAN SERVER DISCOVERY
-// ==========================================
-
 builder.Services.AddHostedService<ServerDiscoveryService>();
 
 // ==========================================
@@ -101,7 +93,6 @@ builder.Services.AddHostedService<ServerDiscoveryService>();
 // ==========================================
 
 builder.Services.AddEndpointsApiExplorer();
-
 builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc(
@@ -145,47 +136,18 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
-// ==========================================
-// SWAGGER
-// ==========================================
-
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
-// ==========================================
-// HTTPS
-// DEVELOPMENT: DO NOT FORCE HTTP -> HTTPS
-// PRODUCTION: FORCE HTTPS
-// ==========================================
-
 if (!app.Environment.IsDevelopment())
 {
     app.UseHttpsRedirection();
 }
 
-// ==========================================
-// AUTHENTICATION
-// ==========================================
-
 app.UseAuthentication();
-
-// ==========================================
-// AUTHORIZATION
-// ==========================================
-
 app.UseAuthorization();
-
-// ==========================================
-// CONTROLLERS
-// ==========================================
-
 app.MapControllers();
-
-// ==========================================
-// START SERVER
-// ==========================================
-
 app.Run();
