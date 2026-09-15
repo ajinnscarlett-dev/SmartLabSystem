@@ -33,8 +33,6 @@ namespace SmartLab.Client
             Button? schedulesButton = FindButtonByLabel("Schedules");
             if (schedulesButton != null)
             {
-                // There is no schedule module in the current application model.
-                // Hide the historical miswired entry instead of sending it to Reports.
                 schedulesButton.Visibility = Visibility.Collapsed;
                 schedulesButton.Click -= ReportsNavButton_Click;
             }
@@ -47,10 +45,7 @@ namespace SmartLab.Client
                 maintenanceButton.Click += MaintenanceNavButton_Click;
             }
 
-            // There is no server-side account-blocking operation in the current model.
-            // Hide the misleading dashboard action rather than exposing a no-op button.
             BlockThisUserButton?.SetCurrentValue(UIElement.VisibilityProperty, Visibility.Collapsed);
-
             ApplyConsistentNavigationIcons();
         }
 
@@ -79,25 +74,6 @@ namespace SmartLab.Client
             }
 
             return string.Empty;
-        }
-
-        private static IEnumerable<T> FindVisualChildren<T>(DependencyObject parent)
-            where T : DependencyObject
-        {
-            if (parent == null)
-                yield break;
-
-            int childCount = VisualTreeHelper.GetChildrenCount(parent);
-            for (int index = 0; index < childCount; index++)
-            {
-                DependencyObject child = VisualTreeHelper.GetChild(parent, index);
-
-                if (child is T match)
-                    yield return match;
-
-                foreach (T descendant in FindVisualChildren<T>(child))
-                    yield return descendant;
-            }
         }
 
         private void ApplyConsistentNavigationIcons()
