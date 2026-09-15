@@ -19,8 +19,15 @@ namespace SmartLab.Server
         {
             string key =
                 _configuration["Jwt:Key"]
+                ?? Environment.GetEnvironmentVariable("SMARTLAB_JWT_KEY")
                 ?? throw new InvalidOperationException(
-                    "JWT signing key is missing.");
+                    "JWT signing key is missing. Configure Jwt:Key through a local secret/environment variable.");
+
+            if (key.Length < 32)
+            {
+                throw new InvalidOperationException(
+                    "Jwt:Key must be at least 32 characters long.");
+            }
 
             string issuer =
                 _configuration["Jwt:Issuer"]
