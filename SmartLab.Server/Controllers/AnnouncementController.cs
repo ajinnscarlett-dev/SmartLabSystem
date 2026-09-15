@@ -1,10 +1,13 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace SmartLab.Server.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class AnnouncementController : ControllerBase
     {
         private readonly AppDbContext _context;
@@ -14,233 +17,219 @@ namespace SmartLab.Server.Controllers
             _context = context;
         }
 
-
-        // ==========================================
-        // GET ALL ACTIVE ANNOUNCEMENTS
-        //
-        // GET:
-        // api/Announcement
-        // ==========================================
+        private string CurrentRole =>
+            User.FindFirstValue(ClaimTypes.Role) ?? string.Empty;
 
         [HttpGet]
         public async Task<IActionResult> GetAnnouncements()
         {
-            var now = DateTime.Now;
+            string role = CurrentRole;
+            DateTime now = DateTime.Now;
 
-            var announcements =
-                await _context.Announcements
-                    .Where(a =>
-                        a.IsActive &&
-                        (!a.ExpiresAt.HasValue ||
-                         a.ExpiresAt.Value > now))
-                    .OrderByDescending(a => a.CreatedAt)
-                    .ToListAsync();
+            var announcements = await _context.Announcements
+                .AsNoTracking()
+                .Where(a =>
+                    a.IsActive &&
+                    (!a.ExpiresAt.HasValue || a.ExpiresAt.Value > now) &&
+                    (a.TargetRole == "All" ||
+                     a.TargetRole == role))
+                .OrderByDescending(a => a.CreatedAt)
+                .ToListAsync();
 
             return Ok(announcements);
         }
 
+        [HttpGet("all")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> GetAllAnnouncements()
+        {
+            var announcements = await _context.Announcements
+                .AsNoTracking()
+                .OrderByDescending(a => a.CreatedAt)
+                .ToListAsync();
 
-        // ==========================================
-        // GET ANNOUNCEMENT BY ID
-        //
-        // GET:
-        // api/Announcement/{id}
-        // ==========================================
+            return Ok(announcements);
+        }
 
         [HttpGet("{id}")]
-        public async Task<IActionResult> GetAnnouncement(
-            int id)
+        public async Task<IActionResult> GetAnnouncement(int id)
         {
-            var announcement =
-                await _context.Announcements
-                    .FirstOrDefaultAsync(
-                        a => a.AnnouncementId == id);
+            var announcement = await _context.Announcements
+                .AsNoTracking()
+                .FirstOrDefaultAsync(a => a.AnnouncementId == id);
 
             if (announcement == null)
             {
-                return NotFound(new
-                {
-                    message = "Announcement not found."
-                });
+                return NotFound(new { message = "Announcement not found." });
+            }
+
+            if (!string.Equals(CurrentRole, "Admin", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(announcement.TargetRole, "All", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(announcement.TargetRole, CurrentRole, StringComparison.OrdinalIgnoreCase))
+            {
+                return Forbid();
             }
 
             return Ok(announcement);
         }
 
-
-        // ==========================================
-        // CREATE ANNOUNCEMENT
-        //
-        // POST:
-        // api/Announcement
-        // ==========================================
-
         [HttpPost]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> CreateAnnouncement(
             [FromBody] AnnouncementCreateRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.Title))
             {
-                return BadRequest(new
-                {
-                    message = "Announcement title is required."
-                });
+                return BadRequest(new { message = "Announcement title is required." });
             }
 
             if (string.IsNullOrWhiteSpace(request.Message))
             {
-                return BadRequest(new
-                {
-                    message = "Announcement message is required."
-                });
+                return BadRequest(new { message = "Announcement message is required." });
             }
 
-
-            // ==========================================
-            // VALIDATE EXPIRATION
-            // ==========================================
-
-            if (request.ExpiresAt.HasValue &&
-                request.ExpiresAt.Value <= DateTime.Now)
+            if (request.ExpiresAt.HasValue && request.ExpiresAt.Value <= DateTime.Now)
             {
-                return BadRequest(new
-                {
-                    message =
-                        "Expiration date must be in the future."
-                });
+                return BadRequest(new { message = "Expiration date must be in the future." });
             }
 
+            string targetRole = request.TargetRole?.Trim() ?? "All";
 
-            var announcement =
-                new Announcement
-                {
-                    Title = request.Title.Trim(),
+            if (!new[] { "All", "Student", "Teacher", "Admin" }
+                .Contains(targetRole, StringComparer.OrdinalIgnoreCase))
+            {
+                return BadRequest(new { message = "Invalid target role." });
+            }
 
-                    Message = request.Message.Trim(),
+            int? postedByUserId = null;
+            if (int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out int currentUserId))
+            {
+                postedByUserId = currentUserId;
+            }
 
-                    PostedByUserId =
-                        request.PostedByUserId,
+            var announcement = new Announcement
+            {
+                Title = request.Title.Trim(),
+                Message = request.Message.Trim(),
+                PostedByUserId = postedByUserId,
+                CreatedAt = DateTime.Now,
+                IsActive = true,
+                ExpiresAt = request.ExpiresAt,
+                TargetRole = new[] { "All", "Student", "Teacher", "Admin" }
+                    .First(v => v.Equals(targetRole, StringComparison.OrdinalIgnoreCase))
+            };
 
-                    CreatedAt =
-                        DateTime.Now,
-
-                    IsActive = true,
-
-                    ExpiresAt =
-                        request.ExpiresAt
-                };
-
-
-            _context.Announcements.Add(
-                announcement);
-
+            _context.Announcements.Add(announcement);
             await _context.SaveChangesAsync();
-
 
             return Ok(new
             {
-                message =
-                    "Announcement created successfully.",
-
+                message = "Announcement created successfully.",
                 announcement
             });
         }
 
+        [HttpPut("{id}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> EditAnnouncement(
+            int id,
+            [FromBody] AnnouncementEditRequest request)
+        {
+            var announcement = await _context.Announcements
+                .FirstOrDefaultAsync(a => a.AnnouncementId == id);
 
-        // ==========================================
-        // DEACTIVATE ANNOUNCEMENT
-        //
-        // PUT:
-        // api/Announcement/{id}/deactivate
-        // ==========================================
+            if (announcement == null)
+            {
+                return NotFound(new { message = "Announcement not found." });
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Title) ||
+                string.IsNullOrWhiteSpace(request.Message))
+            {
+                return BadRequest(new { message = "Title and message are required." });
+            }
+
+            if (request.ExpiresAt.HasValue && request.ExpiresAt.Value <= DateTime.Now)
+            {
+                return BadRequest(new { message = "Expiration date must be in the future." });
+            }
+
+            if (!new[] { "All", "Student", "Teacher", "Admin" }
+                .Contains(request.TargetRole, StringComparer.OrdinalIgnoreCase))
+            {
+                return BadRequest(new { message = "Invalid target role." });
+            }
+
+            announcement.Title = request.Title.Trim();
+            announcement.Message = request.Message.Trim();
+            announcement.ExpiresAt = request.ExpiresAt;
+            announcement.TargetRole = new[] { "All", "Student", "Teacher", "Admin" }
+                .First(v => v.Equals(request.TargetRole, StringComparison.OrdinalIgnoreCase));
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = "Announcement updated successfully.",
+                announcement
+            });
+        }
 
         [HttpPut("{id}/deactivate")]
-        public async Task<IActionResult> DeactivateAnnouncement(
-            int id)
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> DeactivateAnnouncement(int id)
         {
-            var announcement =
-                await _context.Announcements
-                    .FirstOrDefaultAsync(
-                        a => a.AnnouncementId == id);
+            var announcement = await _context.Announcements
+                .FirstOrDefaultAsync(a => a.AnnouncementId == id);
 
             if (announcement == null)
             {
-                return NotFound(new
-                {
-                    message = "Announcement not found."
-                });
+                return NotFound(new { message = "Announcement not found." });
             }
 
-
             announcement.IsActive = false;
-
             await _context.SaveChangesAsync();
-
 
             return Ok(new
             {
-                message =
-                    "Announcement deactivated successfully.",
-
+                message = "Announcement deactivated successfully.",
                 announcement
             });
         }
 
-
-        // ==========================================
-        // DELETE ANNOUNCEMENT
-        //
-        // DELETE:
-        // api/Announcement/{id}
-        // ==========================================
-
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteAnnouncement(
-            int id)
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> DeleteAnnouncement(int id)
         {
-            var announcement =
-                await _context.Announcements
-                    .FirstOrDefaultAsync(
-                        a => a.AnnouncementId == id);
+            var announcement = await _context.Announcements
+                .FirstOrDefaultAsync(a => a.AnnouncementId == id);
 
             if (announcement == null)
             {
-                return NotFound(new
-                {
-                    message = "Announcement not found."
-                });
+                return NotFound(new { message = "Announcement not found." });
             }
 
-
-            _context.Announcements.Remove(
-                announcement);
-
+            _context.Announcements.Remove(announcement);
             await _context.SaveChangesAsync();
 
-
-            return Ok(new
-            {
-                message =
-                    "Announcement deleted successfully."
-            });
+            return Ok(new { message = "Announcement deleted successfully." });
         }
     }
 
-
-    // ==========================================
-    // CREATE ANNOUNCEMENT REQUEST
-    // ==========================================
-
     public class AnnouncementCreateRequest
     {
-        public string Title { get; set; } =
-            string.Empty;
-
-        public string Message { get; set; } =
-            string.Empty;
-
+        public string Title { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
         public int? PostedByUserId { get; set; }
-
         public DateTime? ExpiresAt { get; set; }
+        public string TargetRole { get; set; } = "All";
+    }
+
+    public class AnnouncementEditRequest
+    {
+        public string Title { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+        public DateTime? ExpiresAt { get; set; }
+        public string TargetRole { get; set; } = "All";
     }
 }
