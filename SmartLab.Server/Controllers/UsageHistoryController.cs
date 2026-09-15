@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace SmartLab.Server.Controllers
 {
@@ -37,6 +38,26 @@ namespace SmartLab.Server.Controllers
                 query = query.Where(s => s.PCId == pcId.Value);
             if (userId.HasValue)
                 query = query.Where(s => s.UserId == userId.Value);
+
+            if (User.IsInRole("Teacher"))
+            {
+                if (!int.TryParse(
+                        User.FindFirstValue(ClaimTypes.NameIdentifier),
+                        out int teacherId))
+                {
+                    return Unauthorized();
+                }
+
+                var authorizedLabs = await _context.TeacherLaboratoryAuthorizations
+                    .AsNoTracking()
+                    .Where(a => a.TeacherUserId == teacherId)
+                    .Select(a => a.LaboratoryId)
+                    .ToListAsync();
+
+                query = query.Where(s =>
+                    s.LaboratoryId.HasValue &&
+                    authorizedLabs.Contains(s.LaboratoryId.Value));
+            }
 
             var result = await query
                 .OrderByDescending(s => s.LoginTime)
