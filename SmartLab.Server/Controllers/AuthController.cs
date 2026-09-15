@@ -32,7 +32,11 @@ namespace SmartLab.Server.Controllers
         public async Task<IActionResult> Login(
             [FromBody] LoginRequest request)
         {
-            if (string.IsNullOrWhiteSpace(request.Username) ||
+            string normalizedUsername =
+                request.Username?.Trim()
+                ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(normalizedUsername) ||
                 string.IsNullOrWhiteSpace(request.Password))
             {
                 return BadRequest(new
@@ -45,7 +49,7 @@ namespace SmartLab.Server.Controllers
             var user =
                 await _context.Users
                     .FirstOrDefaultAsync(
-                        u => u.Username == request.Username);
+                        u => u.Username == normalizedUsername);
 
             if (user == null)
             {
@@ -56,7 +60,7 @@ namespace SmartLab.Server.Controllers
                         PCId = null,
                         Action = "Login Failed",
                         Details =
-                            $"Failed login attempt for username: {request.Username}",
+                            $"Failed login attempt for username: {normalizedUsername}",
                         CreatedAt = DateTime.Now
                     });
 
@@ -149,7 +153,11 @@ namespace SmartLab.Server.Controllers
         public async Task<IActionResult> Register(
             [FromBody] RegisterRequest request)
         {
-            if (string.IsNullOrWhiteSpace(request.Username) ||
+            string normalizedUsername =
+                request.Username?.Trim()
+                ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(normalizedUsername) ||
                 string.IsNullOrWhiteSpace(request.Password))
             {
                 return BadRequest(new
@@ -162,7 +170,7 @@ namespace SmartLab.Server.Controllers
             var existingUser =
                 await _context.Users
                     .FirstOrDefaultAsync(
-                        u => u.Username == request.Username);
+                        u => u.Username == normalizedUsername);
 
             if (existingUser != null)
             {
@@ -177,7 +185,7 @@ namespace SmartLab.Server.Controllers
                 new User
                 {
                     Username =
-                        request.Username.Trim(),
+                        normalizedUsername,
 
                     Role = "Student",
 
