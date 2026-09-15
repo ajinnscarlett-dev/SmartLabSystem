@@ -44,15 +44,23 @@ namespace SmartLab.Server.Controllers
                 })
                 .FirstOrDefaultAsync();
 
+            int available = counts?.Available ?? 0;
+            int occupied = counts?.Occupied ?? 0;
+            int offline = counts?.Offline ?? 0;
+            int maintenance = counts?.Maintenance ?? 0;
+            int totalPcs = available + occupied + offline + maintenance;
+
             return Ok(new
             {
                 server = "Online",
                 database = databaseHealthy ? "Online" : "Offline",
+                databaseConnected = databaseHealthy,
                 databaseError,
-                available = counts?.Available ?? 0,
-                occupied = counts?.Occupied ?? 0,
-                offline = counts?.Offline ?? 0,
-                maintenance = counts?.Maintenance ?? 0,
+                available,
+                occupied,
+                offline,
+                maintenance,
+                totalPCs = totalPcs,
                 checkedAt = DateTime.Now
             });
         }
