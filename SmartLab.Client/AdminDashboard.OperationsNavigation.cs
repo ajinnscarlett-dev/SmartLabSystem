@@ -7,9 +7,6 @@ namespace SmartLab.Client
 {
     public partial class AdminDashboard
     {
-        // Runs before the constructor body and registers a bubbling handler so the
-        // existing dashboard navigation stays intact while the new operational modules
-        // get a real WPF surface without duplicating or replacing the existing dashboard.
         private readonly bool _operationsNavigationAttached = AttachOperationsNavigation();
 
         private bool AttachOperationsNavigation()
@@ -21,15 +18,18 @@ namespace SmartLab.Client
         private void OperationsNavigation_Click(object sender, RoutedEventArgs e)
         {
             if (e.OriginalSource is not Button button)
-            {
                 return;
-            }
 
             string label = GetButtonLabel(button);
 
+            if (string.Equals(label, "Incidents", StringComparison.OrdinalIgnoreCase))
+            {
+                OpenServiceDeskCenter();
+                return;
+            }
+
             if (string.Equals(label, "Reports", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(label, "Maintenance", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(label, "Incidents", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(label, "Announcements", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(label, "Send Announcement", StringComparison.OrdinalIgnoreCase))
             {
@@ -40,9 +40,7 @@ namespace SmartLab.Client
         private string GetButtonLabel(Button button)
         {
             if (button.Content is string text)
-            {
                 return text.Trim();
-            }
 
             if (button.Content is Panel panel)
             {
@@ -66,12 +64,27 @@ namespace SmartLab.Client
                 }
             }
 
-            var operations = new AdminOperationsWindow(AdminNameText.Text)
+            new AdminOperationsWindow(AdminNameText.Text)
             {
                 Owner = this
-            };
+            }.Show();
+        }
 
-            operations.Show();
+        private void OpenServiceDeskCenter()
+        {
+            foreach (Window window in Application.Current.Windows)
+            {
+                if (window is AdminServiceDeskWindow existing && existing.IsVisible)
+                {
+                    existing.Activate();
+                    return;
+                }
+            }
+
+            new AdminServiceDeskWindow
+            {
+                Owner = this
+            }.Show();
         }
     }
 }
