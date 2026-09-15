@@ -1,30 +1,19 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 
 namespace SmartLab.Server
 {
     public class PCMonitorService : BackgroundService
     {
         private readonly IServiceScopeFactory _scopeFactory;
+        private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(20);
+        private static readonly TimeSpan CheckInterval = TimeSpan.FromSeconds(5);
 
-        // PC is considered offline after 20 seconds
-        // without receiving a heartbeat.
-        private readonly TimeSpan _timeout =
-            TimeSpan.FromSeconds(20);
-
-        // Check PCs every 5 seconds.
-        private readonly TimeSpan _checkInterval =
-            TimeSpan.FromSeconds(5);
-
-
-        public PCMonitorService(
-            IServiceScopeFactory scopeFactory)
+        public PCMonitorService(IServiceScopeFactory scopeFactory)
         {
             _scopeFactory = scopeFactory;
         }
 
-
-        protected override async Task ExecuteAsync(
-            CancellationToken stoppingToken)
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             while (!stoppingToken.IsCancellationRequested)
             {
@@ -32,86 +21,72 @@ namespace SmartLab.Server
                 {
                     await CheckPCs(stoppingToken);
                 }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
                 catch (Exception ex)
                 {
-                    Console.WriteLine(
-                        $"PC Monitor Error: {ex.Message}"
-                    );
+                    Console.WriteLine($"PC Monitor Error: {ex.Message}");
                 }
 
-                await Task.Delay(
-                    _checkInterval,
-                    stoppingToken
-                );
+                try
+                {
+                    await Task.Delay(CheckInterval, stoppingToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
             }
         }
 
-
-        private async Task CheckPCs(
-            CancellationToken cancellationToken)
+        private async Task CheckPCs(CancellationToken cancellationToken)
         {
-            using IServiceScope scope =
-                _scopeFactory.CreateScope();
+            using IServiceScope scope = _scopeFactory.CreateScope();
+            AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            DateTime cutoff = DateTime.Now - Timeout;
 
-            AppDbContext context =
-                scope.ServiceProvider
-                    .GetRequiredService<AppDbContext>();
-
-
-            DateTime cutoffTime =
-                DateTime.Now - _timeout;
-
-
-            // Find occupied PCs whose heartbeat
-            // has not been received recently.
-
-            var stalePCs =
-                await context.PCs
-                    .Where(p =>
-                        p.Status == "Occupied" &&
-                        p.CurrentUserId != null &&
-                        p.LastSeen != null &&
-                        p.LastSeen < cutoffTime
-                    )
-                    .ToListAsync(
-                        cancellationToken
-                    );
-
+            var stalePCs = await context.PCs
+                .Where(p => p.Status != "Maintenance" &&
+                            p.LastSeen != null &&
+                            p.LastSeen < cutoff)
+                .ToListAsync(cancellationToken);
 
             if (stalePCs.Count == 0)
             {
                 return;
             }
 
-
-            foreach (var pc in stalePCs)
+            foreach (PC pc in stalePCs)
             {
-                Console.WriteLine(
-                    $"[PC MONITOR] " +
-                    $"{pc.PCNumber} heartbeat timeout. " +
-                    $"Releasing PC."
-                );
+                string previousStatus = pc.Status;
 
+                if (pc.Status == "Occupied" && pc.CurrentUserId != null)
+                {
+                    pc.Status = "Offline";
+                    pc.CurrentUserId = null;
+                }
+                else if (pc.CurrentUserId == null)
+                {
+                    pc.Status = "Offline";
+                }
 
-                // Release the PC
-
-                pc.Status = "Available";
-
-                pc.CurrentUserId = null;
-
-                pc.LastSeen = DateTime.Now;
+                if (!string.Equals(previousStatus, pc.Status, StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.WriteLine($"[PC MONITOR] {pc.PCNumber}: {previousStatus} -> {pc.Status}");
+                    context.ActivityLogs.Add(new ActivityLog
+                    {
+                        UserId = null,
+                        PCId = pc.PCId,
+                        Action = "PC Status Changed",
+                        Details = $"PC {pc.PCNumber} changed from {previousStatus} to {pc.Status} after heartbeat timeout.",
+                        CreatedAt = DateTime.Now
+                    });
+                }
             }
 
-
-            await context.SaveChangesAsync(
-                cancellationToken
-            );
-
-
-            Console.WriteLine(
-                $"[PC MONITOR] " +
-                $"{stalePCs.Count} PC(s) automatically released."
-            );
+            await context.SaveChangesAsync(cancellationToken);
         }
     }
 }
