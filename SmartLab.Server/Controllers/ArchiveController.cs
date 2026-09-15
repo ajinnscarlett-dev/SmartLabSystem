@@ -40,6 +40,11 @@ namespace SmartLab.Server.Controllers
             {
                 cutoff,
                 ageDays,
+                usageHistoryCount = sessions,
+                maintenanceCount = maintenance,
+                serviceDeskCount = tickets,
+                activityLogCount = activity,
+                totalEligible = sessions + maintenance + tickets + activity,
                 eligible = new
                 {
                     usageSessions = sessions,
