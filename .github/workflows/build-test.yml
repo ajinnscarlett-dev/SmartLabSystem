@@ -39,6 +39,8 @@ jobs:
 
       - name: Verify EF model has no pending changes
         working-directory: SmartLab.Server
+        env:
+          SMARTLAB_JWT_KEY: "SmartLab-CI-Only-Test-Key-2026-At-Least-32-Chars!"
         run: dotnet ef migrations has-pending-model-changes --configuration Release --no-build
 
       - name: Test
