@@ -23,6 +23,10 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
+      - name: Install EF Core CLI
+        shell: pwsh
+        run: dotnet tool install --global dotnet-ef --version 8.0.29
+
       - name: Restore
         run: dotnet restore SmartLabSystem.sln
 
