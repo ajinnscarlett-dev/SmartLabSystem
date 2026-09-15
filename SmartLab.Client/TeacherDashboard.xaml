@@ -1,17 +1,74 @@
 ﻿<Window x:Class="SmartLab.Client.TeacherDashboard"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="SmartLab - Teacher Dashboard"
-        Width="1200"
-        Height="800"
-        MinWidth="1000"
-        MinHeight="650"
+        Title="SmartLab — Teacher Dashboard"
+        Width="1280"
+        Height="820"
+        MinWidth="1080"
+        MinHeight="680"
         WindowStartupLocation="CenterScreen"
-        Background="#F4F6F9"
+        Background="{StaticResource PageBackground}"
+        Foreground="{StaticResource TextPrimary}"
+        FontFamily="Segoe UI"
         Loaded="Window_Loaded">
 
-    <Grid Margin="25">
+    <Window.Resources>
+        <SolidColorBrush x:Key="PageBackground" Color="#F3F5F8"/>
+        <SolidColorBrush x:Key="Surface" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="SurfaceAlt" Color="#F8FAFC"/>
+        <SolidColorBrush x:Key="Border" Color="#D9E0E7"/>
+        <SolidColorBrush x:Key="TextPrimary" Color="#1F2937"/>
+        <SolidColorBrush x:Key="TextSecondary" Color="#64748B"/>
+        <SolidColorBrush x:Key="Accent" Color="#2467A9"/>
+        <SolidColorBrush x:Key="AccentHover" Color="#1D568F"/>
+        <SolidColorBrush x:Key="Danger" Color="#B63A3A"/>
 
+        <Style x:Key="ButtonBase" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource Surface}"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="12,7"/>
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+
+        <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource ButtonBase}">
+            <Setter Property="Background" Value="{StaticResource Accent}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Accent}"/>
+        </Style>
+
+        <Style x:Key="DangerButton" TargetType="Button" BasedOn="{StaticResource ButtonBase}">
+            <Setter Property="Background" Value="{StaticResource Danger}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Danger}"/>
+        </Style>
+
+        <Style x:Key="SectionBorder" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource Surface}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="14"/>
+        </Style>
+
+        <Style x:Key="DenseGrid" TargetType="DataGrid">
+            <Setter Property="Background" Value="{StaticResource Surface}"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="RowHeight" Value="34"/>
+            <Setter Property="ColumnHeaderHeight" Value="32"/>
+            <Setter Property="GridLinesVisibility" Value="Horizontal"/>
+            <Setter Property="HorizontalGridLinesBrush" Value="#E5EAF0"/>
+            <Setter Property="CanUserAddRows" Value="False"/>
+            <Setter Property="IsReadOnly" Value="True"/>
+            <Setter Property="SelectionMode" Value="Single"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="22">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -21,135 +78,7 @@
         </Grid.RowDefinitions>
 
         <!-- HEADER -->
-        <Grid Grid.Row="0" Margin="0,0,0,20">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-
-            <StackPanel>
-                <TextBlock Text="SmartLab"
-                           FontSize="30"
-                           FontWeight="Bold"
-                           Foreground="#182536"/>
-                <TextBlock Text="Teacher Dashboard"
-                           FontSize="16"
-                           Foreground="#65758A"
-                           Margin="0,4,0,0"/>
-                <TextBlock x:Name="TeacherNameText"
-                           Text="Teacher"
-                           FontSize="14"
-                           FontWeight="SemiBold"
-                           Foreground="#3F5368"
-                           Margin="0,6,0,0"/>
-            </StackPanel>
-
-            <StackPanel Grid.Column="1"
-                        Orientation="Horizontal"
-                        VerticalAlignment="Center">
-
-                <Grid Width="135"
-                      Height="36"
-                      Margin="0,0,10,0">
-
-                    <Button x:Name="NotificationButton"
-                            Content="NOTIFICATIONS"
-                            Width="135"
-                            Height="36"
-                            FontWeight="Bold"
-                            Click="NotificationButton_Click"/>
-
-                    <Border x:Name="NotificationCountBadge"
-                            Width="22"
-                            Height="22"
-                            CornerRadius="11"
-                            Background="#C62828"
-                            HorizontalAlignment="Right"
-                            VerticalAlignment="Top"
-                            Margin="0,-7,-7,0"
-                            Visibility="Collapsed">
-
-                        <TextBlock x:Name="NotificationCountText"
-                                   Text="0"
-                                   FontSize="11"
-                                   FontWeight="Bold"
-                                   Foreground="White"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"
-                                   TextAlignment="Center"/>
-                    </Border>
-
-                </Grid>
-
-                <Button Content="REFRESH"
-                        Width="105"
-                        Height="36"
-                        Margin="0,0,10,0"
-                        FontWeight="Bold"
-                        Click="RefreshButton_Click"/>
-
-                <Button Content="LOGOUT"
-                        Width="105"
-                        Height="36"
-                        FontWeight="Bold"
-                        Click="LogoutButton_Click"/>
-            </StackPanel>
-        </Grid>
-
-        <!-- QUICK ACTIONS -->
-        <Grid Grid.Row="1" Margin="0,0,0,20">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-
-            <Border Grid.Column="0"
-                    Background="White"
-                    CornerRadius="10"
-                    Padding="18"
-                    Margin="0,0,10,0">
-                <StackPanel>
-                    <TextBlock Text="PC STATUS"
-                               FontSize="14"
-                               FontWeight="Bold"
-                               Foreground="#65758A"/>
-                    <TextBlock x:Name="PcStatusSummaryText"
-                               Text="Loading..."
-                               FontSize="22"
-                               FontWeight="Bold"
-                               Foreground="#182536"
-                               Margin="0,8,0,0"/>
-                </StackPanel>
-            </Border>
-
-            <Button Grid.Column="1"
-                    Content="VIEW PC SCREEN"
-                    Height="75"
-                    Margin="10,0"
-                    FontSize="16"
-                    FontWeight="Bold"
-                    Click="ViewPcScreenButton_Click"/>
-
-            <Button Grid.Column="2"
-                    Content="NEED ASSISTANCE"
-                    Height="75"
-                    Margin="10,0,0,0"
-                    FontSize="16"
-                    FontWeight="Bold"
-                    Click="NeedAssistanceButton_Click"/>
-        </Grid>
-
-        <!-- NOTIFICATION BANNER -->
-        <Border x:Name="NotificationBanner"
-                Grid.Row="2"
-                Visibility="Collapsed"
-                Background="#E8F0F8"
-                BorderBrush="#B8C7D9"
-                BorderThickness="1"
-                CornerRadius="10"
-                Padding="15"
-                Margin="0,0,0,20">
+        <Border Grid.Row="0" Style="{StaticResource SectionBorder}" Margin="0,0,0,14">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -157,26 +86,59 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel>
-                    <TextBlock x:Name="NotificationTitleText"
-                               Text="SMARTLAB NOTIFICATION"
-                               FontSize="14"
-                               FontWeight="Bold"
-                               Foreground="#182536"/>
-
-                    <TextBlock x:Name="NotificationMessageText"
-                               Text="Notification message"
-                               FontSize="13"
-                               Foreground="#4B5D70"
-                               TextWrapping="Wrap"
-                               Margin="0,5,0,0"/>
+                    <TextBlock Text="SMARTLAB" FontSize="24" FontWeight="SemiBold"/>
+                    <TextBlock Text="Teacher Operations" FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
+                    <TextBlock x:Name="TeacherNameText" Text="Teacher" FontSize="13" FontWeight="SemiBold" Margin="0,7,0,0"/>
                 </StackPanel>
 
-                <Button Grid.Column="1"
-                        Content="X"
-                        Width="32"
-                        Height="30"
-                        VerticalAlignment="Center"
-                        Click="DismissNotificationButton_Click"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Grid Width="122" Height="36" Margin="0,0,8,0">
+                        <Button x:Name="NotificationButton" Content="NOTIFICATIONS" Width="122" Height="36" Style="{StaticResource ButtonBase}" Click="NotificationButton_Click"/>
+                        <Border x:Name="NotificationCountBadge" Width="20" Height="20" CornerRadius="10" Background="{StaticResource Danger}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-5,-5,0" Visibility="Collapsed">
+                            <TextBlock x:Name="NotificationCountText" Text="0" FontSize="10" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </Grid>
+                    <Button Content="REFRESH" Width="96" Margin="0,0,8,0" Style="{StaticResource PrimaryButton}" Click="RefreshButton_Click"/>
+                    <Button Content="LOGOUT" Width="96" Style="{StaticResource DangerButton}" Click="LogoutButton_Click"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- QUICK ACTIONS -->
+        <Grid Grid.Row="1" Margin="0,0,0,14">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1.15*"/>
+                <ColumnDefinition Width="0.85*"/>
+                <ColumnDefinition Width="0.85*"/>
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Style="{StaticResource SectionBorder}" Margin="0,0,8,0">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="PC STATUS" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1" x:Name="PcStatusSummaryText" Text="Loading…" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+
+            <Button Grid.Column="1" Content="VIEW PC SCREEN" Margin="8,0" Style="{StaticResource ButtonBase}" Click="ViewPcScreenButton_Click"/>
+            <Button Grid.Column="2" Content="NEED ASSISTANCE" Margin="8,0,0,0" Style="{StaticResource PrimaryButton}" Click="NeedAssistanceButton_Click"/>
+        </Grid>
+
+        <!-- NOTIFICATION BANNER -->
+        <Border x:Name="NotificationBanner" Grid.Row="2" Visibility="Collapsed" Background="#EEF4FA" BorderBrush="#C6D7E6" BorderThickness="1" Padding="12" Margin="0,0,0,14">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock x:Name="NotificationTitleText" Text="SMARTLAB NOTIFICATION" FontSize="12" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="NotificationMessageText" Text="Notification message" FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                </StackPanel>
+                <Button Grid.Column="1" Content="DISMISS" Width="86" Style="{StaticResource ButtonBase}" Click="DismissNotificationButton_Click"/>
             </Grid>
         </Border>
 
@@ -188,129 +150,56 @@
             </Grid.ColumnDefinitions>
 
             <!-- PC STATUS -->
-            <Border Grid.Column="0"
-                    Background="White"
-                    CornerRadius="10"
-                    Padding="12"
-                    Margin="0,0,10,0">
+            <Border Grid.Column="0" Style="{StaticResource SectionBorder}" Margin="0,0,8,0">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
-
-                    <TextBlock Text="Student PC Status"
-                               FontSize="20"
-                               FontWeight="Bold"
-                               Foreground="#182536"
-                               Margin="5,5,5,12"/>
-
-                    <DataGrid x:Name="PcGrid"
-                              Grid.Row="1"
-                              AutoGenerateColumns="False"
-                              IsReadOnly="True"
-                              CanUserAddRows="False"
-                              SelectionMode="Single">
+                    <TextBlock Text="STUDENT PC STATUS" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,10"/>
+                    <DataGrid x:Name="PcGrid" Grid.Row="1" Style="{StaticResource DenseGrid}">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="PC"
-                                                Width="110"
-                                                Binding="{Binding PcNumber}"/>
-                            <DataGridTextColumn Header="STATUS"
-                                                Width="120"
-                                                Binding="{Binding Status}"/>
-                            <DataGridTextColumn Header="USER"
-                                                Width="140"
-                                                Binding="{Binding Username}"/>
-                            <DataGridTextColumn Header="LAST SEEN"
-                                                Width="*"
-                                                Binding="{Binding LastSeen, StringFormat={}{0:HH:mm:ss}}"/>
+                            <DataGridTextColumn Header="PC" Width="100" Binding="{Binding PcNumber}"/>
+                            <DataGridTextColumn Header="STATUS" Width="115" Binding="{Binding Status}"/>
+                            <DataGridTextColumn Header="USER" Width="140" Binding="{Binding Username}"/>
+                            <DataGridTextColumn Header="LAST SEEN" Width="*" Binding="{Binding LastSeen, StringFormat={}{0:HH:mm:ss}}"/>
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>
             </Border>
 
             <!-- RIGHT -->
-            <Grid Grid.Column="1" Margin="10,0,0,0">
+            <Grid Grid.Column="1" Margin="8,0,0,0">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <Border Grid.Row="0"
-                        Background="White"
-                        CornerRadius="10"
-                        Padding="15"
-                        Margin="0,0,0,10">
+                <Border Grid.Row="0" Style="{StaticResource SectionBorder}" Margin="0,0,0,8">
                     <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                        </Grid.RowDefinitions>
-
-                        <TextBlock Text="MIS Announcements"
-                                   FontSize="20"
-                                   FontWeight="Bold"
-                                   Foreground="#182536"
-                                   Margin="0,0,0,10"/>
-
-                        <DataGrid x:Name="AnnouncementGrid"
-                                  Grid.Row="1"
-                                  AutoGenerateColumns="False"
-                                  IsReadOnly="True"
-                                  CanUserAddRows="False">
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                        <TextBlock Text="MIS ANNOUNCEMENTS" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,10"/>
+                        <DataGrid x:Name="AnnouncementGrid" Grid.Row="1" Style="{StaticResource DenseGrid}">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="TITLE"
-                                                    Width="150"
-                                                    Binding="{Binding Title}"/>
-                                <DataGridTextColumn Header="MESSAGE"
-                                                    Width="*"
-                                                    Binding="{Binding Message}"/>
-                                <DataGridTextColumn Header="DATE"
-                                                    Width="135"
-                                                    Binding="{Binding CreatedAt, StringFormat={}{0:MM/dd HH:mm}}"/>
+                                <DataGridTextColumn Header="TITLE" Width="145" Binding="{Binding Title}"/>
+                                <DataGridTextColumn Header="MESSAGE" Width="*" Binding="{Binding Message}"/>
+                                <DataGridTextColumn Header="DATE" Width="120" Binding="{Binding CreatedAt, StringFormat={}{0:MM/dd HH:mm}}"/>
                             </DataGrid.Columns>
                         </DataGrid>
                     </Grid>
                 </Border>
 
-                <Border Grid.Row="1"
-                        Background="White"
-                        CornerRadius="10"
-                        Padding="15"
-                        Margin="0,10,0,0">
+                <Border Grid.Row="1" Style="{StaticResource SectionBorder}" Margin="0,8,0,0">
                     <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                        </Grid.RowDefinitions>
-
-                        <TextBlock Text="My Assistance History"
-                                   FontSize="20"
-                                   FontWeight="Bold"
-                                   Foreground="#182536"
-                                   Margin="0,0,0,10"/>
-
-                        <DataGrid x:Name="HistoryGrid"
-                                  Grid.Row="1"
-                                  AutoGenerateColumns="False"
-                                  IsReadOnly="True"
-                                  CanUserAddRows="False">
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                        <TextBlock Text="MY ASSISTANCE HISTORY" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,10"/>
+                        <DataGrid x:Name="HistoryGrid" Grid.Row="1" Style="{StaticResource DenseGrid}">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="SUBJECT"
-                                                    Width="150"
-                                                    Binding="{Binding Subject}"/>
-                                <DataGridTextColumn Header="STATUS"
-                                                    Width="105"
-                                                    Binding="{Binding Status}"/>
-                                <DataGridTextColumn Header="CREATED"
-                                                    Width="130"
-                                                    Binding="{Binding CreatedAt, StringFormat={}{0:MM/dd HH:mm}}"/>
-                                <DataGridTextColumn Header="RESOLUTION"
-                                                    Width="*"
-                                                    Binding="{Binding ResolutionNotes}"/>
-                                <DataGridTextColumn Header="RESOLVED"
-                                                    Width="130"
-                                                    Binding="{Binding ResolvedAt, StringFormat={}{0:MM/dd HH:mm}}"/>
+                                <DataGridTextColumn Header="SUBJECT" Width="135" Binding="{Binding Subject}"/>
+                                <DataGridTextColumn Header="STATUS" Width="100" Binding="{Binding Status}"/>
+                                <DataGridTextColumn Header="CREATED" Width="115" Binding="{Binding CreatedAt, StringFormat={}{0:MM/dd HH:mm}}"/>
+                                <DataGridTextColumn Header="RESOLUTION" Width="*" Binding="{Binding ResolutionNotes}"/>
+                                <DataGridTextColumn Header="RESOLVED" Width="115" Binding="{Binding ResolvedAt, StringFormat={}{0:MM/dd HH:mm}}"/>
                             </DataGrid.Columns>
                         </DataGrid>
                     </Grid>
@@ -318,10 +207,6 @@
             </Grid>
         </Grid>
 
-        <TextBlock Grid.Row="4"
-                   x:Name="StatusText"
-                   Text="Connected"
-                   Foreground="#65758A"
-                   Margin="5,15,5,0"/>
+        <TextBlock Grid.Row="4" x:Name="StatusText" Text="Connected" Foreground="{StaticResource TextSecondary}" FontSize="11" Margin="2,10,0,0"/>
     </Grid>
 </Window>
