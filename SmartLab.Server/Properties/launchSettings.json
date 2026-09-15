@@ -17,7 +17,10 @@
       "applicationUrl": "http://0.0.0.0:5047",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "SMARTLAB_JWT_KEY": "SmartLab-Local-Development-Key-2026-At-Least-32-Chars!"
+        "SMARTLAB_JWT_KEY": "SmartLab-Local-Development-Key-2026-At-Least-32-Chars!",
+        "SmartLab__EnableDevelopmentBootstrap": "true",
+        "SmartLab__DevelopmentAdminUsername": "admin",
+        "SmartLab__DevelopmentAdminPassword": "SmartLabAdmin2026!"
       }
     },
     "https": {
@@ -28,7 +31,10 @@
       "applicationUrl": "https://0.0.0.0:7277;http://0.0.0.0:5047",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "SMARTLAB_JWT_KEY": "SmartLab-Local-Development-Key-2026-At-Least-32-Chars!"
+        "SMARTLAB_JWT_KEY": "SmartLab-Local-Development-Key-2026-At-Least-32-Chars!",
+        "SmartLab__EnableDevelopmentBootstrap": "true",
+        "SmartLab__DevelopmentAdminUsername": "admin",
+        "SmartLab__DevelopmentAdminPassword": "SmartLabAdmin2026!"
       }
     },
     "IIS Express": {
@@ -37,7 +43,10 @@
       "launchUrl": "swagger",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "SMARTLAB_JWT_KEY": "SmartLab-Local-Development-Key-2026-At-Least-32-Chars!"
+        "SMARTLAB_JWT_KEY": "SmartLab-Local-Development-Key-2026-At-Least-32-Chars!",
+        "SmartLab__EnableDevelopmentBootstrap": "true",
+        "SmartLab__DevelopmentAdminUsername": "admin",
+        "SmartLab__DevelopmentAdminPassword": "SmartLabAdmin2026!"
       }
     }
   }
