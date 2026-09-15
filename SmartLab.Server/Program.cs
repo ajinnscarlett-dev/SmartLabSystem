@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -17,13 +17,11 @@ builder.Services.AddDbContext<AppDbContext>(options =>
         builder.Configuration.GetConnectionString("DefaultConnection")
     ));
 
-
 // ==========================================
 // CONTROLLERS
 // ==========================================
 
 builder.Services.AddControllers();
-
 
 // ==========================================
 // JWT AUTHENTICATION
@@ -31,8 +29,9 @@ builder.Services.AddControllers();
 
 string jwtKey =
     builder.Configuration["Jwt:Key"]
+    ?? Environment.GetEnvironmentVariable("SMARTLAB_JWT_KEY")
     ?? throw new InvalidOperationException(
-        "JWT signing key is missing. Configure Jwt:Key in appsettings.json.");
+        "JWT signing key is missing. Configure Jwt:Key through a local secret/environment variable.");
 
 if (jwtKey.Length < 32)
 {
@@ -59,79 +58,19 @@ builder.Services
             new TokenValidationParameters
             {
                 ValidateIssuerSigningKey = true,
-
                 IssuerSigningKey =
                     new SymmetricSecurityKey(
                         Encoding.UTF8.GetBytes(jwtKey)),
-
                 ValidateIssuer = true,
-
-                ValidIssuer =
-                    jwtIssuer,
-
+                ValidIssuer = jwtIssuer,
                 ValidateAudience = true,
-
-                ValidAudience =
-                    jwtAudience,
-
+                ValidAudience = jwtAudience,
                 ValidateLifetime = true,
-
-                ClockSkew =
-                    TimeSpan.FromMinutes(1),
-
-                NameClaimType =
-                    ClaimTypes.Name,
-
-                RoleClaimType =
-                    ClaimTypes.Role
-            };
-
-        // ==========================================
-        // TEMPORARY JWT DIAGNOSTIC LOGGING
-        // ==========================================
-
-        options.Events =
-            new JwtBearerEvents
-            {
-                OnTokenValidated = context =>
-                {
-                    Console.WriteLine(
-                        "[JWT] Token validated successfully.");
-
-                    Console.WriteLine(
-                        $"[JWT] User: {context.Principal?.Identity?.Name ?? "(unknown)"}");
-
-                    Console.WriteLine(
-                        $"[JWT] Role: {context.Principal?.FindFirst(ClaimTypes.Role)?.Value ?? "(none)"}");
-
-                    return Task.CompletedTask;
-                },
-
-                OnAuthenticationFailed = context =>
-                {
-                    Console.WriteLine(
-                        "==========================================");
-
-                    Console.WriteLine(
-                        "[JWT] AUTHENTICATION FAILED");
-
-                    Console.WriteLine(
-                        $"[JWT] Exception: {context.Exception.Message}");
-
-                    if (context.Exception.InnerException != null)
-                    {
-                        Console.WriteLine(
-                            $"[JWT] Inner: {context.Exception.InnerException.Message}");
-                    }
-
-                    Console.WriteLine(
-                        "==========================================");
-
-                    return Task.CompletedTask;
-                }
+                ClockSkew = TimeSpan.FromMinutes(1),
+                NameClaimType = ClaimTypes.Name,
+                RoleClaimType = ClaimTypes.Role
             };
     });
-
 
 // ==========================================
 // AUTHORIZATION
@@ -139,13 +78,11 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
-
 // ==========================================
 // TOKEN SERVICE
 // ==========================================
 
 builder.Services.AddSingleton<AuthTokenService>();
-
 
 // ==========================================
 // AUTOMATIC PC HEARTBEAT MONITOR
@@ -153,13 +90,11 @@ builder.Services.AddSingleton<AuthTokenService>();
 
 builder.Services.AddHostedService<PCMonitorService>();
 
-
 // ==========================================
 // LAN SERVER DISCOVERY
 // ==========================================
 
 builder.Services.AddHostedService<ServerDiscoveryService>();
-
 
 // ==========================================
 // SWAGGER
@@ -199,8 +134,7 @@ builder.Services.AddSwaggerGen(options =>
                     Reference =
                         new OpenApiReference
                         {
-                            Type =
-                                ReferenceType.SecurityScheme,
+                            Type = ReferenceType.SecurityScheme,
                             Id = "Bearer"
                         }
                 },
@@ -210,7 +144,6 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 var app = builder.Build();
-
 
 // ==========================================
 // SWAGGER
@@ -222,10 +155,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-
 // ==========================================
 // HTTPS
-// DEVELOPMENT: DO NOT FORCE HTTP → HTTPS
+// DEVELOPMENT: DO NOT FORCE HTTP -> HTTPS
 // PRODUCTION: FORCE HTTPS
 // ==========================================
 
@@ -234,13 +166,11 @@ if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 }
 
-
 // ==========================================
 // AUTHENTICATION
 // ==========================================
 
 app.UseAuthentication();
-
 
 // ==========================================
 // AUTHORIZATION
@@ -248,13 +178,11 @@ app.UseAuthentication();
 
 app.UseAuthorization();
 
-
 // ==========================================
 // CONTROLLERS
 // ==========================================
 
 app.MapControllers();
-
 
 // ==========================================
 // START SERVER
