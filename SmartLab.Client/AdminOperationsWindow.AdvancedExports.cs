@@ -72,8 +72,7 @@ namespace SmartLab.Client
             TabItem? announcementTab = FindTab("ANNOUNCEMENTS");
             if (announcementTab != null)
             {
-                StackPanel? announcementButtons = FindVisualChildren<StackPanel>(announcementTab)
-                    .FirstOrDefault(p => p.Children.OfType<Button>().Any(b => string.Equals(b.Content?.ToString(), "CREATE", StringComparison.OrdinalIgnoreCase)));
+                StackPanel? announcementButtons = FindVisualChildren<StackPanel>(announcementTab).FirstOrDefault(p => p.Children.OfType<Button>().Any(b => string.Equals(b.Content?.ToString(), "CREATE", StringComparison.OrdinalIgnoreCase)));
                 if (announcementButtons != null)
                 {
                     var editButton = new Button
@@ -97,19 +96,26 @@ namespace SmartLab.Client
 
         private async void EditAnnouncement_Click(object sender, RoutedEventArgs e)
         {
-            if (AnnouncementGrid.SelectedItem is not dynamic selected)
+            if (AnnouncementGrid.SelectedItem is not AnnouncementRow selected)
             {
                 MessageBox.Show("Select an announcement first.", "Announcements", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
+            string title = AnnouncementTitleText.Text.Trim();
+            string message = AnnouncementMessageText.Text.Trim();
+            if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(message))
+            {
+                MessageBox.Show("Title and message are required.", "Announcements", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
             try
             {
-                int id = (int)selected.AnnouncementId;
-                var response = await _httpClient.PutAsJsonAsync($"api/Announcement/{id}", new
+                var response = await _httpClient.PutAsJsonAsync($"api/Announcement/{selected.AnnouncementId}", new
                 {
-                    title = AnnouncementTitleText.Text.Trim(),
-                    message = AnnouncementMessageText.Text.Trim(),
+                    title,
+                    message,
                     expiresAt = AnnouncementExpiry.SelectedDate?.Date.AddHours(23).AddMinutes(59).AddSeconds(59),
                     targetRole = AnnouncementRoleCombo.SelectedItem?.ToString() ?? "All"
                 });
