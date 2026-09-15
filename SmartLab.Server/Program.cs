@@ -24,9 +24,11 @@ builder.Services.AddHostedService<DatabaseMigrationHostedService>();
 // ==========================================
 
 builder.Services.AddScoped<SmartLabAuthorizationFilter>();
+builder.Services.AddScoped<SmartLabRequestIntegrityFilter>();
 builder.Services.AddControllers(options =>
 {
     options.Filters.AddService<SmartLabAuthorizationFilter>();
+    options.Filters.AddService<SmartLabRequestIntegrityFilter>();
 });
 
 // ==========================================
