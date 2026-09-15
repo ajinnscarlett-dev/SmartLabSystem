@@ -1,0 +1,37 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore SmartLabSystem.sln
+
+      - name: Build
+        run: dotnet build SmartLabSystem.sln --configuration Release --no-restore
+
+      - name: Verify EF model has no pending changes
+        working-directory: SmartLab.Server
+        run: dotnet ef migrations has-pending-model-changes --no-build
+
+      - name: Test
+        run: dotnet test SmartLabSystem.sln --configuration Release --no-build --verbosity normal
