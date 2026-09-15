@@ -120,6 +120,11 @@ namespace SmartLab.Client
                     username,
                     role);
 
+                // Refresh this HttpClient's Authorization header immediately
+                // after receiving the JWT. The same client is then used for the
+                // protected PC login request below.
+                AuthSession.Apply(_httpClient);
+
                 if (role.Equals(
                     "Student",
                     StringComparison.OrdinalIgnoreCase))
@@ -160,6 +165,7 @@ namespace SmartLab.Client
 
                         StatusText.Text = message;
                         AuthSession.Clear();
+                        AuthSession.Apply(_httpClient);
                         LoginButton.IsEnabled = true;
                         return;
                     }
@@ -213,6 +219,7 @@ namespace SmartLab.Client
                 else
                 {
                     AuthSession.Clear();
+                    AuthSession.Apply(_httpClient);
                     StatusText.Text =
                         $"Login successful, but role '{role}' is not supported by this client.";
                     LoginButton.IsEnabled = true;
@@ -224,6 +231,7 @@ namespace SmartLab.Client
                     $"Connection error: {ex.Message}";
                 LoginButton.IsEnabled = true;
                 AuthSession.Clear();
+                AuthSession.Apply(_httpClient);
             }
         }
 
