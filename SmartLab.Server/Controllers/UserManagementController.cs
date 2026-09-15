@@ -42,7 +42,7 @@ public class UserManagementController : ControllerBase
         if (string.IsNullOrWhiteSpace(username)) return BadRequest(new { message = "Username is required." });
         if (password.Length < 6) return BadRequest(new { message = "Password must be at least 6 characters." });
         if (role == null) return BadRequest(new { message = "Role must be Student, Teacher, or Admin." });
-        if (await _context.Users.AnyAsync(u => !IsDisabled(u) && u.Username.ToLower() == username.ToLower()))
+        if (await _context.Users.AnyAsync(u => !u.Username.StartsWith(DisabledPrefix) && u.Username.ToLower() == username.ToLower()))
             return Conflict(new { message = $"Username '{username}' already exists." });
 
         var user = new User { Username = username, Role = role, CreatedAt = DateTime.Now };
@@ -61,7 +61,7 @@ public class UserManagementController : ControllerBase
 
         var user = await _context.Users.FirstOrDefaultAsync(u => u.UserId == id);
         if (user == null) return NotFound(new { message = "User not found." });
-        if (await _context.Users.AnyAsync(u => u.UserId != id && !IsDisabled(u) && u.Username.ToLower() == username.ToLower()))
+        if (await _context.Users.AnyAsync(u => u.UserId != id && !u.Username.StartsWith(DisabledPrefix) && u.Username.ToLower() == username.ToLower()))
             return Conflict(new { message = $"Username '{username}' already exists." });
 
         string old = DisplayUsername(user.Username);
@@ -83,7 +83,7 @@ public class UserManagementController : ControllerBase
 
         int currentId = int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out int parsed) ? parsed : -1;
         if (currentId == id && role != "Admin") return BadRequest(new { message = "You cannot remove Admin access from your current account." });
-        if (user.Role == "Admin" && role != "Admin" && await _context.Users.CountAsync(u => u.Role == "Admin" && !IsDisabled(u)) <= 1)
+        if (user.Role == "Admin" && role != "Admin" && await _context.Users.CountAsync(u => u.Role == "Admin" && !u.Username.StartsWith(DisabledPrefix)) <= 1)
             return BadRequest(new { message = "The last active Admin cannot be changed to a non-Admin role." });
 
         string old = user.Role;
@@ -117,7 +117,7 @@ public class UserManagementController : ControllerBase
 
         int currentId = int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out int parsed) ? parsed : -1;
         if (currentId == id) return BadRequest(new { message = "You cannot deactivate the account currently being used." });
-        if (user.Role == "Admin" && await _context.Users.CountAsync(u => u.Role == "Admin" && !IsDisabled(u)) <= 1)
+        if (user.Role == "Admin" && await _context.Users.CountAsync(u => u.Role == "Admin" && !u.Username.StartsWith(DisabledPrefix)) <= 1)
             return BadRequest(new { message = "The last active Admin cannot be deactivated." });
 
         string username = DisplayUsername(user.Username);
@@ -137,7 +137,7 @@ public class UserManagementController : ControllerBase
 
         string username = DisplayUsername(user.Username);
         string role = DisplayRole(user.Role);
-        if (await _context.Users.AnyAsync(u => u.UserId != id && !IsDisabled(u) && u.Username.ToLower() == username.ToLower()))
+        if (await _context.Users.AnyAsync(u => u.UserId != id && !u.Username.StartsWith(DisabledPrefix) && u.Username.ToLower() == username.ToLower()))
             return Conflict(new { message = $"Username '{username}' is already in use." });
 
         user.Username = username;
