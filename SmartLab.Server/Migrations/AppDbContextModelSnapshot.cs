@@ -179,7 +179,7 @@ namespace SmartLab.Server.Migrations
                 b.Property<string>("Status").IsRequired().HasColumnType("nvarchar(max)"); b.Property<DateTime>("CreatedAt").HasColumnType("datetime2");
                 b.Property<DateTime?>("AcknowledgedAt").HasColumnType("datetime2"); b.Property<DateTime?>("StartedAt").HasColumnType("datetime2"); b.Property<DateTime?>("ResolvedAt").HasColumnType("datetime2");
                 b.Property<DateTime?>("ClosedAt").HasColumnType("datetime2"); b.Property<int?>("ResolvedByUserId").HasColumnType("int"); b.Property<string>("ResolutionNotes").HasColumnType("nvarchar(max)");
-                b.HasKey("AssistanceRequestId"); b.HasIndex("LaboratoryId", "Status", "CreatedAt"); b.HasIndex("StudentUserId", "CreatedAt"); b.HasIndex("PCId", "Status"); b.ToTable("AssistanceRequests");
+                b.HasKey("AssistanceRequestId"); b.HasIndex("LaboratoryId", "CreatedAt"); b.HasIndex("StudentUserId", "CreatedAt"); b.HasIndex("PCId"); b.ToTable("AssistanceRequests");
                 b.HasOne(x => x.StudentUser).WithMany().HasForeignKey("StudentUserId").OnDelete(DeleteBehavior.Restrict);
                 b.HasOne(x => x.PC).WithMany().HasForeignKey("PCId").OnDelete(DeleteBehavior.Restrict);
                 b.HasOne(x => x.Laboratory).WithMany().HasForeignKey("LaboratoryId").OnDelete(DeleteBehavior.Restrict);
