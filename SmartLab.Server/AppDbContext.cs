@@ -280,13 +280,10 @@ namespace SmartLab.Server
                     continue;
                 }
 
-                string targetRole =
-                    entry.Entity.TargetRole?.Trim() ?? "All";
+                string targetRole = entry.Entity.TargetRole?.Trim() ?? "All";
 
                 var recipients = Users
-                    .Where(u =>
-                        string.Equals(targetRole, "All", StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(u.Role, targetRole, StringComparison.OrdinalIgnoreCase))
+                    .Where(u => targetRole == "All" || u.Role == targetRole)
                     .Select(u => u.UserId)
                     .ToList();
 
@@ -309,8 +306,7 @@ namespace SmartLab.Server
                 if (entry.State == EntityState.Added)
                 {
                     foreach (int userId in Users
-                        .Where(u =>
-                            string.Equals(u.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+                        .Where(u => u.Role == "Admin")
                         .Select(u => u.UserId)
                         .ToList())
                     {
@@ -328,11 +324,8 @@ namespace SmartLab.Server
                 else if (entry.State == EntityState.Modified &&
                          entry.Property(t => t.Status).IsModified)
                 {
-                    string oldStatus =
-                        entry.Property(t => t.Status).OriginalValue ?? string.Empty;
-
-                    string newStatus =
-                        entry.Entity.Status ?? string.Empty;
+                    string oldStatus = entry.Property(t => t.Status).OriginalValue ?? string.Empty;
+                    string newStatus = entry.Entity.Status ?? string.Empty;
 
                     if (!string.Equals(oldStatus, newStatus, StringComparison.OrdinalIgnoreCase))
                     {
@@ -354,9 +347,7 @@ namespace SmartLab.Server
                 if (entry.State == EntityState.Added)
                 {
                     foreach (int userId in Users
-                        .Where(u =>
-                            string.Equals(u.Role, "Teacher", StringComparison.OrdinalIgnoreCase) ||
-                            string.Equals(u.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+                        .Where(u => u.Role == "Teacher" || u.Role == "Admin")
                         .Select(u => u.UserId)
                         .ToList())
                     {
@@ -374,11 +365,8 @@ namespace SmartLab.Server
                 else if (entry.State == EntityState.Modified &&
                          entry.Property(a => a.Status).IsModified)
                 {
-                    string oldStatus =
-                        entry.Property(a => a.Status).OriginalValue ?? string.Empty;
-
-                    string newStatus =
-                        entry.Entity.Status ?? string.Empty;
+                    string oldStatus = entry.Property(a => a.Status).OriginalValue ?? string.Empty;
+                    string newStatus = entry.Entity.Status ?? string.Empty;
 
                     if (!string.Equals(oldStatus, newStatus, StringComparison.OrdinalIgnoreCase))
                     {
@@ -403,11 +391,8 @@ namespace SmartLab.Server
         {
             session.LogoutTime = logoutTime;
             session.EndReason = endReason;
-
-            TimeSpan duration = logoutTime - session.LoginTime;
-
             session.DurationSeconds =
-                (int)Math.Max(0, Math.Round(duration.TotalSeconds));
+                (int)Math.Max(0, Math.Round((logoutTime - session.LoginTime).TotalSeconds));
         }
     }
 }
