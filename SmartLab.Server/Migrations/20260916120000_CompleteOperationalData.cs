@@ -1,10 +1,14 @@
 using System;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace SmartLab.Server.Migrations
 {
+    [DbContext(typeof(SmartLab.Server.AppDbContext))]
+    [Migration("20260916120000_CompleteOperationalData")]
     public partial class CompleteOperationalData : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -243,9 +247,7 @@ namespace SmartLab.Server.Migrations
             migrationBuilder.DropTable(name: "MaintenanceRecords");
             migrationBuilder.DropTable(name: "Notifications");
             migrationBuilder.DropTable(name: "PcUsageHistory");
-            migrationBuilder.DropColumn(
-                name: "TargetRole",
-                table: "Announcements");
+            migrationBuilder.DropColumn(name: "TargetRole", table: "Announcements");
         }
     }
 }
