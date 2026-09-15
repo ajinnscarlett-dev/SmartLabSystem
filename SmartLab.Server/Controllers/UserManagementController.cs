@@ -96,13 +96,14 @@ public class UserManagementController : ControllerBase
     [HttpPut("management/{id}/password")]
     public async Task<IActionResult> ResetPassword(int id, [FromBody] PasswordResetRequest request)
     {
-        if ((request.NewPassword ?? string.Empty).Length < 6)
+        string newPassword = request.NewPassword ?? string.Empty;
+        if (newPassword.Length < 6)
             return BadRequest(new { message = "Password must be at least 6 characters." });
 
         var user = await _context.Users.FirstOrDefaultAsync(u => u.UserId == id);
         if (user == null) return NotFound(new { message = "User not found." });
 
-        user.PasswordHash = _hasher.HashPassword(user, request.NewPassword);
+        user.PasswordHash = _hasher.HashPassword(user, newPassword);
         await _context.SaveChangesAsync();
         await LogAsync(id, "Password Reset", $"Password reset for user {DisplayUsername(user.Username)}.");
         return Ok(new { message = "Password reset successfully." });
