@@ -81,7 +81,8 @@
 
                 <!-- LOGIN -->
 
-                <Button Content="LOGIN"
+                <Button x:Name="LoginButton"
+                        Content="LOGIN"
                         Height="42"
                         FontWeight="Bold"
                         Background="#182536"
