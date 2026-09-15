@@ -1,110 +1,112 @@
 ﻿<Window x:Class="SmartLab.Client.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="SmartLab Login"
-        Height="450"
-        Width="800"
+        Title="SmartLab — Student Login"
+        Height="500"
+        Width="430"
+        MinHeight="500"
+        MinWidth="430"
         WindowStartupLocation="CenterScreen"
-        ResizeMode="NoResize">
+        ResizeMode="NoResize"
+        Background="#F3F5F8"
+        FontFamily="Segoe UI">
 
-    <Grid Background="#F4F6F9">
+    <Window.Resources>
+        <SolidColorBrush x:Key="Surface" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="Border" Color="#D9E0E7"/>
+        <SolidColorBrush x:Key="TextPrimary" Color="#1F2937"/>
+        <SolidColorBrush x:Key="TextSecondary" Color="#64748B"/>
+        <SolidColorBrush x:Key="Accent" Color="#2467A9"/>
 
-        <!-- ========================================== -->
-        <!-- ADMIN / SETTINGS BUTTON -->
-        <!-- ========================================== -->
+        <Style x:Key="Field" TargetType="Control">
+            <Setter Property="Height" Value="40"/>
+            <Setter Property="Padding" Value="9,7"/>
+            <Setter Property="Background" Value="{StaticResource Surface}"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="13"/>
+        </Style>
 
+        <Style x:Key="PrimaryButton" TargetType="Button">
+            <Setter Property="Height" Value="42"/>
+            <Setter Property="Background" Value="{StaticResource Accent}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Accent}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+
+        <Style x:Key="SecondaryButton" TargetType="Button">
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="Background" Value="{StaticResource Surface}"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="24">
         <Button x:Name="AdminSettingsButton"
-                Content="⚙"
-                Width="40"
-                Height="40"
+                Content="MANAGEMENT"
+                Width="108"
+                Height="30"
                 HorizontalAlignment="Right"
                 VerticalAlignment="Top"
-                Margin="0,15,15,0"
-                FontSize="22"
-                Background="Transparent"
-                BorderThickness="0"
+                Style="{StaticResource SecondaryButton}"
                 ToolTip="Management Login"
                 Click="AdminLoginButton_Click"/>
 
-
-        <!-- ========================================== -->
-        <!-- LOGIN FORM -->
-        <!-- ========================================== -->
-
         <Border Width="360"
-                Padding="30"
-                Background="White"
-                CornerRadius="12"
+                Padding="28"
+                Background="{StaticResource Surface}"
+                BorderBrush="{StaticResource Border}"
+                BorderThickness="1"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center">
-
             <StackPanel>
-
-                <!-- TITLE -->
-
-                <TextBlock Text="SmartLab"
-                           FontSize="30"
-                           FontWeight="Bold"
-                           Foreground="#182536"
+                <TextBlock Text="SMARTLAB"
+                           FontSize="24"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource TextPrimary}"
                            HorizontalAlignment="Center"/>
-
-                <TextBlock Text="Computer Laboratory System"
-                           FontSize="14"
-                           Foreground="#65758A"
+                <TextBlock Text="Student Workstation Login"
+                           FontSize="12"
+                           Foreground="{StaticResource TextSecondary}"
                            HorizontalAlignment="Center"
-                           Margin="0,5,0,30"/>
-
-
-                <!-- USERNAME -->
+                           Margin="0,4,0,24"/>
 
                 <TextBlock Text="Username"
                            FontWeight="SemiBold"
-                           Foreground="#182536"/>
-
+                           Foreground="{StaticResource TextPrimary}"/>
                 <TextBox x:Name="UsernameTextBox"
-                         Height="38"
-                         Margin="0,6,0,18"
-                         Padding="8"/>
-
-
-                <!-- PASSWORD -->
+                         Style="{StaticResource Field}"
+                         Margin="0,6,0,16"/>
 
                 <TextBlock Text="Password"
                            FontWeight="SemiBold"
-                           Foreground="#182536"/>
-
+                           Foreground="{StaticResource TextPrimary}"/>
                 <PasswordBox x:Name="PasswordBox"
-                             Height="38"
-                             Margin="0,6,0,22"
-                             Padding="8"/>
-
-
-                <!-- LOGIN -->
+                             Style="{StaticResource Field}"
+                             Margin="0,6,0,20"/>
 
                 <Button x:Name="LoginButton"
                         Content="LOGIN"
-                        Height="42"
-                        FontWeight="Bold"
-                        Background="#182536"
-                        Foreground="White"
-                        BorderThickness="0"
+                        Style="{StaticResource PrimaryButton}"
                         Click="LoginButton_Click"/>
-
-
-                <!-- STATUS -->
 
                 <TextBlock x:Name="StatusText"
                            Text=""
-                           Margin="0,15,0,0"
+                           Margin="0,14,0,0"
                            TextWrapping="Wrap"
                            HorizontalAlignment="Center"
                            TextAlignment="Center"
-                           Foreground="#65758A"/>
-
+                           Foreground="{StaticResource TextSecondary}"/>
             </StackPanel>
-
         </Border>
-
     </Grid>
-
 </Window>
