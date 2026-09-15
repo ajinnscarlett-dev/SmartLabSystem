@@ -33,9 +33,9 @@ namespace SmartLab.Server
             modelBuilder.Entity<MaintenanceRecord>().HasIndex(m => new { m.PCId, m.StartedAt });
             modelBuilder.Entity<HardwareInventory>().HasIndex(h => h.PCId).IsUnique();
             modelBuilder.Entity<Notification>().HasIndex(n => new { n.UserId, n.IsRead, n.CreatedAt });
-            modelBuilder.Entity<AssistanceRequest>().HasIndex(a => new { a.LaboratoryId, a.Status, a.CreatedAt });
+            modelBuilder.Entity<AssistanceRequest>().HasIndex(a => new { a.LaboratoryId, a.CreatedAt });
             modelBuilder.Entity<AssistanceRequest>().HasIndex(a => new { a.StudentUserId, a.CreatedAt });
-            modelBuilder.Entity<AssistanceRequest>().HasIndex(a => new { a.PCId, a.Status });
+            modelBuilder.Entity<AssistanceRequest>().HasIndex(a => a.PCId);
 
             modelBuilder.Entity<PcUsageHistory>().HasOne(s => s.PC).WithMany().HasForeignKey(s => s.PCId).OnDelete(DeleteBehavior.Restrict);
             modelBuilder.Entity<PcUsageHistory>().HasOne(s => s.User).WithMany().HasForeignKey(s => s.UserId).OnDelete(DeleteBehavior.Restrict);
