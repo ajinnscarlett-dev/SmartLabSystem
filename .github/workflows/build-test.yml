@@ -1,33 +1,33 @@
-name: Build and Test
+name: SmartLab Build and Test
 
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  workflow_dispatch:
 
 concurrency:
-  group: smartlab-build-test-${{ github.ref }}
+  group: smartlab-ci-${{ github.ref }}
   cancel-in-progress: true
-
-permissions:
-  contents: read
 
 jobs:
   build-and-test:
-    runs-on: windows-latest
+    runs-on: windows-2025
+
+    env:
+      SMARTLAB_JWT_KEY: SmartLab-CI-Only-Test-Key-2026-At-Least-32-Chars!
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup .NET 8
+      - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
+          cache: false
 
-      - name: Install EF Core CLI
+      - name: Install EF tool
         shell: pwsh
         run: dotnet tool install --global dotnet-ef --version 8.0.29
 
@@ -37,11 +37,25 @@ jobs:
       - name: Build
         run: dotnet build SmartLabSystem.sln --configuration Release --no-restore
 
-      - name: Verify EF model has no pending changes
+      - name: Diagnose EF model differences
         working-directory: SmartLab.Server
-        env:
-          SMARTLAB_JWT_KEY: "SmartLab-CI-Only-Test-Key-2026-At-Least-32-Chars!"
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $migrationName = "__CiModelProbe"
+          dotnet ef migrations add $migrationName --configuration Release --no-build --output-dir Migrations/CiProbe
+          Write-Host "=== GENERATED EF PROBE ==="
+          Get-ChildItem Migrations/CiProbe -Filter "*.cs" | ForEach-Object {
+            Write-Host "=== $($_.FullName) ==="
+            Get-Content $_.FullName
+          }
+          Write-Host "=== SNAPSHOT DIFF ==="
+          git diff -- Migrations/AppDbContextModelSnapshot.cs
+          Remove-Item Migrations/CiProbe -Recurse -Force
+          git checkout -- Migrations/AppDbContextModelSnapshot.cs
+
+      - name: EF model validation
         run: dotnet ef migrations has-pending-model-changes --configuration Release --no-build
 
       - name: Test
-        run: dotnet test SmartLabSystem.sln --configuration Release --no-build --verbosity normal
+        run: dotnet test SmartLabSystem.sln --configuration Release --no-build
