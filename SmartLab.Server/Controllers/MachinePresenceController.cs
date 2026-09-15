@@ -24,7 +24,7 @@ namespace SmartLab.Server.Controllers
             CancellationToken cancellationToken)
         {
             string pcNumber = request.PCNumber?.Trim() ?? string.Empty;
-            string macAddress = NormalizeMac(request.MACAddress);
+            string? macAddress = NormalizeMac(request.MACAddress);
 
             if (string.IsNullOrWhiteSpace(pcNumber) || macAddress == null)
             {
