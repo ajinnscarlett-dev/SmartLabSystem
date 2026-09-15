@@ -67,7 +67,7 @@ namespace SmartLab.Server
         private void PrepareOperationalHistory()
         {
             DateTime now = DateTime.Now;
-            foreach (var entry in ChangeTracker.Entries<PC>())
+            foreach (var entry in ChangeTracker.Entries<PC>().ToList())
             {
                 if (entry.State != EntityState.Modified) continue;
 
@@ -139,7 +139,7 @@ namespace SmartLab.Server
         {
             DateTime now = DateTime.Now;
 
-            foreach (var entry in ChangeTracker.Entries<Announcement>())
+            foreach (var entry in ChangeTracker.Entries<Announcement>().ToList())
             {
                 if (entry.State != EntityState.Added) continue;
                 string targetRole = entry.Entity.TargetRole?.Trim() ?? "All";
@@ -148,7 +148,7 @@ namespace SmartLab.Server
                     Notifications.Add(new Notification { UserId = userId, Type = "Announcement", Title = entry.Entity.Title, Message = entry.Entity.Message, CreatedAt = now, IsRead = false });
             }
 
-            foreach (var entry in ChangeTracker.Entries<ServiceDeskTicket>())
+            foreach (var entry in ChangeTracker.Entries<ServiceDeskTicket>().ToList())
             {
                 if (entry.State == EntityState.Added)
                 {
@@ -164,7 +164,7 @@ namespace SmartLab.Server
                 }
             }
 
-            foreach (var entry in ChangeTracker.Entries<AssistanceRequest>())
+            foreach (var entry in ChangeTracker.Entries<AssistanceRequest>().ToList())
             {
                 if (entry.State == EntityState.Added)
                 {
