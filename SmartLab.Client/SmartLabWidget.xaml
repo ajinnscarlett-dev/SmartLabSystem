@@ -2,8 +2,8 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="SmartLab"
-        Width="270"
-        Height="155"
+        Width="320"
+        Height="175"
         WindowStyle="None"
         ResizeMode="NoResize"
         AllowsTransparency="True"
@@ -20,7 +20,6 @@
             Padding="12">
 
         <Grid>
-
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
@@ -28,9 +27,7 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <!-- HEADER -->
             <Grid Grid.Row="0">
-
                 <TextBlock Text="SmartLab"
                            FontSize="16"
                            FontWeight="Bold"
@@ -45,61 +42,70 @@
                            VerticalAlignment="Center"/>
             </Grid>
 
-            <!-- USERNAME -->
             <TextBlock x:Name="UsernameText"
                        Grid.Row="1"
                        Text="student01"
                        FontSize="12"
                        Foreground="#4B5D70"
-                       Margin="0,5,0,5"/>
+                       Margin="0,5,0,7"/>
 
-            <!-- ACTIONS -->
             <Grid Grid.Row="2"
                   Margin="0,0,0,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
 
-                <Button x:Name="NotificationButton"
-                        Content="NOTIFICATIONS"
-                        Width="125"
-                        Height="28"
-                        HorizontalAlignment="Left"
-                        Click="NotificationButton_Click"/>
+                <Grid Grid.Column="0">
+                    <Button x:Name="NotificationButton"
+                            Content="NOTIFICATIONS"
+                            Width="125"
+                            Height="30"
+                            Click="NotificationButton_Click"/>
 
-                <Border x:Name="NotificationCountBadge"
-                        Width="20"
-                        Height="20"
-                        CornerRadius="10"
-                        Background="#C62828"
-                        HorizontalAlignment="Left"
-                        VerticalAlignment="Top"
-                        Margin="112,-7,0,0"
-                        Visibility="Collapsed">
+                    <Border x:Name="NotificationCountBadge"
+                            Width="20"
+                            Height="20"
+                            CornerRadius="10"
+                            Background="#C62828"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Top"
+                            Margin="112,-7,0,0"
+                            Visibility="Collapsed">
+                        <TextBlock x:Name="NotificationCountText"
+                                   Text="0"
+                                   FontSize="10"
+                                   FontWeight="Bold"
+                                   Foreground="White"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   TextAlignment="Center"/>
+                    </Border>
+                </Grid>
 
-                    <TextBlock x:Name="NotificationCountText"
-                               Text="0"
-                               FontSize="10"
-                               FontWeight="Bold"
-                               Foreground="White"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"
-                               TextAlignment="Center"/>
-                </Border>
+                <Button Grid.Column="1"
+                        x:Name="NeedAssistanceButton"
+                        Content="NEED HELP"
+                        Width="82"
+                        Height="30"
+                        Margin="8,0,0,0"
+                        Click="NeedAssistanceButton_Click"/>
 
-                <Button x:Name="LogoutButton"
+                <Button Grid.Column="2"
+                        x:Name="LogoutButton"
                         Content="Logout"
                         Width="65"
-                        Height="28"
+                        Height="30"
                         HorizontalAlignment="Right"
                         Click="LogoutButton_Click"/>
             </Grid>
 
-            <!-- STATUS -->
-            <TextBlock Grid.Row="3"
-                       Text="Announcements &amp; notifications are checked automatically."
+            <TextBlock x:Name="ConnectionStatusText"
+                       Grid.Row="3"
+                       Text="Connected • workstation presence active"
                        FontSize="9"
-                       Foreground="#6B7D90"/>
-
+                       Foreground="#4E6A84"/>
         </Grid>
-
     </Border>
-
 </Window>
