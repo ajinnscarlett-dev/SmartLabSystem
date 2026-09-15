@@ -18,7 +18,12 @@ namespace SmartLab.Client
             AuthSession.Apply(_httpClient);
         }
 
-        private async void Window_Loaded(object sender, RoutedEventArgs e) => await LoadTicketsAsync();
+        private async void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            TicketGrid.SelectionChanged += TicketGrid_SelectionChanged;
+            await LoadTicketsAsync();
+        }
+
         private async void Refresh_Click(object sender, RoutedEventArgs e) => await LoadTicketsAsync();
 
         private async Task LoadTicketsAsync()
