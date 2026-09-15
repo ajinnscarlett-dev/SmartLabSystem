@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using SmartLab.Server.Controllers;
 
 namespace SmartLab.Server
 {
@@ -191,6 +192,7 @@ namespace SmartLab.Server
 
         private static bool TryGetRouteInt(ActionContext context, string name, out int value)
         {
+            value = 0;
             return context.RouteData.Values.TryGetValue(name, out object? routeValue) && int.TryParse(routeValue?.ToString(), out value);
         }
     }
