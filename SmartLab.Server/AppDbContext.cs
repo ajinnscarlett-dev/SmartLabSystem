@@ -56,5 +56,153 @@ namespace SmartLab.Server
             modelBuilder.Entity<Notification>()
                 .HasIndex(n => new { n.UserId, n.IsRead, n.CreatedAt });
         }
+
+        public override int SaveChanges()
+        {
+            PrepareOperationalHistory();
+            return base.SaveChanges();
+        }
+
+        public override async Task<int> SaveChangesAsync(
+            CancellationToken cancellationToken = default)
+        {
+            PrepareOperationalHistory();
+            return await base.SaveChangesAsync(cancellationToken);
+        }
+
+        private void PrepareOperationalHistory()
+        {
+            DateTime now = DateTime.Now;
+
+            foreach (var entry in ChangeTracker.Entries<PC>())
+            {
+                if (entry.State != EntityState.Modified)
+                {
+                    continue;
+                }
+
+                string previousStatus =
+                    entry.Property(p => p.Status).OriginalValue ?? string.Empty;
+
+                string currentStatus =
+                    entry.Entity.Status ?? string.Empty;
+
+                int? previousUserId =
+                    entry.Property(p => p.CurrentUserId).OriginalValue;
+
+                int? currentUserId =
+                    entry.Entity.CurrentUserId;
+
+                bool enteredOccupied =
+                    !string.Equals(previousStatus, "Occupied", StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(currentStatus, "Occupied", StringComparison.OrdinalIgnoreCase) &&
+                    currentUserId.HasValue;
+
+                bool leftOccupied =
+                    string.Equals(previousStatus, "Occupied", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(currentStatus, "Occupied", StringComparison.OrdinalIgnoreCase);
+
+                if (enteredOccupied)
+                {
+                    bool hasOpenSession = PcUsageHistory.Any(s =>
+                        s.PCId == entry.Entity.PCId &&
+                        s.LogoutTime == null);
+
+                    bool hasPendingOpenSession = ChangeTracker.Entries<PcUsageHistory>()
+                        .Any(e =>
+                            e.State == EntityState.Added &&
+                            e.Entity.PCId == entry.Entity.PCId &&
+                            e.Entity.LogoutTime == null);
+
+                    if (!hasOpenSession && !hasPendingOpenSession)
+                    {
+                        PcUsageHistory.Add(new PcUsageHistory
+                        {
+                            PCId = entry.Entity.PCId,
+                            UserId = currentUserId!.Value,
+                            LaboratoryId = entry.Entity.LaboratoryId,
+                            LoginTime = now,
+                            EndReason = string.Empty
+                        });
+                    }
+                }
+
+                if (leftOccupied && previousUserId.HasValue)
+                {
+                    string endReason =
+                        string.Equals(currentStatus, "Offline", StringComparison.OrdinalIgnoreCase)
+                            ? "HeartbeatTimeout"
+                            : string.Equals(currentStatus, "Maintenance", StringComparison.OrdinalIgnoreCase)
+                                ? "Maintenance"
+                                : "Logout";
+
+                    PcUsageHistory? openSession = PcUsageHistory
+                        .OrderByDescending(s => s.LoginTime)
+                        .FirstOrDefault(s =>
+                            s.PCId == entry.Entity.PCId &&
+                            s.LogoutTime == null);
+
+                    if (openSession != null)
+                    {
+                        CloseUsageSession(openSession, now, endReason);
+                    }
+                }
+
+                bool enteredMaintenance =
+                    !string.Equals(previousStatus, "Maintenance", StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(currentStatus, "Maintenance", StringComparison.OrdinalIgnoreCase);
+
+                bool leftMaintenance =
+                    string.Equals(previousStatus, "Maintenance", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(currentStatus, "Maintenance", StringComparison.OrdinalIgnoreCase);
+
+                if (enteredMaintenance)
+                {
+                    bool alreadyOpen = MaintenanceRecords.Any(m =>
+                        m.PCId == entry.Entity.PCId &&
+                        m.EndedAt == null);
+
+                    if (!alreadyOpen)
+                    {
+                        MaintenanceRecords.Add(new MaintenanceRecord
+                        {
+                            PCId = entry.Entity.PCId,
+                            Reason = entry.Entity.MaintenanceReason?.Trim() ?? "Maintenance",
+                            StartedAt = entry.Entity.MaintenanceStarted ?? now,
+                            Notes = null,
+                            TechnicianUserId = null
+                        });
+                    }
+                }
+
+                if (leftMaintenance)
+                {
+                    MaintenanceRecord? openMaintenance = MaintenanceRecords
+                        .OrderByDescending(m => m.StartedAt)
+                        .FirstOrDefault(m =>
+                            m.PCId == entry.Entity.PCId &&
+                            m.EndedAt == null);
+
+                    if (openMaintenance != null)
+                    {
+                        openMaintenance.EndedAt = now;
+                    }
+                }
+            }
+        }
+
+        private static void CloseUsageSession(
+            PcUsageHistory session,
+            DateTime logoutTime,
+            string endReason)
+        {
+            session.LogoutTime = logoutTime;
+            session.EndReason = endReason;
+
+            TimeSpan duration = logoutTime - session.LoginTime;
+
+            session.DurationSeconds =
+                (int)Math.Max(0, Math.Round(duration.TotalSeconds));
+        }
     }
 }
