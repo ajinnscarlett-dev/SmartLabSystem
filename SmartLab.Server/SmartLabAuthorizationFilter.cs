@@ -15,16 +15,18 @@ namespace SmartLab.Server
                 return Task.CompletedTask;
             }
 
-            string controller = context.Controller.GetType().Name;
+            string controller = context.ActionDescriptor.RouteValues.TryGetValue("controller", out var controllerName)
+                ? controllerName ?? string.Empty
+                : string.Empty;
             string action = context.ActionDescriptor.RouteValues.TryGetValue("action", out var actionName)
                 ? actionName ?? string.Empty
                 : string.Empty;
 
-            if (controller == "PCController")
+            if (controller == "PC")
             {
                 AuthorizePcController(context, action);
             }
-            else if (controller == "ServiceDeskController")
+            else if (controller == "ServiceDesk")
             {
                 AuthorizeServiceDeskController(context, action);
             }
