@@ -37,24 +37,8 @@ jobs:
       - name: Build
         run: dotnet build SmartLabSystem.sln --configuration Release --no-restore
 
-      - name: Diagnose EF model differences
-        working-directory: SmartLab.Server
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-          $migrationName = "__CiModelProbe"
-          dotnet ef migrations add $migrationName --configuration Release --no-build --output-dir Migrations/CiProbe
-          Write-Host "=== GENERATED EF PROBE ==="
-          Get-ChildItem Migrations/CiProbe -Filter "*.cs" | ForEach-Object {
-            Write-Host "=== $($_.FullName) ==="
-            Get-Content $_.FullName
-          }
-          Write-Host "=== SNAPSHOT DIFF ==="
-          git diff -- Migrations/AppDbContextModelSnapshot.cs
-          Remove-Item Migrations/CiProbe -Recurse -Force
-          git checkout -- Migrations/AppDbContextModelSnapshot.cs
-
       - name: EF model validation
+        working-directory: SmartLab.Server
         run: dotnet ef migrations has-pending-model-changes --configuration Release --no-build
 
       - name: Test
