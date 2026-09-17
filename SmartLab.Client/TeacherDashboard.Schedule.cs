@@ -10,6 +10,7 @@ public partial class TeacherDashboard
 {
     private static readonly bool ScheduleHandlerRegistered = RegisterScheduleHandler();
     private TextBlock? _currentScheduleText;
+    private DispatcherTimer? _scheduleSummaryTimer;
 
     private static bool RegisterScheduleHandler()
     {
@@ -32,24 +33,31 @@ public partial class TeacherDashboard
 
     private async Task InitializeScheduleSummaryAsync()
     {
-        if (_currentScheduleText == null)
+        if (_currentScheduleText == null && TeacherNameText.Parent is StackPanel header)
         {
-            if (TeacherNameText.Parent is StackPanel header)
+            _currentScheduleText = new TextBlock
             {
-                _currentScheduleText = new TextBlock
-                {
-                    Text = "Current schedule: loading...",
-                    FontSize = 11,
-                    Foreground = (Brush)FindResource("TextSecondary"),
-                    Margin = new Thickness(0, 3, 0, 0)
-                };
+                Text = "Current schedule: loading...",
+                FontSize = 11,
+                Foreground = (Brush)FindResource("TextSecondary"),
+                Margin = new Thickness(0, 3, 0, 0),
+                TextTrimming = TextTrimming.CharacterEllipsis
+            };
 
-                int index = header.Children.IndexOf(TeacherNameText);
-                header.Children.Insert(Math.Max(0, index + 1), _currentScheduleText);
-            }
+            int index = header.Children.IndexOf(TeacherNameText);
+            header.Children.Insert(Math.Max(0, index + 1), _currentScheduleText);
         }
 
+        _scheduleSummaryTimer ??= CreateScheduleSummaryTimer();
+        _scheduleSummaryTimer.Start();
         await LoadCurrentScheduleSummaryAsync();
+    }
+
+    private DispatcherTimer CreateScheduleSummaryTimer()
+    {
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
+        timer.Tick += async (_, _) => await LoadCurrentScheduleSummaryAsync();
+        return timer;
     }
 
     private async Task LoadCurrentScheduleSummaryAsync()
@@ -59,12 +67,13 @@ public partial class TeacherDashboard
 
         try
         {
-            List<TeacherCurrentSchedule> schedules = await _httpClient.GetFromJsonAsync<List<TeacherCurrentSchedule>>("api/Schedule/current") ?? new();
-            TeacherCurrentSchedule? current = schedules.OrderBy(s => s.StartTime).FirstOrDefault();
+            List<TeacherCurrentSchedule> schedules =
+                await _httpClient.GetFromJsonAsync<List<TeacherCurrentSchedule>>("api/Schedule/current") ?? new();
 
+            TeacherCurrentSchedule? current = schedules.OrderBy(s => s.StartTime).FirstOrDefault();
             _currentScheduleText.Text = current == null
                 ? "Current schedule: no scheduled class right now"
-                : $"Current schedule: {current.LaboratoryName}  |  {current.SubjectName}  |  {current.ClassName}  |  {current.StartTime:hh\:mm}–{current.EndTime:hh\:mm}";
+                : $"Current schedule: {current.LaboratoryName} | {current.SubjectName} | {current.ClassName} | {current.StartTime:hh\:mm}–{current.EndTime:hh\:mm}";
         }
         catch
         {
