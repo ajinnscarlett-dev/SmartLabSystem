@@ -1,5 +1,7 @@
+using System.Net.Http;
 using System.Net.Http.Json;
 using System.Windows;
+using System.Windows.Controls;
 
 namespace SmartLab.Client;
 
