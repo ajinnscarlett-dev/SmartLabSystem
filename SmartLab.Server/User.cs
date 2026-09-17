@@ -10,7 +10,7 @@
 
         public string Role { get; set; } = string.Empty;
 
-        public bool MustChangePassword { get; set; }
+        public bool MustChangePassword { get; set; } = true;
 
         public DateTime CreatedAt { get; set; }
     }
