@@ -66,6 +66,7 @@ builder.Services.AddSingleton<AuthTokenService>();
 builder.Services.AddHostedService<PCMonitorService>();
 builder.Services.AddHostedService<CommandLifecycleHostedService>();
 builder.Services.AddHostedService<ServerDiscoveryService>();
+builder.Services.AddHostedService<TeacherScheduleAuthorizationCacheService>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
