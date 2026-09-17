@@ -1,5 +1,4 @@
 using System.Net.Http.Json;
-using System.Reflection;
 using System.Windows;
 
 namespace SmartLab.Client;
@@ -18,6 +17,7 @@ public partial class ScheduleManagementWindow : Window
         _httpClient = new HttpClient { BaseAddress = new Uri(SmartLabServerConfig.BaseUrl) };
         AuthSession.Apply(_httpClient);
         ScheduleDatePicker.SelectedDate = DateTime.Today;
+        ScheduleDatePicker.SelectedDateChanged += async (_, _) => await LoadSchedulesAsync();
         Loaded += async (_, _) =>
         {
             await LoadOptionsAsync();
@@ -33,8 +33,16 @@ public partial class ScheduleManagementWindow : Window
                 await _httpClient.GetFromJsonAsync<List<AccountRow>>("api/User/management") ?? new();
 
             _teachers = accounts
-                .Where(a => a.Role.Equals("Teacher", StringComparison.OrdinalIgnoreCase) && a.Status.Equals("Active", StringComparison.OrdinalIgnoreCase))
-                .Select(a => new TeacherOption { UserId = a.UserId, DisplayName = string.IsNullOrWhiteSpace(a.FullName) ? a.Username : $"{a.FullName} ({a.Username})" })
+                .Where(a =>
+                    a.Role.Equals("Teacher", StringComparison.OrdinalIgnoreCase) &&
+                    a.Status.Equals("Active", StringComparison.OrdinalIgnoreCase))
+                .Select(a => new TeacherOption
+                {
+                    UserId = a.UserId,
+                    DisplayName = string.IsNullOrWhiteSpace(a.FullName)
+                        ? (a.Username ?? string.Empty)
+                        : $"{a.FullName} ({a.Username})"
+                })
                 .OrderBy(a => a.DisplayName)
                 .ToList();
 
@@ -53,7 +61,8 @@ public partial class ScheduleManagementWindow : Window
         {
             DateTime date = ScheduleDatePicker.SelectedDate?.Date ?? DateTime.Today;
             _schedules =
-                await _httpClient.GetFromJsonAsync<List<TeacherScheduleRow>>($"api/Schedule?date={date:yyyy-MM-dd}") ?? new();
+                await _httpClient.GetFromJsonAsync<List<TeacherScheduleRow>>(
+                    $"api/Schedule?date={date:yyyy-MM-dd}") ?? new();
 
             foreach (TeacherScheduleRow row in _schedules)
                 row.TimeText = $"{row.StartTime:hh\:mm}–{row.EndTime:hh\:mm}";
@@ -68,10 +77,8 @@ public partial class ScheduleManagementWindow : Window
         }
     }
 
-    private async void AddButton_Click(object sender, RoutedEventArgs e)
-    {
+    private async void AddButton_Click(object sender, RoutedEventArgs e) =>
         await EditScheduleAsync(null);
-    }
 
     private async void EditButton_Click(object sender, RoutedEventArgs e)
     {
@@ -84,9 +91,14 @@ public partial class ScheduleManagementWindow : Window
         if (_teachers.Count == 0 || _laboratories.Count == 0)
         {
             await LoadOptionsAsync();
+
             if (_teachers.Count == 0 || _laboratories.Count == 0)
             {
-                MessageBox.Show("An active Teacher and at least one laboratory are required before a schedule can be created.", "Schedule Management", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(
+                    "An active Teacher and at least one laboratory are required before a schedule can be created.",
+                    "Schedule Management",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
                 return;
             }
         }
@@ -94,8 +106,8 @@ public partial class ScheduleManagementWindow : Window
         Window dialog = new()
         {
             Title = existing == null ? "Add Schedule" : "Edit Schedule",
-            Width = 560,
-            Height = 520,
+            Width = 600,
+            Height = 650,
             Owner = this,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             ResizeMode = ResizeMode.NoResize,
@@ -103,35 +115,84 @@ public partial class ScheduleManagementWindow : Window
         };
 
         Grid root = new() { Margin = new Thickness(20) };
-        for (int i = 0; i < 6; i++)
-            root.RowDefinitions.Add(new RowDefinition { Height = i == 4 ? new GridLength(1, GridUnitType.Star) : GridLength.Auto });
+        for (int i = 0; i < 9; i++)
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-        TextBlock title = new() { Text = existing == null ? "ADD SCHEDULE" : "EDIT SCHEDULE", FontSize = 19, FontWeight = FontWeights.SemiBold };
-        root.Children.Add(title);
+        root.Children.Add(new TextBlock
+        {
+            Text = existing == null ? "ADD SCHEDULE" : "EDIT SCHEDULE",
+            FontSize = 19,
+            FontWeight = FontWeights.SemiBold
+        });
 
-        ComboBox teacher = new() { ItemsSource = _teachers, DisplayMemberPath = "DisplayName", Margin = new Thickness(0, 12, 0, 0) };
-        Grid.SetRow(teacher, 1); root.Children.Add(LabeledControl("Teacher", teacher));
+        ComboBox teacher = new()
+        {
+            ItemsSource = _teachers,
+            DisplayMemberPath = "DisplayName"
+        };
+        AddField(root, 1, "Teacher", teacher);
 
-        ComboBox laboratory = new() { ItemsSource = _laboratories, DisplayMemberPath = "LabName", Margin = new Thickness(0, 8, 0, 0) };
-        Grid.SetRow(laboratory, 2); root.Children.Add(LabeledControl("Laboratory", laboratory));
+        ComboBox laboratory = new()
+        {
+            ItemsSource = _laboratories,
+            DisplayMemberPath = "LabName"
+        };
+        AddField(root, 2, "Laboratory", laboratory);
 
-        TextBox subject = new() { Margin = new Thickness(0, 8, 0, 0) };
-        Grid.SetRow(subject, 3); root.Children.Add(LabeledControl("Subject", subject));
+        TextBox subject = new();
+        AddField(root, 3, "Subject", subject);
 
-        StackPanel dateTime = new() { Orientation = System.Windows.Controls.Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) };
-        DatePicker date = new() { Width = 180, SelectedDate = existing?.ScheduleDate ?? ScheduleDatePicker.SelectedDate ?? DateTime.Today };
-        TextBox start = new() { Width = 95, Margin = new Thickness(8, 0, 0, 0), Text = existing == null ? "08:00" : existing.StartTime.ToString(@"hh:mm") };
-        TextBox end = new() { Width = 95, Margin = new Thickness(8, 0, 0, 0), Text = existing == null ? "09:00" : existing.EndTime.ToString(@"hh:mm") };
-        dateTime.Children.Add(date); dateTime.Children.Add(start); dateTime.Children.Add(end);
-        Grid.SetRow(dateTime, 4); root.Children.Add(dateTime);
+        DatePicker date = new()
+        {
+            SelectedDate = existing?.ScheduleDate ?? ScheduleDatePicker.SelectedDate ?? DateTime.Today,
+            HorizontalAlignment = HorizontalAlignment.Left
+        };
+        AddField(root, 4, "Date", date);
 
-        StackPanel classAndStatus = new() { Orientation = System.Windows.Controls.Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0), VerticalAlignment = VerticalAlignment.Top };
-        TextBox className = new() { Width = 300, Text = existing?.ClassName ?? string.Empty };
-        ComboBox status = new() { Width = 150, Margin = new Thickness(8, 0, 0, 0) };
-        status.Items.Add("Scheduled"); status.Items.Add("Completed"); status.Items.Add("Cancelled");
+        StackPanel times = new()
+        {
+            Orientation = System.Windows.Controls.Orientation.Horizontal
+        };
+        TextBox start = new()
+        {
+            Width = 105,
+            Text = existing == null ? "08:00" : existing.StartTime.ToString(@"hh:mm")
+        };
+        TextBox end = new()
+        {
+            Width = 105,
+            Margin = new Thickness(8, 0, 0, 0),
+            Text = existing == null ? "09:00" : existing.EndTime.ToString(@"hh:mm")
+        };
+        times.Children.Add(new TextBlock
+        {
+            Text = "Start",
+            VerticalAlignment = VerticalAlignment.Center,
+            Foreground = (System.Windows.Media.Brush)FindResource("SmartLabMuted")
+        });
+        times.Children.Add(start);
+        times.Children.Add(new TextBlock
+        {
+            Text = "End",
+            VerticalAlignment = VerticalAlignment.Center,
+            Foreground = (System.Windows.Media.Brush)FindResource("SmartLabMuted"),
+            Margin = new Thickness(12, 0, 0, 0)
+        });
+        times.Children.Add(end);
+        AddField(root, 5, "Time", times);
+
+        TextBox className = new()
+        {
+            Text = existing?.ClassName ?? string.Empty
+        };
+        AddField(root, 6, "Class", className);
+
+        ComboBox status = new();
+        status.Items.Add("Scheduled");
+        status.Items.Add("Completed");
+        status.Items.Add("Cancelled");
         status.SelectedItem = existing?.Status ?? "Scheduled";
-        classAndStatus.Children.Add(className); classAndStatus.Children.Add(status);
-        Grid.SetRow(classAndStatus, 5); root.Children.Add(classAndStatus);
+        AddField(root, 7, "Status", status);
 
         if (existing != null)
         {
@@ -145,21 +206,35 @@ public partial class ScheduleManagementWindow : Window
             laboratory.SelectedIndex = 0;
         }
 
-        Grid footer = new();
-        Button cancel = new() { Content = "CANCEL", Width = 90, Height = 34, Margin = new Thickness(0, 0, 8, 0) };
-        Button save = new() { Content = existing == null ? "CREATE" : "SAVE", Width = 90, Height = 34, Style = (System.Windows.Style)FindResource("SmartLabPrimaryButton") };
-        footer.Children.Add(cancel); footer.Children.Add(save); footer.HorizontalAlignment = HorizontalAlignment.Right;
+        StackPanel footer = new()
+        {
+            Orientation = System.Windows.Controls.Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Margin = new Thickness(0, 18, 0, 0)
+        };
 
-        // Put footer in a separate overlay row by increasing the grid.
-        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        Grid.SetRow(footer, 6); root.Children.Add(footer);
+        Button cancel = new()
+        {
+            Content = "CANCEL",
+            Width = 90,
+            Height = 34,
+            Margin = new Thickness(0, 0, 8, 0)
+        };
+        Button save = new()
+        {
+            Content = existing == null ? "CREATE" : "SAVE",
+            Width = 90,
+            Height = 34,
+            Style = (System.Windows.Style)FindResource("SmartLabPrimaryButton")
+        };
 
-        TextBlock classLabel = new() { Text = "Class", Foreground = (System.Windows.Media.Brush)FindResource("SmartLabMuted"), Margin = new Thickness(0, 0, 0, 3) };
-        TextBlock dateLabel = new() { Text = "Date / start / end", Foreground = (System.Windows.Media.Brush)FindResource("SmartLabMuted"), Margin = new Thickness(0, 0, 0, 3) };
-        Grid.SetRow(classLabel, 5);
-        Grid.SetRow(dateLabel, 4);
+        footer.Children.Add(cancel);
+        footer.Children.Add(save);
+        Grid.SetRow(footer, 8);
+        root.Children.Add(footer);
 
         cancel.Click += (_, _) => dialog.Close();
+
         save.Click += async (_, _) =>
         {
             if (teacher.SelectedItem is not TeacherOption selectedTeacher ||
@@ -171,7 +246,11 @@ public partial class ScheduleManagementWindow : Window
                 !TimeSpan.TryParse(end.Text.Trim(), out TimeSpan endTime) ||
                 endTime <= startTime)
             {
-                MessageBox.Show("Enter a Teacher, laboratory, subject, class, valid date, and start/end time where end is later than start.", "Schedule Management", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(
+                    "Enter a Teacher, laboratory, subject, class, valid date, and start/end time where end is later than start.",
+                    "Schedule Management",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
                 return;
             }
 
@@ -188,6 +267,7 @@ public partial class ScheduleManagementWindow : Window
             };
 
             save.IsEnabled = false;
+
             try
             {
                 HttpResponseMessage response = existing == null
@@ -196,7 +276,11 @@ public partial class ScheduleManagementWindow : Window
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    MessageBox.Show(await response.Content.ReadAsStringAsync(), "Schedule Management", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show(
+                        await response.Content.ReadAsStringAsync(),
+                        "Schedule Management",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
                     return;
                 }
 
@@ -205,7 +289,11 @@ public partial class ScheduleManagementWindow : Window
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.Message, "Schedule Management", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(
+                    ex.Message,
+                    "Schedule Management",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
             }
             finally
             {
@@ -227,15 +315,22 @@ public partial class ScheduleManagementWindow : Window
             "Schedule Management",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning);
+
         if (confirm != MessageBoxResult.Yes)
             return;
 
         try
         {
-            HttpResponseMessage response = await _httpClient.DeleteAsync($"api/Schedule/{row.ScheduleId}");
+            HttpResponseMessage response =
+                await _httpClient.DeleteAsync($"api/Schedule/{row.ScheduleId}");
+
             if (!response.IsSuccessStatusCode)
             {
-                MessageBox.Show(await response.Content.ReadAsStringAsync(), "Schedule Management", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(
+                    await response.Content.ReadAsStringAsync(),
+                    "Schedule Management",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
                 return;
             }
 
@@ -243,19 +338,33 @@ public partial class ScheduleManagementWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show(ex.Message, "Schedule Management", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(
+                ex.Message,
+                "Schedule Management",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
         }
     }
 
-    private async void RefreshButton_Click(object sender, RoutedEventArgs e) => await LoadSchedulesAsync();
-    private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
+    private async void RefreshButton_Click(object sender, RoutedEventArgs e) =>
+        await LoadSchedulesAsync();
 
-    private FrameworkElement LabeledControl(string label, FrameworkElement control)
+    private void CloseButton_Click(object sender, RoutedEventArgs e) =>
+        Close();
+
+    private void AddField(Grid root, int row, string label, FrameworkElement control)
     {
-        StackPanel panel = new();
-        panel.Children.Add(new TextBlock { Text = label, Foreground = (System.Windows.Media.Brush)FindResource("SmartLabMuted"), Margin = new Thickness(0, 0, 0, 3) });
-        panel.Children.Add(control);
-        return panel;
+        StackPanel field = new();
+        field.Children.Add(new TextBlock
+        {
+            Text = label,
+            Foreground = (System.Windows.Media.Brush)FindResource("SmartLabMuted"),
+            Margin = new Thickness(0, 0, 0, 3)
+        });
+        field.Children.Add(control);
+        field.Margin = new Thickness(0, 8, 0, 0);
+        Grid.SetRow(field, row);
+        root.Children.Add(field);
     }
 
     private sealed class AccountRow
