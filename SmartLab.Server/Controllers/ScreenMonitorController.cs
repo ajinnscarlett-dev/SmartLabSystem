@@ -91,6 +91,7 @@ namespace SmartLab.Server.Controllers
             CleanupStaleFrames();
             if (!await CanStaffAccessPcAsync(pcId)) return Forbid();
             if (!LatestFrames.TryGetValue(pcId, out ScreenFrame? frame)) return NotFound(new { message = "No current screen image is available for this PC." });
+            TouchRemoteViewerLease(pcId);
             return Ok(new { pcId, version = frame.Version, updatedAt = frame.UpdatedAt });
         }
 
@@ -103,6 +104,7 @@ namespace SmartLab.Server.Controllers
             if (!LatestFrames.TryGetValue(pcId, out ScreenFrame? frame)) return NotFound(new { message = "No current screen image is available for this PC." });
             if (version.HasValue && version.Value >= frame.Version) return NoContent();
 
+            TouchRemoteViewerLease(pcId);
             Response.Headers["X-SmartLab-Frame-Version"] = frame.Version.ToString();
             Response.Headers["X-SmartLab-Frame-Time"] = frame.UpdatedAt.ToString("O");
             return File(frame.Image, "image/jpeg");
@@ -115,8 +117,20 @@ namespace SmartLab.Server.Controllers
             CleanupStaleFrames();
             if (!await CanAccessPcAsync(pcId)) return Forbid();
             LatestFrames.TryRemove(pcId, out _);
-            if (User.IsInRole("Admin") || User.IsInRole("Teacher")) MonitoringStates[pcId] = false;
+            if (User.IsInRole("Admin") || User.IsInRole("Teacher"))
+            {
+                MonitoringStates[pcId] = false;
+                RemoteControlSessionTracker.Remove(pcId);
+            }
             return Ok(new { message = "Screen monitoring data removed.", pcId });
+        }
+
+        private void TouchRemoteViewerLease(int pcId)
+        {
+            if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out int userId))
+                return;
+
+            RemoteControlSessionTracker.Touch(pcId, userId);
         }
 
         private static void CleanupStaleFrames()
