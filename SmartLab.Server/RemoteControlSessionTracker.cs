@@ -19,7 +19,7 @@ internal static class RemoteControlSessionTracker
 
     public static int CleanupExpired(TimeSpan ttl, ISet<int>? offlinePcIds = null)
     {
-        if (!TryGetSessions(out ConcurrentDictionary<int, int>? sessions))
+        if (!TryGetSessions(out ConcurrentDictionary<int, int> sessions))
             return 0;
 
         int removed = 0;
@@ -58,13 +58,13 @@ internal static class RemoteControlSessionTracker
 
     public static void Remove(int pcId)
     {
-        if (TryGetSessions(out ConcurrentDictionary<int, int>? sessions))
+        if (TryGetSessions(out ConcurrentDictionary<int, int> sessions))
             sessions.TryRemove(pcId, out _);
 
         LastSeenUtc.TryRemove(pcId, out _);
     }
 
-    private static bool TryGetSessions(out ConcurrentDictionary<int, int>? sessions)
+    private static bool TryGetSessions(out ConcurrentDictionary<int, int> sessions)
     {
         sessions = null!;
 
