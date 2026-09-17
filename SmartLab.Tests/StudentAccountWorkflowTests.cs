@@ -37,7 +37,8 @@ public sealed class StudentAccountWorkflowTests
 
         var hasher = new PasswordHasher<User>();
         Assert.NotEqual("2026-0001", user.PasswordHash);
-        Assert.NotEqual(PasswordVerificationResult.Failed, hasher.VerifyHashedPassword(user, user.PasswordHash, "2026-0001"));
+        Assert.NotEqual(PasswordVerificationResult.Failed,
+            hasher.VerifyHashedPassword(user, user.PasswordHash, "2026-0001"));
     }
 
     [Fact]
