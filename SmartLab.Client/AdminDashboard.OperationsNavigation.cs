@@ -189,7 +189,7 @@ namespace SmartLab.Client
                 return;
             }
 
-            ShowPCDetails(_selectedPc);
+            ShowPCIdentityDetails(_selectedPc);
         }
 
         private void SessionHistoryButton_Click(object sender, RoutedEventArgs e) => OpenOperationsCenter(1);
