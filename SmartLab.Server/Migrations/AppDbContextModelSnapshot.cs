@@ -47,6 +47,28 @@ namespace SmartLab.Server.Migrations
                 b.HasKey("AnnouncementId"); b.ToTable("Announcements");
             });
 
+            modelBuilder.Entity<ClassSchedule>(b =>
+            {
+                b.Property<int>("ClassScheduleId").ValueGeneratedOnAdd().HasColumnType("int");
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ClassScheduleId"));
+                b.Property<int>("TeacherUserId").HasColumnType("int");
+                b.Property<int>("LaboratoryId").HasColumnType("int");
+                b.Property<string>("SubjectName").IsRequired().HasColumnType("nvarchar(max)");
+                b.Property<string>("ClassName").IsRequired().HasColumnType("nvarchar(max)");
+                b.Property<DateTime>("ScheduleDate").HasColumnType("datetime2");
+                b.Property<TimeSpan>("StartTime").HasColumnType("time");
+                b.Property<TimeSpan>("EndTime").HasColumnType("time");
+                b.Property<string>("Status").IsRequired().HasColumnType("nvarchar(max)");
+                b.Property<DateTime>("CreatedAt").HasColumnType("datetime2");
+                b.HasKey("ClassScheduleId");
+                b.HasIndex("LaboratoryId", "ScheduleDate");
+                b.HasIndex("ScheduleDate");
+                b.HasIndex("TeacherUserId", "ScheduleDate");
+                b.ToTable("ClassSchedules");
+                b.HasOne(x => x.TeacherUser).WithMany().HasForeignKey("TeacherUserId").OnDelete(DeleteBehavior.Restrict);
+                b.HasOne(x => x.Laboratory).WithMany().HasForeignKey("LaboratoryId").OnDelete(DeleteBehavior.Restrict);
+            });
+
             modelBuilder.Entity<Laboratory>(b =>
             {
                 b.Property<int>("LaboratoryId").ValueGeneratedOnAdd().HasColumnType("int");
@@ -107,9 +129,13 @@ namespace SmartLab.Server.Migrations
                 b.Property<string>("Username").IsRequired().HasColumnType("nvarchar(max)");
                 b.Property<string>("PasswordHash").IsRequired().HasColumnType("nvarchar(max)");
                 b.Property<string>("Role").IsRequired().HasColumnType("nvarchar(max)");
+                b.Property<string>("StudentNumber").HasColumnType("nvarchar(450)");
+                b.Property<string>("FullName").HasColumnType("nvarchar(max)");
                 b.Property<bool>("MustChangePassword").HasColumnType("bit");
                 b.Property<DateTime>("CreatedAt").HasColumnType("datetime2");
-                b.HasKey("UserId"); b.ToTable("Users");
+                b.HasKey("UserId");
+                b.HasIndex("StudentNumber").IsUnique().HasFilter("[StudentNumber] IS NOT NULL");
+                b.ToTable("Users");
             });
 
             modelBuilder.Entity<TeacherLaboratoryAuthorization>(b =>
