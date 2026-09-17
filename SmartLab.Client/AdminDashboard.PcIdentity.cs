@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -6,11 +7,35 @@ namespace SmartLab.Client;
 
 public partial class AdminDashboard
 {
-    private void ShowPCIdentityDetails(PCInfo pc)
+    private async Task ShowPCIdentityDetailsAsync(PCInfo pc)
     {
+        PCIdentityDetails? details = null;
+
+        try
+        {
+            details = await _httpClient.GetFromJsonAsync<PCIdentityDetails>($"api/PC/{pc.PcId}");
+        }
+        catch
+        {
+            // Fall back to the fields already present in the dashboard's PC list.
+        }
+
+        details ??= new PCIdentityDetails
+        {
+            PcId = pc.PcId,
+            PcNumber = pc.PcNumber,
+            Status = pc.Status,
+            Username = pc.Username,
+            CurrentUserId = pc.CurrentUserId,
+            LastSeen = pc.LastSeen,
+            IsEnabled = pc.IsEnabled,
+            MaintenanceReason = pc.MaintenanceReason,
+            MaintenanceStarted = pc.MaintenanceStarted
+        };
+
         var dialog = new Window
         {
-            Title = $"{pc.PcNumber} — Workstation Details",
+            Title = $"{details.PcNumber} — Workstation Details",
             Width = 560,
             Height = 620,
             MinWidth = 520,
@@ -45,25 +70,25 @@ public partial class AdminDashboard
         Grid.SetRow(subtitle, 1);
         root.Children.Add(subtitle);
 
-        var details = new StackPanel();
-        AddDetail(details, "PC Number", pc.PcNumber);
-        AddDetail(details, "Registered MAC Address", DisplayOrDash(pc.MACAddress));
-        AddDetail(details, "Current IP Address", DisplayOrDash(pc.IPAddress));
-        AddDetail(details, "Last Seen", pc.LastSeen.HasValue ? pc.LastSeen.Value.ToString("yyyy-MM-dd HH:mm:ss") : "Not seen");
-        AddDetail(details, "Status", DisplayOrDash(pc.Status));
-        AddDetail(details, "Laboratory", DisplayOrDash(pc.LaboratoryName ?? (pc.LaboratoryId.HasValue ? $"Laboratory {pc.LaboratoryId}" : null)));
-        AddDetail(details, "Current User", DisplayOrDash(pc.Username ?? (pc.CurrentUserId.HasValue ? $"User ID {pc.CurrentUserId}" : null)));
-        AddDetail(details, "Enabled", pc.IsEnabled ? "Yes" : "No");
-        if (string.Equals(pc.Status, "Maintenance", System.StringComparison.OrdinalIgnoreCase))
+        var detailsPanel = new StackPanel();
+        AddDetail(detailsPanel, "PC Number", DisplayOrDash(details.PcNumber));
+        AddDetail(detailsPanel, "Registered MAC Address", DisplayOrDash(details.MACAddress));
+        AddDetail(detailsPanel, "Current IP Address", DisplayOrDash(details.IPAddress));
+        AddDetail(detailsPanel, "Last Seen", details.LastSeen.HasValue ? details.LastSeen.Value.ToString("yyyy-MM-dd HH:mm:ss") : "Not seen");
+        AddDetail(detailsPanel, "Status", DisplayOrDash(details.Status));
+        AddDetail(detailsPanel, "Laboratory", DisplayOrDash(details.LaboratoryName ?? (details.LaboratoryId.HasValue ? $"Laboratory {details.LaboratoryId}" : null)));
+        AddDetail(detailsPanel, "Current User", DisplayOrDash(details.Username ?? (details.CurrentUserId.HasValue ? $"User ID {details.CurrentUserId}" : null)));
+        AddDetail(detailsPanel, "Enabled", details.IsEnabled ? "Yes" : "No");
+        if (string.Equals(details.Status, "Maintenance", StringComparison.OrdinalIgnoreCase))
         {
-            AddDetail(details, "Maintenance Reason", DisplayOrDash(pc.MaintenanceReason));
-            AddDetail(details, "Maintenance Started", pc.MaintenanceStarted?.ToString("yyyy-MM-dd HH:mm:ss") ?? "Not recorded");
+            AddDetail(detailsPanel, "Maintenance Reason", DisplayOrDash(details.MaintenanceReason));
+            AddDetail(detailsPanel, "Maintenance Started", details.MaintenanceStarted?.ToString("yyyy-MM-dd HH:mm:ss") ?? "Not recorded");
         }
 
         var scroll = new ScrollViewer
         {
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            Content = details
+            Content = detailsPanel
         };
         Grid.SetRow(scroll, 2);
         root.Children.Add(scroll);
@@ -116,4 +141,21 @@ public partial class AdminDashboard
     }
 
     private static string DisplayOrDash(string? value) => string.IsNullOrWhiteSpace(value) ? "—" : value;
+
+    private sealed class PCIdentityDetails
+    {
+        public int PcId { get; set; }
+        public string PcNumber { get; set; } = string.Empty;
+        public string? Status { get; set; }
+        public int? CurrentUserId { get; set; }
+        public string? Username { get; set; }
+        public int? LaboratoryId { get; set; }
+        public string? LaboratoryName { get; set; }
+        public string? MACAddress { get; set; }
+        public string? IPAddress { get; set; }
+        public DateTime? LastSeen { get; set; }
+        public bool IsEnabled { get; set; }
+        public string? MaintenanceReason { get; set; }
+        public DateTime? MaintenanceStarted { get; set; }
+    }
 }
