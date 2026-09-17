@@ -7,6 +7,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using SmartLab.Shared;
 
 namespace SmartLab.Client
 {
@@ -376,9 +377,17 @@ namespace SmartLab.Client
                     }
                     else
                     {
-                        RemoteKeyPayload? payload =
-                            JsonSerializer.Deserialize<RemoteKeyPayload>(
+                        RemoteKeyCommandPayload? payload =
+                            JsonSerializer.Deserialize<RemoteKeyCommandPayload>(
                                 command.Message ?? string.Empty);
+
+#if DEBUG
+                        if (payload != null)
+                        {
+                            System.Diagnostics.Debug.WriteLine(
+                                $"[SmartLab RemoteInput] CLIENT AFTER DESERIALIZATION: KeyCode={payload.KeyCode}");
+                        }
+#endif
 
                         if (payload == null ||
                             payload.KeyCode <= 0 ||
@@ -418,9 +427,17 @@ namespace SmartLab.Client
                     }
                     else
                     {
-                        RemoteMousePayload? payload =
-                            JsonSerializer.Deserialize<RemoteMousePayload>(
+                        RemoteMouseCommandPayload? payload =
+                            JsonSerializer.Deserialize<RemoteMouseCommandPayload>(
                                 command.Message ?? string.Empty);
+
+#if DEBUG
+                        if (payload != null)
+                        {
+                            System.Diagnostics.Debug.WriteLine(
+                                $"[SmartLab RemoteInput] CLIENT AFTER DESERIALIZATION: X={payload.X:R} Y={payload.Y:R} Button={payload.Button}");
+                        }
+#endif
 
                         if (payload == null ||
                             payload.X < 0 ||
@@ -749,6 +766,13 @@ namespace SmartLab.Client
                     Math.Max(
                         0,
                         virtualHeight - 1));
+
+#if DEBUG
+            System.Diagnostics.Debug.WriteLine(
+                $"[SmartLab RemoteInput] TARGET SCREEN: left={virtualLeft} top={virtualTop} width={virtualWidth} height={virtualHeight}");
+            System.Diagnostics.Debug.WriteLine(
+                $"[SmartLab RemoteInput] TARGET PIXEL: X={screenX} Y={screenY}");
+#endif
 
             if (!SetCursorPos(
                 screenX,
@@ -1181,19 +1205,6 @@ namespace SmartLab.Client
                 "SmartLab - Message from Instructor",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
-        }
-
-
-        private sealed class RemoteKeyPayload
-        {
-            public int KeyCode { get; set; }
-        }
-
-        private sealed class RemoteMousePayload
-        {
-            public double X { get; set; }
-            public double Y { get; set; }
-            public string? Button { get; set; }
         }
 
         private sealed class PCCommandPendingResponse

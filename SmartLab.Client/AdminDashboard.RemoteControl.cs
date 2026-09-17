@@ -297,6 +297,10 @@ namespace SmartLab.Client
                 (double X, double Y)? point = CalculateNormalizedImagePoint(image, e.GetPosition(image));
                 if (point.HasValue)
                 {
+#if DEBUG
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[SmartLab RemoteInput] VIEWER: X={point.Value.X:R} Y={point.Value.Y:R}");
+#endif
                     await SendRemoteMouseClickAsync(pc.PcId, point.Value.X, point.Value.Y, "LEFT");
                     image.Focus();
                 }
@@ -312,6 +316,10 @@ namespace SmartLab.Client
                 (double X, double Y)? point = CalculateNormalizedImagePoint(image, e.GetPosition(image));
                 if (point.HasValue)
                 {
+#if DEBUG
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[SmartLab RemoteInput] VIEWER: X={point.Value.X:R} Y={point.Value.Y:R}");
+#endif
                     await SendRemoteMouseClickAsync(pc.PcId, point.Value.X, point.Value.Y, "RIGHT");
                     image.Focus();
                 }

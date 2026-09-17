@@ -1,6 +1,7 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using SmartLab.Shared;
 using System.Collections.Concurrent;
 using System.Security.Claims;
 using System.Threading;
@@ -165,14 +166,24 @@ namespace SmartLab.Server.Controllers
                 });
             }
 
+            string payloadJson =
+                System.Text.Json.JsonSerializer.Serialize(
+                    new RemoteKeyCommandPayload
+                    {
+                        KeyCode = request.KeyCode
+                    });
+
+#if DEBUG
+            System.Diagnostics.Debug.WriteLine(
+                $"[SmartLab RemoteInput] SERVER KEY: KeyCode={request.KeyCode}");
+            System.Diagnostics.Debug.WriteLine(
+                $"[SmartLab RemoteInput] QUEUED COMMAND: {payloadJson}");
+#endif
+
             return await QueuePcCommandAsync(
                 pcId,
                 "REMOTE_KEY_PRESS",
-                System.Text.Json.JsonSerializer.Serialize(
-                    new
-                    {
-                        keyCode = request.KeyCode
-                    }),
+                payloadJson,
                 true);
         }
 
@@ -212,16 +223,26 @@ namespace SmartLab.Server.Controllers
                 });
             }
 
+            string payloadJson =
+                System.Text.Json.JsonSerializer.Serialize(
+                    new RemoteMouseCommandPayload
+                    {
+                        X = request.X,
+                        Y = request.Y,
+                        Button = button
+                    });
+
+#if DEBUG
+            System.Diagnostics.Debug.WriteLine(
+                $"[SmartLab RemoteInput] SERVER: X={request.X:R} Y={request.Y:R}");
+            System.Diagnostics.Debug.WriteLine(
+                $"[SmartLab RemoteInput] QUEUED COMMAND: {payloadJson}");
+#endif
+
             return await QueuePcCommandAsync(
                 pcId,
                 "REMOTE_MOUSE_CLICK",
-                System.Text.Json.JsonSerializer.Serialize(
-                    new
-                    {
-                        x = request.X,
-                        y = request.Y,
-                        button
-                    }),
+                payloadJson,
                 true);
         }
 

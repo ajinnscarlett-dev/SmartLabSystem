@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SmartLab.Server\SmartLab.Server.csproj" />
+    <ProjectReference Include="..\SmartLab.Shared\SmartLab.Shared.csproj" />
   </ItemGroup>
 
 </Project>
