@@ -28,6 +28,7 @@ public class UserManagementController : ControllerBase
             username = DisplayUsername(u.Username),
             role = DisplayRole(u.Role),
             status = IsDisabled(u) ? "Inactive" : "Active",
+            mustChangePassword = u.MustChangePassword,
             createdAt = u.CreatedAt
         }));
     }
@@ -45,12 +46,18 @@ public class UserManagementController : ControllerBase
         if (await _context.Users.AnyAsync(u => !u.Username.StartsWith(DisabledPrefix) && u.Username.ToLower() == username.ToLower()))
             return Conflict(new { message = $"Username '{username}' already exists." });
 
-        var user = new User { Username = username, Role = role, CreatedAt = DateTime.Now };
+        var user = new User
+        {
+            Username = username,
+            Role = role,
+            MustChangePassword = true,
+            CreatedAt = DateTime.Now
+        };
         user.PasswordHash = _hasher.HashPassword(user, password);
         _context.Users.Add(user);
         await _context.SaveChangesAsync();
         await LogAsync(user.UserId, "User Added", $"User {username} created with role {role}.");
-        return Ok(new { message = "User created successfully.", userId = user.UserId });
+        return Ok(new { message = "User created successfully.", userId = user.UserId, mustChangePassword = user.MustChangePassword });
     }
 
     [HttpPut("management/{id}/username")]
@@ -97,16 +104,16 @@ public class UserManagementController : ControllerBase
     public async Task<IActionResult> ResetPassword(int id, [FromBody] PasswordResetRequest request)
     {
         string newPassword = request.NewPassword ?? string.Empty;
-        if (newPassword.Length < 6)
-            return BadRequest(new { message = "Password must be at least 6 characters." });
+        if (newPassword.Length < 6) return BadRequest(new { message = "Password must be at least 6 characters." });
 
         var user = await _context.Users.FirstOrDefaultAsync(u => u.UserId == id);
         if (user == null) return NotFound(new { message = "User not found." });
 
         user.PasswordHash = _hasher.HashPassword(user, newPassword);
+        user.MustChangePassword = true;
         await _context.SaveChangesAsync();
-        await LogAsync(id, "Password Reset", $"Password reset for user {DisplayUsername(user.Username)}.");
-        return Ok(new { message = "Password reset successfully." });
+        await LogAsync(id, "Password Reset", $"Password reset for user {DisplayUsername(user.Username)}; next login requires a password change.");
+        return Ok(new { message = "Password reset successfully.", mustChangePassword = true });
     }
 
     [HttpDelete("management/{id}")]
