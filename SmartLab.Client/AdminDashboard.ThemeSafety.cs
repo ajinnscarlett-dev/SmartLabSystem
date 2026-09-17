@@ -11,7 +11,7 @@ namespace SmartLab.Client
         private static bool RegisterThemeBrushSafety()
         {
             EventManager.RegisterClassHandler(
-                typeof(AdminDashboard),
+                typeof(Button),
                 Button.ClickEvent,
                 new RoutedEventHandler(PrepareThemeBrushes),
                 handledEventsToo: false);
@@ -23,7 +23,7 @@ namespace SmartLab.Client
             object sender,
             RoutedEventArgs e)
         {
-            if (e.OriginalSource is not Button button ||
+            if (sender is not Button button ||
                 button.Name != "ThemeToggleButton")
             {
                 return;
