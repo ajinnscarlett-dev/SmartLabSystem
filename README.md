@@ -54,7 +54,7 @@ The server contains EF Core migrations. Current schema includes:
 - Activity logs
 - Announcements
 - Service Desk tickets
-- Teacher laboratory authorization
+- Teacher laboratory authorization compatibility table
 - Persistent PC usage history
 - Maintenance history
 - Hardware inventory
@@ -101,6 +101,42 @@ Newly provisioned accounts and administrator-reset accounts are marked as requir
 
 The authenticated change-password endpoint verifies the current password, hashes the new password, clears the requirement flag, and writes an activity log entry. Closing or cancelling the change-password dialog clears the client session.
 
+Deactivated accounts are rejected before a usable JWT is issued. Existing authenticated requests are also checked against current persisted account state and role claims.
+
+## Student account management
+
+Admin/MIS can create individual accounts or use the bulk `.xlsx` student import workflow.
+
+The minimum Excel columns are:
+
+- `Student Number`
+- `Student Name`
+
+The import workflow:
+
+1. Select an `.xlsx` workbook.
+2. SmartLab reads the first worksheet and previews the rows.
+3. Missing Student Number/Name, duplicate Student Numbers, and oversized values are rejected before import.
+4. The server checks existing SmartLab Student Numbers/usernames again to prevent duplicate accounts.
+5. Valid records are created as enabled Student accounts with:
+   - Username = Student Number
+   - Initial password = Student Number
+   - `MustChangePassword = true`
+   - Student Number and Student Name persisted on the User record
+6. The result reports imported rows and rejected rows/reasons.
+
+Imported passwords are immediately hashed with `PasswordHasher<User>`; the plaintext Student Number is never stored as the password.
+
+Admin can disable and restore accounts. Disabling does not delete usage/history records.
+
+## Teacher workflow and schedule-based laboratory access
+
+Teacher login is a dedicated WPF login surface, but it uses the same `/api/Auth/login` endpoint, JWT validation, role claims, and password-change flow as the other roles.
+
+Teacher laboratory access is schedule-based rather than permanently assigning a teacher to a laboratory. The existing `ClassSchedule` model and schedule service determine whether a Teacher is scheduled in a laboratory at the current date/time. Relevant PC monitoring, screen viewing, commands, and teacher screen sharing are therefore checked against the active schedule context.
+
+The existing TeacherLaboratoryAuthorizations table remains as a compatibility cache for the legacy PC command path; the schedule service is the source of current operational access, and a background synchronizer refreshes the compatibility table from currently active schedules.
+
 ## Remote control
 
 Remote control uses the existing SmartLab command and screen-monitoring pipeline:
@@ -110,6 +146,8 @@ Remote control uses the existing SmartLab command and screen-monitoring pipeline
 Mouse X/Y values are normalized to `0..1`. The viewer accounts for `Stretch.Uniform` letterboxing before creating the normalized coordinates. The student client maps those coordinates against Windows virtual-desktop metrics (`SM_XVIRTUALSCREEN`, `SM_YVIRTUALSCREEN`, `SM_CXVIRTUALSCREEN`, `SM_CYVIRTUALSCREEN`), which supports negative desktop origins and multi-monitor layouts.
 
 Only LEFT and RIGHT mouse clicks are accepted by the server. Keyboard commands use validated Windows virtual-key codes. Remote input is accepted only while an active, authorized remote-control session exists for the requesting Admin/Teacher.
+
+For physical LAN responsiveness, screen frames are reduced to a practical monitoring size/quality, the remote viewer avoids a separate metadata round trip when polling for newer frames, and interactive input requests do not wait for an extra completion-polling round trip.
 
 The viewer refreshes live screen traffic while the remote session is open. The server also maintains a short remote-control session lease and removes the session after inactivity or when the PC is Offline, so an unexpected viewer/client failure cannot leave remote control active indefinitely.
 
@@ -138,13 +176,15 @@ Ensure the school network permits client-to-server TCP access to the SmartLab AP
 11. Student logs out.
 12. Usage session is closed and the PC returns to Available.
 
-## Teacher workflow
+## Teacher dashboard priorities
 
-Teacher access is restricted server-side to authorized laboratories. The existing teacher dashboard uses real PC/API data for monitoring, screen viewing, commands, Service Desk, Need Assistance, and teacher screen sharing.
+The Teacher dashboard exposes the current schedule context alongside laboratory/PC operations. The current schedule summary is sourced from the existing schedule API and refreshed during the session.
+
+Teacher actions remain server-authorized for the selected/scheduled laboratory and include monitoring, screen viewing, Send Message, Lock, Logoff, Restart, Shutdown, Remote Control, Need Assistance, Service Desk, announcements, and notifications where the existing client supports them.
 
 ## Admin/MIS workflow
 
-Admin/MIS manages laboratories, PCs, users, teacher authorization, commands, announcements, Service Desk, maintenance, hardware inventory, usage history, reporting, analytics, archive, activity logs, and system health.
+Admin/MIS manages laboratories, PCs, users, teacher authorization compatibility data, commands, announcements, Service Desk, maintenance, hardware inventory, usage history, reporting, analytics, archive, activity logs, and system health.
 
 PC registration/configuration, MAC identity changes, enable/disable, maintenance, teacher laboratory authorization, user management, and other administrative mutations are enforced server-side with Admin authorization.
 
@@ -164,7 +204,7 @@ Archive support provides a retention plan and historical usage CSV export. The a
 
 - JWT validation checks issuer, audience, signing key, and lifetime.
 - Administrative and teacher controller boundaries are enforced server-side.
-- Teacher laboratory access is checked on relevant APIs.
+- Teacher laboratory access is checked on relevant APIs against current schedule context.
 - Student-owned operations are restricted to the authenticated student/session.
 - Anonymous presence is bound to a pre-registered workstation MAC.
 - Student login cannot auto-create an unknown workstation.
@@ -212,7 +252,7 @@ At every stage verify:
 - reconnect after short outage
 - server restart recovery
 - client restart recovery
-- Teacher authorization
+- Teacher authorization against the active schedule
 - command execution/result handling
 - screen monitoring
 - remote-control lease cleanup after an unexpected viewer close
