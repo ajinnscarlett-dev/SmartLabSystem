@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -15,7 +16,11 @@ namespace SmartLab.Server.Controllers
         private readonly IHostEnvironment _environment;
         private readonly IConfiguration _configuration;
 
-        public AuthController(AppDbContext context, AuthTokenService tokenService, IHostEnvironment environment, IConfiguration configuration)
+        public AuthController(
+            AppDbContext context,
+            AuthTokenService tokenService,
+            IHostEnvironment environment,
+            IConfiguration configuration)
         {
             _context = context;
             _passwordHasher = new PasswordHasher<User>();
@@ -99,8 +104,76 @@ namespace SmartLab.Server.Controllers
                 expiresInHours = 8,
                 userId = user.UserId,
                 username = user.Username,
-                role = user.Role
+                role = user.Role,
+                mustChangePassword = user.MustChangePassword
             });
+        }
+
+        [Authorize]
+        [HttpPost("change-password")]
+        public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
+        {
+            if (!int.TryParse(
+                    User.FindFirstValue(ClaimTypes.NameIdentifier),
+                    out int userId))
+            {
+                return Unauthorized(new { message = "Authenticated user ID is missing." });
+            }
+
+            string currentPassword = request.CurrentPassword ?? string.Empty;
+            string newPassword = request.NewPassword ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(currentPassword) || string.IsNullOrWhiteSpace(newPassword))
+            {
+                return BadRequest(new { message = "Current password and new password are required." });
+            }
+
+            if (newPassword.Length < 6)
+            {
+                return BadRequest(new { message = "New password must be at least 6 characters." });
+            }
+
+            if (string.Equals(currentPassword, newPassword, StringComparison.Ordinal))
+            {
+                return BadRequest(new { message = "New password must be different from the current password." });
+            }
+
+            User? user = await _context.Users.FirstOrDefaultAsync(u => u.UserId == userId);
+            if (user == null)
+            {
+                return Unauthorized(new { message = "User account no longer exists." });
+            }
+
+            if (user.Role.StartsWith("Disabled:", StringComparison.OrdinalIgnoreCase))
+            {
+                return Unauthorized(new { message = "This account is inactive." });
+            }
+
+            PasswordVerificationResult verification = _passwordHasher.VerifyHashedPassword(
+                user,
+                user.PasswordHash,
+                currentPassword);
+
+            if (verification == PasswordVerificationResult.Failed)
+            {
+                return BadRequest(new { message = "Current password is incorrect." });
+            }
+
+            user.PasswordHash = _passwordHasher.HashPassword(user, newPassword);
+            user.MustChangePassword = false;
+
+            _context.ActivityLogs.Add(new ActivityLog
+            {
+                UserId = user.UserId,
+                PCId = null,
+                Action = "Password Changed",
+                Details = $"User {user.Username} changed their password successfully.",
+                CreatedAt = DateTime.Now
+            });
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Password changed successfully." });
         }
 
         private async Task<User?> EnsureDevelopmentAdminAsync(string suppliedPassword)
@@ -135,6 +208,7 @@ namespace SmartLab.Server.Controllers
                 {
                     Username = bootstrapUsername,
                     Role = "Admin",
+                    MustChangePassword = false,
                     CreatedAt = DateTime.Now
                 };
 
@@ -151,10 +225,11 @@ namespace SmartLab.Server.Controllers
 
             bool roleMatches = string.Equals(admin.Role, "Admin", StringComparison.OrdinalIgnoreCase);
 
-            if (!passwordMatches || !roleMatches)
+            if (!passwordMatches || !roleMatches || admin.MustChangePassword)
             {
                 admin.Role = "Admin";
                 admin.PasswordHash = _passwordHasher.HashPassword(admin, bootstrapPassword);
+                admin.MustChangePassword = false;
                 await _context.SaveChangesAsync();
             }
 
@@ -180,6 +255,7 @@ namespace SmartLab.Server.Controllers
             {
                 Username = normalizedUsername,
                 Role = "Student",
+                MustChangePassword = true,
                 CreatedAt = DateTime.Now
             };
 
@@ -203,7 +279,8 @@ namespace SmartLab.Server.Controllers
                 message = "Registration successful!",
                 userId = user.UserId,
                 username = user.Username,
-                role = user.Role
+                role = user.Role,
+                mustChangePassword = user.MustChangePassword
             });
         }
     }
@@ -222,5 +299,11 @@ namespace SmartLab.Server.Controllers
         // Kept for compatibility with the existing client.
         // The server intentionally ignores this value and always creates public registrations as Student.
         public string Role { get; set; } = "Student";
+    }
+
+    public class ChangePasswordRequest
+    {
+        public string CurrentPassword { get; set; } = string.Empty;
+        public string NewPassword { get; set; } = string.Empty;
     }
 }
