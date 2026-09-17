@@ -57,7 +57,7 @@ public sealed class PasswordPolicyTests
             }
         };
 
-        IActionResult result = await controller.ChangePassword(new AuthController.ChangePasswordRequest
+        IActionResult result = await controller.ChangePassword(new ChangePasswordRequest
         {
             CurrentPassword = "OldPass123",
             NewPassword = "NewPass456"
