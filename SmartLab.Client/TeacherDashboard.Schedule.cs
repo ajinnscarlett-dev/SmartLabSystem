@@ -73,7 +73,7 @@ public partial class TeacherDashboard
             TeacherCurrentSchedule? current = schedules.OrderBy(s => s.StartTime).FirstOrDefault();
             _currentScheduleText.Text = current == null
                 ? "Current schedule: no scheduled class right now"
-                : $"Current schedule: {current.LaboratoryName} | {current.SubjectName} | {current.ClassName} | {current.StartTime:hh\:mm}–{current.EndTime:hh\:mm}";
+                : $"Current schedule: {current.LaboratoryName} | {current.SubjectName} | {current.ClassName} | {current.StartTime:hh\\:mm}–{current.EndTime:hh\\:mm}";
         }
         catch
         {
