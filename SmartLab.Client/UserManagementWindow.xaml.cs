@@ -356,6 +356,7 @@ public partial class UserManagementWindow : Window
         public string Role { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public bool MustChangePassword { get; set; }
+        public string PasswordStatus => MustChangePassword ? "CHANGE REQUIRED" : "SET";
         public DateTime CreatedAt { get; set; }
     }
 }
