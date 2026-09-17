@@ -61,9 +61,12 @@ namespace SmartLab.Client
                 return;
             }
 
+            bool remoteSessionStarted = false;
+
             try
             {
                 await StartRemoteControlSessionAsync(_selectedPc);
+                remoteSessionStarted = true;
                 await EnsureMonitoringStartedAsync(_selectedPc.PcId);
 
                 Border? card = PcGrid.Children
@@ -73,8 +76,9 @@ namespace SmartLab.Client
 
                 if (card == null)
                 {
-                    MessageBox.Show("The selected PC card could not be found.", "SmartLab - Remote Control", MessageBoxButton.OK, MessageBoxImage.Warning);
                     await StopRemoteControlSessionAsync(_selectedPc.PcId);
+                    remoteSessionStarted = false;
+                    MessageBox.Show("The selected PC card could not be found.", "SmartLab - Remote Control", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
 
@@ -82,8 +86,9 @@ namespace SmartLab.Client
 
                 if (!_latestScreenImages.TryGetValue(_selectedPc.PcId, out byte[]? bytes) || bytes.Length == 0)
                 {
-                    MessageBox.Show("No live screen frame is available yet.", "SmartLab - Remote Control", MessageBoxButton.OK, MessageBoxImage.Information);
                     await StopRemoteControlSessionAsync(_selectedPc.PcId);
+                    remoteSessionStarted = false;
+                    MessageBox.Show("No live screen frame is available yet.", "SmartLab - Remote Control", MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
 
@@ -91,14 +96,19 @@ namespace SmartLab.Client
                 if (initial == null)
                 {
                     await StopRemoteControlSessionAsync(_selectedPc.PcId);
+                    remoteSessionStarted = false;
                     MessageBox.Show("Unable to decode the live frame.", "SmartLab - Remote Control", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
 
                 await ShowRemoteControlWindowAsync(_selectedPc, card, initial);
+                remoteSessionStarted = false;
             }
             catch (Exception ex)
             {
+                if (remoteSessionStarted)
+                    await StopRemoteControlSessionAsync(_selectedPc.PcId);
+
                 MessageBox.Show("Unable to start remote control.\n\n" + ex.Message, "SmartLab - Remote Control", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -284,9 +294,13 @@ namespace SmartLab.Client
                 if (closing)
                     return;
 
-                (double x, double y) = CalculateNormalizedImagePoint(image, e.GetPosition(image));
-                await SendRemoteMouseClickAsync(pc.PcId, x, y, "LEFT");
-                image.Focus();
+                (double x, double y)? point = CalculateNormalizedImagePoint(image, e.GetPosition(image));
+                if (point.HasValue)
+                {
+                    await SendRemoteMouseClickAsync(pc.PcId, point.Value.X, point.Value.Y, "LEFT");
+                    image.Focus();
+                }
+
                 e.Handled = true;
             };
 
@@ -295,9 +309,13 @@ namespace SmartLab.Client
                 if (closing)
                     return;
 
-                (double x, double y) = CalculateNormalizedImagePoint(image, e.GetPosition(image));
-                await SendRemoteMouseClickAsync(pc.PcId, x, y, "RIGHT");
-                image.Focus();
+                (double x, double y)? point = CalculateNormalizedImagePoint(image, e.GetPosition(image));
+                if (point.HasValue)
+                {
+                    await SendRemoteMouseClickAsync(pc.PcId, point.Value.X, point.Value.Y, "RIGHT");
+                    image.Focus();
+                }
+
                 e.Handled = true;
             };
 
@@ -344,26 +362,51 @@ namespace SmartLab.Client
             timer.Stop();
         }
 
-        private static (double X, double Y) CalculateNormalizedImagePoint(Image image, Point position)
+        private static (double X, double Y)? CalculateNormalizedImagePoint(Image image, Point position)
         {
-            if (image.Source is not BitmapSource bitmap || bitmap.PixelWidth <= 0 || bitmap.PixelHeight <= 0)
-                return (0.5, 0.5);
+            if (image.Source is not BitmapSource bitmap ||
+                bitmap.Width <= 0 ||
+                bitmap.Height <= 0 ||
+                image.ActualWidth <= 0 ||
+                image.ActualHeight <= 0)
+            {
+                return null;
+            }
 
-            double actualWidth = Math.Max(1, image.ActualWidth);
-            double actualHeight = Math.Max(1, image.ActualHeight);
-            double sourceWidth = bitmap.PixelWidth;
-            double sourceHeight = bitmap.PixelHeight;
-            double scale = Math.Min(actualWidth / sourceWidth, actualHeight / sourceHeight);
-            double displayWidth = sourceWidth * scale;
-            double displayHeight = sourceHeight * scale;
-            double offsetX = (actualWidth - displayWidth) / 2.0;
-            double offsetY = (actualHeight - displayHeight) / 2.0;
+            // Mouse coordinates are WPF DIPs, so use the bitmap's DIPs as the
+            // source dimensions too. This avoids a DPI-dependent pixel/DIP mix.
+            double sourceWidth = bitmap.Width;
+            double sourceHeight = bitmap.Height;
+            double actualWidth = image.ActualWidth;
+            double actualHeight = image.ActualHeight;
+
+            double scale = Math.Min(
+                actualWidth / sourceWidth,
+                actualHeight / sourceHeight);
+
+            if (scale <= 0)
+                return null;
+
+            double renderedWidth = sourceWidth * scale;
+            double renderedHeight = sourceHeight * scale;
+            double offsetX = (actualWidth - renderedWidth) / 2.0;
+            double offsetY = (actualHeight - renderedHeight) / 2.0;
+
+            bool insideRenderedImage =
+                position.X >= offsetX &&
+                position.X <= offsetX + renderedWidth &&
+                position.Y >= offsetY &&
+                position.Y <= offsetY + renderedHeight;
+
+            if (!insideRenderedImage)
+                return null;
+
             double sourceX = (position.X - offsetX) / scale;
             double sourceY = (position.Y - offsetY) / scale;
 
             return (
-                Math.Clamp(sourceX / sourceWidth, 0, 1),
-                Math.Clamp(sourceY / sourceHeight, 0, 1));
+                Math.Clamp(sourceX / sourceWidth, 0.0, 1.0),
+                Math.Clamp(sourceY / sourceHeight, 0.0, 1.0));
         }
 
         private async Task SendRemoteKeyAsync(int pcId, int keyCode)
