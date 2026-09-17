@@ -107,6 +107,7 @@ namespace SmartLab.Server.Migrations
                 b.Property<string>("Username").IsRequired().HasColumnType("nvarchar(max)");
                 b.Property<string>("PasswordHash").IsRequired().HasColumnType("nvarchar(max)");
                 b.Property<string>("Role").IsRequired().HasColumnType("nvarchar(max)");
+                b.Property<bool>("MustChangePassword").HasColumnType("bit");
                 b.Property<DateTime>("CreatedAt").HasColumnType("datetime2");
                 b.HasKey("UserId"); b.ToTable("Users");
             });
