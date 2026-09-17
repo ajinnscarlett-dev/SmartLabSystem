@@ -18,6 +18,10 @@
         <SolidColorBrush x:Key="SmartLabDangerSoft" Color="#F9EEEE"/>
         <SolidColorBrush x:Key="SmartLabDisabled" Color="#9AA6B2"/>
 
+        <!-- Backward-compatible names used by older WPF windows. -->
+        <SolidColorBrush x:Key="SmartLabControlBorder" Color="#D7DEE6"/>
+        <SolidColorBrush x:Key="SmartLabControlBackground" Color="#FFFFFF"/>
+
         <Style TargetType="Window">
             <Setter Property="FontFamily" Value="Segoe UI"/>
             <Setter Property="FontSize" Value="13"/>
