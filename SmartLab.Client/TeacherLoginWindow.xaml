@@ -18,7 +18,6 @@
                 HorizontalAlignment="Left"
                 VerticalAlignment="Top"
                 Click="BackButton_Click"/>
-
         <Border Width="360"
                 Padding="28"
                 Background="{StaticResource SmartLabSurface}"
@@ -29,19 +28,15 @@
             <StackPanel>
                 <TextBlock Text="SMARTLABSYSTEM" FontSize="23" FontWeight="SemiBold" HorizontalAlignment="Center"/>
                 <TextBlock Text="Teacher Login" FontSize="13" Foreground="{StaticResource SmartLabMuted}" HorizontalAlignment="Center" Margin="0,4,0,24"/>
-
                 <TextBlock Text="Username" FontWeight="SemiBold"/>
                 <TextBox x:Name="UsernameTextBox" Margin="0,6,0,16"/>
-
                 <TextBlock Text="Password" FontWeight="SemiBold"/>
                 <PasswordBox x:Name="PasswordBox" Margin="0,6,0,20"/>
-
                 <Button x:Name="LoginButton"
                         Content="SIGN IN"
                         Style="{StaticResource SmartLabPrimaryButton}"
                         Height="42"
                         Click="LoginButton_Click"/>
-
                 <TextBlock x:Name="StatusText"
                            Text=""
                            Margin="0,14,0,0"
