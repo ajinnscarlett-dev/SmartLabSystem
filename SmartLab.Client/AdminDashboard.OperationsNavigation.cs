@@ -33,8 +33,10 @@ namespace SmartLab.Client
             Button? schedulesButton = FindButtonByLabel("Schedules");
             if (schedulesButton != null)
             {
-                schedulesButton.Visibility = Visibility.Collapsed;
+                schedulesButton.Visibility = Visibility.Visible;
                 schedulesButton.Click -= ReportsNavButton_Click;
+                schedulesButton.Click -= SchedulesNavButton_Click;
+                schedulesButton.Click += SchedulesNavButton_Click;
             }
 
             Button? maintenanceButton = FindButtonByLabel("Maintenance");
@@ -190,6 +192,12 @@ namespace SmartLab.Client
             }
 
             ShowPCIdentityDetails(_selectedPc);
+        }
+
+        private void SchedulesNavButton_Click(object sender, RoutedEventArgs e)
+        {
+            var window = new ScheduleManagementWindow(this);
+            window.ShowDialog();
         }
 
         private void SessionHistoryButton_Click(object sender, RoutedEventArgs e) => OpenOperationsCenter(1);
