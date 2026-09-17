@@ -12,11 +12,12 @@ public partial class ChangePasswordWindow : Window
     private readonly HttpClient _httpClient;
     private readonly string _username;
 
-    public ChangePasswordWindow(string username, HttpClient httpClient)
+    public ChangePasswordWindow(HttpClient httpClient, string username)
     {
         InitializeComponent();
         _username = username;
         _httpClient = httpClient;
+        Title = $"Change Password - {_username}";
     }
 
     private async void SaveButton_Click(object sender, RoutedEventArgs e)
@@ -82,7 +83,7 @@ public partial class ChangePasswordWindow : Window
         Close();
     }
 
-    private async Task<string> ReadMessageAsync(HttpResponseMessage response)
+    private static async Task<string> ReadMessageAsync(HttpResponseMessage response)
     {
         string text = await response.Content.ReadAsStringAsync();
 
