@@ -116,11 +116,22 @@ namespace SmartLab.Server
                         return;
                     }
 
-                    bool ownsPc = await _context.PCs.AsNoTracking().AnyAsync(p => p.PCId == pcId && p.CurrentUserId == userId);
-                    if (!ownsPc)
+                    PC? ownedPc = await _context.PCs
+                        .FirstOrDefaultAsync(p => p.PCId == pcId && p.CurrentUserId == userId);
+
+                    if (ownedPc == null)
                     {
                         context.Result = new ForbidResult();
                         return;
+                    }
+
+                    // A temporary network outage may have moved an owned PC to
+                    // Offline. Restore the operational state as soon as the same
+                    // authenticated student proves ownership again by heartbeat.
+                    if (string.Equals(ownedPc.Status, "Offline", StringComparison.OrdinalIgnoreCase))
+                    {
+                        ownedPc.Status = "Occupied";
+                        await _context.SaveChangesAsync();
                     }
                 }
             }
