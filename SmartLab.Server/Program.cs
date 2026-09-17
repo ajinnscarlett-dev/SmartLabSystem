@@ -14,6 +14,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     ));
 
 builder.Services.AddHostedService<DatabaseMigrationHostedService>();
+builder.Services.AddScoped<TeacherScheduleService>();
 
 builder.Services.AddScoped<SmartLabAuthorizationFilter>();
 builder.Services.AddScoped<SmartLabRequestIntegrityFilter>();
