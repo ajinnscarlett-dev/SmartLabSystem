@@ -61,7 +61,7 @@
                 <DataGridTextColumn Header="USERNAME" Binding="{Binding Username}" Width="1.2*"/>
                 <DataGridTextColumn Header="ROLE" Binding="{Binding Role}" Width="100"/>
                 <DataGridTextColumn Header="STATUS" Binding="{Binding Status}" Width="95"/>
-                <DataGridTextColumn Header="PASSWORD" Binding="{Binding MustChangePassword}" Width="110"/>
+                <DataGridTextColumn Header="PASSWORD STATUS" Binding="{Binding PasswordStatus}" Width="135"/>
                 <DataGridTextColumn Header="CREATED" Binding="{Binding CreatedAt, StringFormat={}{0:yyyy-MM-dd HH:mm}}" Width="150"/>
                 <DataGridTemplateColumn Header="ACTIONS" Width="365">
                     <DataGridTemplateColumn.CellTemplate>
