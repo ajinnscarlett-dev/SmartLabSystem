@@ -584,6 +584,13 @@ namespace SmartLab.Client
         private static extern int GetSystemMetrics(
             int nIndex);
 
+        [DllImport(
+            "user32.dll",
+            SetLastError = true)]
+        private static extern bool SetCursorPos(
+            int x,
+            int y);
+
         private const int SmXVirtualScreen = 76;
         private const int SmYVirtualScreen = 77;
         private const int SmCxVirtualScreen = 78;
@@ -630,13 +637,10 @@ namespace SmartLab.Client
         private const uint InputMouse = 0;
         private const uint InputKeyboard = 1;
 
-        private const uint MouseEventfMove = 0x0001;
         private const uint MouseEventfLeftDown = 0x0002;
         private const uint MouseEventfLeftUp = 0x0004;
         private const uint MouseEventfRightDown = 0x0008;
         private const uint MouseEventfRightUp = 0x0010;
-        private const uint MouseEventfAbsolute = 0x8000;
-        private const uint MouseEventfVirtualDesk = 0x4000;
 
         private static bool SendRemoteKeyPress(
             ushort virtualKey)
@@ -692,8 +696,11 @@ namespace SmartLab.Client
             double normalizedY,
             bool rightButton)
         {
-            // Use the actual Windows virtual desktop in physical pixels.
-            // This avoids WPF DIP/DPI scaling affecting remote click position.
+            // The viewer sends normalized coordinates over the API.
+            // Convert them exactly once to the target machine's virtual
+            // desktop pixel coordinates, then use SendInput only for the
+            // button transition. This avoids the previous second transform
+            // into the 0..65535 absolute-input coordinate space.
 
             int virtualLeft =
                 GetSystemMetrics(
@@ -727,47 +734,28 @@ namespace SmartLab.Client
                     0.0,
                     1.0);
 
-            double screenX =
+            int screenX =
                 virtualLeft +
-                normalizedX *
-                Math.Max(
-                    1,
-                    virtualWidth - 1);
+                (int)Math.Round(
+                    normalizedX *
+                    Math.Max(
+                        0,
+                        virtualWidth - 1));
 
-            double screenY =
+            int screenY =
                 virtualTop +
-                normalizedY *
-                Math.Max(
-                    1,
-                    virtualHeight - 1);
-
-            int absoluteX =
                 (int)Math.Round(
-                    ((screenX - virtualLeft) /
-                     Math.Max(
-                         1,
-                         virtualWidth - 1)) *
-                    65535.0);
+                    normalizedY *
+                    Math.Max(
+                        0,
+                        virtualHeight - 1));
 
-            int absoluteY =
-                (int)Math.Round(
-                    ((screenY - virtualTop) /
-                     Math.Max(
-                         1,
-                         virtualHeight - 1)) *
-                    65535.0);
-
-            absoluteX =
-                Math.Clamp(
-                    absoluteX,
-                    0,
-                    65535);
-
-            absoluteY =
-                Math.Clamp(
-                    absoluteY,
-                    0,
-                    65535);
+            if (!SetCursorPos(
+                screenX,
+                screenY))
+            {
+                return false;
+            }
 
             uint down =
                 rightButton
@@ -790,13 +778,10 @@ namespace SmartLab.Client
                             Mouse =
                                 new MOUSEINPUT
                                 {
-                                    Dx = absoluteX,
-                                    Dy = absoluteY,
+                                    Dx = 0,
+                                    Dy = 0,
                                     MouseData = 0,
-                                    DwFlags =
-                                        MouseEventfMove |
-                                        MouseEventfAbsolute |
-                                        MouseEventfVirtualDesk,
+                                    DwFlags = down,
                                     Time = 0,
                                     DwExtraInfo = IntPtr.Zero
                                 }
@@ -812,35 +797,10 @@ namespace SmartLab.Client
                             Mouse =
                                 new MOUSEINPUT
                                 {
-                                    Dx = absoluteX,
-                                    Dy = absoluteY,
+                                    Dx = 0,
+                                    Dy = 0,
                                     MouseData = 0,
-                                    DwFlags =
-                                        MouseEventfAbsolute |
-                                        MouseEventfVirtualDesk |
-                                        down,
-                                    Time = 0,
-                                    DwExtraInfo = IntPtr.Zero
-                                }
-                        }
-                },
-
-                new INPUT
-                {
-                    Type = InputMouse,
-                    Data =
-                        new InputUnion
-                        {
-                            Mouse =
-                                new MOUSEINPUT
-                                {
-                                    Dx = absoluteX,
-                                    Dy = absoluteY,
-                                    MouseData = 0,
-                                    DwFlags =
-                                        MouseEventfAbsolute |
-                                        MouseEventfVirtualDesk |
-                                        up,
+                                    DwFlags = up,
                                     Time = 0,
                                     DwExtraInfo = IntPtr.Zero
                                 }
