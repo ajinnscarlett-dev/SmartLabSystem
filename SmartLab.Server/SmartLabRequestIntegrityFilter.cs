@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.EntityFrameworkCore;
+using System.Collections.Concurrent;
 using System.Security.Claims;
 using SmartLab.Server.Controllers;
 
@@ -8,6 +9,7 @@ namespace SmartLab.Server
 {
     public sealed class SmartLabRequestIntegrityFilter : IAsyncActionFilter
     {
+        private static readonly ConcurrentDictionary<int, SemaphoreSlim> PcLoginGates = new();
         private readonly AppDbContext _context;
 
         public SmartLabRequestIntegrityFilter(AppDbContext context)
@@ -99,6 +101,49 @@ namespace SmartLab.Server
                         context.Result = new ForbidResult();
                         return;
                     }
+
+                    if (!context.RouteData.Values.TryGetValue("pcNumber", out object? routePcNumber) ||
+                        string.IsNullOrWhiteSpace(routePcNumber?.ToString()))
+                    {
+                        context.Result = new BadRequestObjectResult(new { message = "PC number is required." });
+                        return;
+                    }
+
+                    string pcNumber = routePcNumber.ToString()!.Trim();
+                    PC? registeredPc = await _context.PCs
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(p => p.PCNumber == pcNumber);
+
+                    if (registeredPc == null)
+                    {
+                        // Do not allow LoginToPC to reach the controller's legacy
+                        // auto-registration fallback. Workstations must be
+                        // provisioned by Admin/MIS before students can log in.
+                        context.Result = new NotFoundObjectResult(new
+                        {
+                            message = $"PC {pcNumber} is not registered in SmartLab."
+                        });
+                        return;
+                    }
+
+                    // Serialize competing claims for the same registered PC.
+                    // The controller then performs its existing enabled,
+                    // maintenance, and occupied checks while holding this gate.
+                    SemaphoreSlim gate = PcLoginGates.GetOrAdd(
+                        registeredPc.PCId,
+                        static _ => new SemaphoreSlim(1, 1));
+
+                    await gate.WaitAsync();
+                    try
+                    {
+                        await next();
+                    }
+                    finally
+                    {
+                        gate.Release();
+                    }
+
+                    return;
                 }
                 else if (action.Equals("ReleasePC", StringComparison.OrdinalIgnoreCase))
                 {
