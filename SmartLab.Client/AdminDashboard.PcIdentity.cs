@@ -7,6 +7,11 @@ namespace SmartLab.Client;
 
 public partial class AdminDashboard
 {
+    private void ShowPCIdentityDetails(PCInfo pc)
+    {
+        _ = ShowPCIdentityDetailsAsync(pc);
+    }
+
     private async Task ShowPCIdentityDetailsAsync(PCInfo pc)
     {
         PCIdentityDetails? details = null;
@@ -17,7 +22,7 @@ public partial class AdminDashboard
         }
         catch
         {
-            // Fall back to the fields already present in the dashboard's PC list.
+            // Fall back to fields already present in the dashboard's PC list.
         }
 
         details ??= new PCIdentityDetails
