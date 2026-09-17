@@ -65,7 +65,7 @@ public partial class ScheduleManagementWindow : Window
                     $"api/Schedule?date={date:yyyy-MM-dd}") ?? new();
 
             foreach (TeacherScheduleRow row in _schedules)
-                row.TimeText = $"{row.StartTime:hh\:mm}–{row.EndTime:hh\:mm}";
+                row.TimeText = $"{row.StartTime.ToString(@"hh\:mm")}–{row.EndTime.ToString(@"hh\:mm")}";
 
             ScheduleGrid.ItemsSource = _schedules;
             StatusText.Text = $"{_schedules.Count:N0} schedule(s) loaded for {date:yyyy-MM-dd}.";
