@@ -17,11 +17,12 @@ internal static class RemoteControlSessionTracker
             LastSeenUtc[pcId] = DateTime.UtcNow;
     }
 
-    public static void CleanupExpired(TimeSpan ttl, ISet<int>? offlinePcIds = null)
+    public static int CleanupExpired(TimeSpan ttl, ISet<int>? offlinePcIds = null)
     {
         if (!TryGetSessions(out ConcurrentDictionary<int, int>? sessions))
-            return;
+            return 0;
 
+        int removed = 0;
         DateTime cutoff = DateTime.UtcNow - ttl;
 
         foreach (var pair in LastSeenUtc)
@@ -32,22 +33,27 @@ internal static class RemoteControlSessionTracker
             if (!expired && !offline)
                 continue;
 
-            sessions.TryRemove(pair.Key, out _);
+            if (sessions.TryRemove(pair.Key, out _))
+                removed++;
+
             LastSeenUtc.TryRemove(pair.Key, out _);
         }
 
         // A session can predate the tracker (for example immediately after a
-        // server restart) and therefore have no timestamp. Fail safe by removing
-        // any untracked session only when the owning PC is offline; active online
-        // sessions are allowed to establish their lease on the next frame request.
-        if (offlinePcIds == null)
-            return;
-
-        foreach (int pcId in offlinePcIds)
+        // server restart). Fail safe by removing any untracked session only when
+        // its owning PC is known to be offline.
+        if (offlinePcIds != null)
         {
-            sessions.TryRemove(pcId, out _);
-            LastSeenUtc.TryRemove(pcId, out _);
+            foreach (int pcId in offlinePcIds)
+            {
+                if (sessions.TryRemove(pcId, out _))
+                    removed++;
+
+                LastSeenUtc.TryRemove(pcId, out _);
+            }
         }
+
+        return removed;
     }
 
     public static void Remove(int pcId)
