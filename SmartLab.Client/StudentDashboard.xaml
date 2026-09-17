@@ -7,116 +7,70 @@
         MinWidth="860"
         MinHeight="560"
         WindowStartupLocation="CenterScreen"
-        Background="{StaticResource PageBackground}"
-        Foreground="{StaticResource TextPrimary}"
+        Background="{StaticResource SmartLabPageBackground}"
+        Foreground="{StaticResource SmartLabText}"
         FontFamily="Segoe UI">
-
-    <Window.Resources>
-        <SolidColorBrush x:Key="PageBackground" Color="#F3F5F8"/>
-        <SolidColorBrush x:Key="Surface" Color="#FFFFFF"/>
-        <SolidColorBrush x:Key="Border" Color="#D9E0E7"/>
-        <SolidColorBrush x:Key="TextPrimary" Color="#1F2937"/>
-        <SolidColorBrush x:Key="TextSecondary" Color="#64748B"/>
-        <SolidColorBrush x:Key="Accent" Color="#2467A9"/>
-        <SolidColorBrush x:Key="Danger" Color="#B63A3A"/>
-
-        <Style x:Key="ActionButton" TargetType="Button">
-            <Setter Property="Height" Value="38"/>
-            <Setter Property="Padding" Value="13,7"/>
-            <Setter Property="Background" Value="{StaticResource Surface}"/>
-            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Cursor" Value="Hand"/>
-        </Style>
-
-        <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource ActionButton}">
-            <Setter Property="Background" Value="{StaticResource Accent}"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="BorderBrush" Value="{StaticResource Accent}"/>
-        </Style>
-
-        <Style x:Key="DangerButton" TargetType="Button" BasedOn="{StaticResource ActionButton}">
-            <Setter Property="Background" Value="{StaticResource Danger}"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="BorderBrush" Value="{StaticResource Danger}"/>
-        </Style>
-
-        <Style x:Key="SectionBorder" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource Surface}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="18"/>
-        </Style>
-    </Window.Resources>
-
     <Grid Margin="22">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- HEADER -->
-        <Border Grid.Row="0" Style="{StaticResource SectionBorder}" Margin="0,0,0,14">
+        <Border Grid.Row="0"
+                Background="{StaticResource SmartLabSurface}"
+                BorderBrush="{StaticResource SmartLabBorder}"
+                BorderThickness="1"
+                Padding="16"
+                Margin="0,0,0,14">
             <Grid>
                 <StackPanel>
-                    <TextBlock Text="SMARTLAB" FontSize="24" FontWeight="SemiBold"/>
-                    <TextBlock Text="Student Console" FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
+                    <TextBlock Text="SMARTLAB" FontSize="20" FontWeight="SemiBold"/>
+                    <TextBlock Text="Student Workstation" FontSize="12" Foreground="{StaticResource SmartLabMuted}" Margin="0,2,0,0"/>
                 </StackPanel>
                 <StackPanel HorizontalAlignment="Right" VerticalAlignment="Center">
                     <TextBlock x:Name="WelcomeText" Text="Welcome, Student" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Right"/>
-                    <TextBlock Text="Student" FontSize="11" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Right" Margin="0,3,0,0"/>
+                    <TextBlock Text="Student" FontSize="11" Foreground="{StaticResource SmartLabMuted}" HorizontalAlignment="Right" Margin="0,3,0,0"/>
                 </StackPanel>
             </Grid>
         </Border>
 
-        <!-- MAIN -->
         <Grid Grid.Row="1">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
-
             <StackPanel Margin="0,0,0,14">
-                <TextBlock Text="My SmartLab Session" FontSize="22" FontWeight="SemiBold"/>
-                <TextBlock Text="Manage your account and current session." Foreground="{StaticResource TextSecondary}" FontSize="12" Margin="0,3,0,0"/>
+                <TextBlock Text="My SmartLab Session" FontSize="20" FontWeight="SemiBold"/>
+                <TextBlock Text="Manage your account and current workstation session." FontSize="12" Foreground="{StaticResource SmartLabMuted}" Margin="0,3,0,0"/>
             </StackPanel>
-
             <Grid Grid.Row="1">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-
-                <!-- ACCOUNT -->
-                <Border Grid.Column="0" Style="{StaticResource SectionBorder}" Margin="0,0,8,0">
+                <Border Grid.Column="0" Background="{StaticResource SmartLabSurface}" BorderBrush="{StaticResource SmartLabBorder}" BorderThickness="1" Padding="18" Margin="0,0,8,0">
                     <StackPanel>
-                        <TextBlock Text="ACCOUNT" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}"/>
-                        <TextBlock x:Name="UsernameText" Text="Username" FontSize="17" FontWeight="SemiBold" Margin="0,12,0,5"/>
-                        <TextBlock Text="Role: Student" FontSize="12" Foreground="{StaticResource TextSecondary}"/>
-                        <Button Content="MY PROFILE" Style="{StaticResource ActionButton}" Margin="0,20,0,0" Click="ProfileButton_Click"/>
+                        <TextBlock Text="ACCOUNT" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource SmartLabMuted}"/>
+                        <TextBlock x:Name="UsernameText" Text="Username" FontSize="16" FontWeight="SemiBold" Margin="0,12,0,5"/>
+                        <TextBlock Text="Role: Student" FontSize="12" Foreground="{StaticResource SmartLabMuted}"/>
+                        <Button Content="MY PROFILE" Margin="0,20,0,0" Click="ProfileButton_Click"/>
                     </StackPanel>
                 </Border>
-
-                <!-- PASSWORD -->
-                <Border Grid.Column="1" Style="{StaticResource SectionBorder}" Margin="8,0">
+                <Border Grid.Column="1" Background="{StaticResource SmartLabSurface}" BorderBrush="{StaticResource SmartLabBorder}" BorderThickness="1" Padding="18" Margin="8,0">
                     <StackPanel>
-                        <TextBlock Text="SECURITY" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}"/>
-                        <TextBlock Text="Password" FontSize="17" FontWeight="SemiBold" Margin="0,12,0,5"/>
-                        <TextBlock Text="Update your account password when necessary." FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
-                        <Button Content="CHANGE PASSWORD" Style="{StaticResource PrimaryButton}" Margin="0,20,0,0" Click="ChangePasswordButton_Click"/>
+                        <TextBlock Text="SECURITY" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource SmartLabMuted}"/>
+                        <TextBlock Text="Password" FontSize="16" FontWeight="SemiBold" Margin="0,12,0,5"/>
+                        <TextBlock Text="Update your account password when necessary." FontSize="12" Foreground="{StaticResource SmartLabMuted}" TextWrapping="Wrap"/>
+                        <Button Content="CHANGE PASSWORD" Style="{StaticResource SmartLabPrimaryButton}" Margin="0,20,0,0" Click="ChangePasswordButton_Click"/>
                     </StackPanel>
                 </Border>
-
-                <!-- SESSION -->
-                <Border Grid.Column="2" Style="{StaticResource SectionBorder}" Margin="8,0,0,0">
+                <Border Grid.Column="2" Background="{StaticResource SmartLabSurface}" BorderBrush="{StaticResource SmartLabBorder}" BorderThickness="1" Padding="18" Margin="8,0,0,0">
                     <StackPanel>
-                        <TextBlock Text="SESSION" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}"/>
-                        <TextBlock Text="Current session" FontSize="17" FontWeight="SemiBold" Margin="0,12,0,5"/>
-                        <TextBlock Text="Sign out when you are finished using this workstation." FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
-                        <Button Content="LOGOUT" Style="{StaticResource DangerButton}" Margin="0,20,0,0" Click="LogoutButton_Click"/>
+                        <TextBlock Text="SESSION" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource SmartLabMuted}"/>
+                        <TextBlock Text="Current session" FontSize="16" FontWeight="SemiBold" Margin="0,12,0,5"/>
+                        <TextBlock Text="Sign out when you are finished using this workstation." FontSize="12" Foreground="{StaticResource SmartLabMuted}" TextWrapping="Wrap"/>
+                        <Button Content="LOGOUT" Style="{StaticResource SmartLabDangerButton}" Margin="0,20,0,0" Click="LogoutButton_Click"/>
                     </StackPanel>
                 </Border>
             </Grid>
