@@ -9,15 +9,15 @@ namespace SmartLab.Server
     public sealed class SmartLabRequestIntegrityFilter : IAsyncActionFilter
     {
         private readonly AppDbContext _context;
+        private readonly TeacherScheduleService _scheduleService;
 
-        public SmartLabRequestIntegrityFilter(AppDbContext context)
+        public SmartLabRequestIntegrityFilter(AppDbContext context, TeacherScheduleService scheduleService)
         {
             _context = context;
+            _scheduleService = scheduleService;
         }
 
-        public async Task OnActionExecutionAsync(
-            ActionExecutingContext context,
-            ActionExecutionDelegate next)
+        public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
         {
             if (!(context.HttpContext.User?.Identity?.IsAuthenticated ?? false))
             {
@@ -30,9 +30,6 @@ namespace SmartLab.Server
                 ? actionName ?? string.Empty
                 : string.Empty;
 
-            // Authentication state is backed by the database as well as the JWT.
-            // This immediately rejects tokens belonging to deleted/deactivated users
-            // and forces a fresh login after an administrator changes the account role.
             if (!TryGetUserId(context, out int currentUserId))
             {
                 context.Result = new UnauthorizedResult();
@@ -62,10 +59,7 @@ namespace SmartLab.Server
                 return;
             }
 
-            // New/admin-provisioned and administrator-reset passwords must be changed
-            // before the account can perform any operational action.
-            if (!string.Equals(controller, "AuthController", StringComparison.OrdinalIgnoreCase) &&
-                currentUser.MustChangePassword)
+            if (!string.Equals(controller, "AuthController", StringComparison.OrdinalIgnoreCase) && currentUser.MustChangePassword)
             {
                 context.Result = new ObjectResult(new
                 {
@@ -94,9 +88,7 @@ namespace SmartLab.Server
                         return;
                     }
 
-                    bool authorized = await _context.TeacherLaboratoryAuthorizations.AsNoTracking()
-                        .AnyAsync(a => a.TeacherUserId == currentUserId && a.LaboratoryId == laboratoryId);
-                    if (!authorized)
+                    if (!await _scheduleService.IsTeacherScheduledAsync(currentUserId, laboratoryId))
                     {
                         context.Result = new ForbidResult();
                         return;
@@ -114,11 +106,9 @@ namespace SmartLab.Server
                         return;
                     }
 
-                    bool authorized = await _context.PCs.AsNoTracking().AnyAsync(pc =>
-                        pc.PCId == pcId && pc.LaboratoryId.HasValue &&
-                        _context.TeacherLaboratoryAuthorizations.Any(a =>
-                            a.TeacherUserId == currentUserId && a.LaboratoryId == pc.LaboratoryId.Value));
-                    if (!authorized)
+                    PC? pc = await _context.PCs.AsNoTracking().FirstOrDefaultAsync(p => p.PCId == pcId);
+                    if (pc == null || !pc.LaboratoryId.HasValue ||
+                        !await _scheduleService.IsTeacherScheduledAsync(currentUserId, pc.LaboratoryId.Value))
                     {
                         context.Result = new ForbidResult();
                         return;
@@ -152,9 +142,7 @@ namespace SmartLab.Server
                         return;
                     }
 
-                    PC? ownedPc = await _context.PCs
-                        .FirstOrDefaultAsync(p => p.PCId == pcId && p.CurrentUserId == currentUserId);
-
+                    PC? ownedPc = await _context.PCs.FirstOrDefaultAsync(p => p.PCId == pcId && p.CurrentUserId == currentUserId);
                     if (ownedPc == null)
                     {
                         context.Result = new ForbidResult();
@@ -198,33 +186,26 @@ namespace SmartLab.Server
             }
 
             await next();
-
-            // Preserve the account-wide password policy even for the older Admin user
-            // controller, which is still retained for client compatibility. The
-            // canonical management controller already sets this flag itself.
-            if (controller == "UserController" &&
-                action.Equals("ResetPassword", StringComparison.OrdinalIgnoreCase) &&
-                context.Result is ObjectResult result &&
-                (result.StatusCode == null || (result.StatusCode >= 200 && result.StatusCode < 300)) &&
-                TryGetRouteInt(context, "id", out int resetUserId))
-            {
-                User? resetUser = await _context.Users.FirstOrDefaultAsync(u => u.UserId == resetUserId);
-                if (resetUser != null && !resetUser.MustChangePassword)
-                {
-                    resetUser.MustChangePassword = true;
-                    _context.Entry(resetUser).Property(u => u.MustChangePassword).IsModified = true;
-                    await _context.SaveChangesAsync();
-                }
-            }
         }
 
         private async Task<List<object>> GetAuthorizedTeacherPcsAsync(int teacherUserId, int? laboratoryId = null)
         {
+            DateTime now = DateTime.Now;
+            DateTime dayStart = now.Date;
+            DateTime dayEnd = dayStart.AddDays(1);
+            TimeSpan time = now.TimeOfDay;
+
             return await _context.PCs.AsNoTracking()
                 .Where(p => p.LaboratoryId.HasValue &&
                     (!laboratoryId.HasValue || p.LaboratoryId == laboratoryId.Value) &&
-                    _context.TeacherLaboratoryAuthorizations.Any(a =>
-                        a.TeacherUserId == teacherUserId && a.LaboratoryId == p.LaboratoryId.Value))
+                    _context.ClassSchedules.Any(s =>
+                        s.TeacherUserId == teacherUserId &&
+                        s.LaboratoryId == p.LaboratoryId.Value &&
+                        s.ScheduleDate >= dayStart &&
+                        s.ScheduleDate < dayEnd &&
+                        s.Status == "Scheduled" &&
+                        s.StartTime <= time &&
+                        s.EndTime > time))
                 .Include(p => p.CurrentUser)
                 .Include(p => p.Laboratory)
                 .OrderBy(p => p.PCId)
@@ -247,10 +228,8 @@ namespace SmartLab.Server
                 .ToListAsync();
         }
 
-        private static bool TryGetUserId(ActionContext context, out int userId)
-        {
-            return int.TryParse(context.HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier), out userId);
-        }
+        private static bool TryGetUserId(ActionContext context, out int userId) =>
+            int.TryParse(context.HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier), out userId);
 
         private static bool TryGetRouteInt(ActionContext context, string name, out int value)
         {
