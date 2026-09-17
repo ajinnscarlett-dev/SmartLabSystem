@@ -50,10 +50,10 @@
             <Setter Property="Padding" Value="11,5"/>
             <Setter Property="FontSize" Value="11"/>
         </Style>
-        <Style x:Key="PurpleButton" TargetType="Button" BasedOn="{StaticResource SmartLabButtonBase}">
-            <Setter Property="Background" Value="#F0ECF8"/>
-            <Setter Property="Foreground" Value="#4F3D84"/>
-            <Setter Property="BorderBrush" Value="#D9D0EB"/>
+        <Style x:Key="PurpleButton" TargetType="Button" BasedOn="{StaticResource SmartLabPrimaryButton}">
+            <Setter Property="Background" Value="{StaticResource SmartLabAccent}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource SmartLabAccent}"/>
             <Setter Property="Height" Value="34"/>
             <Setter Property="Padding" Value="11,5"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
@@ -109,7 +109,7 @@
                 <Button Style="{StaticResource NavButton}" Click="UserManagementNavButton_Click"><StackPanel Orientation="Horizontal"><TextBlock Text="Users"/></StackPanel></Button>
                 <Button Style="{StaticResource NavButton}" Click="LaboratoriesNavButton_Click"><StackPanel Orientation="Horizontal"><TextBlock Text="Laboratories"/></StackPanel></Button>
                 <Button Style="{StaticResource NavButton}" Click="PcManagementNavButton_Click"><StackPanel Orientation="Horizontal"><TextBlock Text="Computers"/></StackPanel></Button>
-                <Button Style="{StaticResource NavButton}" Click="ReportsNavButton_Click"><StackPanel Orientation="Horizontal"><TextBlock Text="Schedules"/></StackPanel></Button>
+                <Button Style="{StaticResource NavButton}" Click="SchedulesNavButton_Click"><StackPanel Orientation="Horizontal"><TextBlock Text="Schedules"/></StackPanel></Button>
                 <Button Style="{StaticResource NavButton}" Click="ServiceDeskNavButton_Click"><StackPanel Orientation="Horizontal"><TextBlock Text="Incidents"/></StackPanel></Button>
                 <Button Style="{StaticResource NavButton}" Click="PcManagementNavButton_Click"><StackPanel Orientation="Horizontal"><TextBlock Text="Maintenance"/></StackPanel></Button>
                 <Button Style="{StaticResource NavButton}" Click="ReportsNavButton_Click"><StackPanel Orientation="Horizontal"><TextBlock Text="Reports"/></StackPanel></Button>
