@@ -75,11 +75,10 @@ namespace SmartLab.Server
             {
                 string previousStatus = pc.Status;
 
-                if (pc.Status == "Occupied" && pc.CurrentUserId != null)
-                {
-                    pc.CurrentUserId = null;
-                }
-
+                // Keep CurrentUserId during a temporary heartbeat outage so the
+                // authenticated student's heartbeat can restore the PC when the
+                // network connection returns. The ownership check remains in the
+                // request-integrity filter, so another student cannot claim it.
                 pc.Status = "Offline";
 
                 if (!string.Equals(previousStatus, pc.Status, StringComparison.OrdinalIgnoreCase))
@@ -91,7 +90,7 @@ namespace SmartLab.Server
                         UserId = null,
                         PCId = pc.PCId,
                         Action = "PC Status Changed",
-                        Details = $"PC {pc.PCNumber} changed from {previousStatus} to Offline after heartbeat timeout.",
+                        Details = $"PC {pc.PCNumber} changed from {previousStatus} to Offline after heartbeat timeout. Student ownership was retained for reconnect recovery.",
                         CreatedAt = DateTime.Now
                     });
                 }
