@@ -10,7 +10,7 @@ internal static class RemoteControlSessionTracker
 
     public static void Touch(int pcId, int userId)
     {
-        if (!TryGetSessions(out ConcurrentDictionary<int, int>? sessions))
+        if (!TryGetSessions(out ConcurrentDictionary<int, int> sessions))
             return;
 
         if (sessions.TryGetValue(pcId, out int ownerUserId) && ownerUserId == userId)
@@ -66,7 +66,7 @@ internal static class RemoteControlSessionTracker
 
     private static bool TryGetSessions(out ConcurrentDictionary<int, int>? sessions)
     {
-        sessions = null;
+        sessions = null!;
 
         FieldInfo? field = typeof(PCCommandController).GetField(
             "RemoteControlSessions",
