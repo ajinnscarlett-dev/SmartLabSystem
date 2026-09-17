@@ -63,10 +63,11 @@
             <Setter Property="Padding" Value="11,5"/>
             <Setter Property="FontSize" Value="11"/>
         </Style>
-        <Style x:Key="DarkCombo" TargetType="ComboBox" BasedOn="{StaticResource SmartLabButtonBase}">
+        <Style x:Key="DarkCombo" TargetType="ComboBox">
             <Setter Property="Background" Value="{StaticResource ControlBg}"/>
             <Setter Property="Foreground" Value="{StaticResource Text}"/>
             <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="8,4"/>
             <Setter Property="Height" Value="36"/>
         </Style>
@@ -83,7 +84,7 @@
             <Setter Property="Margin" Value="0,0,4,0"/>
             <Setter Property="FontSize" Value="10"/>
         </Style>
-        <Style x:Key="DarkDataGrid" TargetType="DataGrid" BasedOn="{StaticResource SmartLabButtonBase}">
+        <Style x:Key="DarkDataGrid" TargetType="DataGrid">
             <Setter Property="Background" Value="{StaticResource GridArea}"/>
             <Setter Property="Foreground" Value="{StaticResource Text}"/>
             <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
