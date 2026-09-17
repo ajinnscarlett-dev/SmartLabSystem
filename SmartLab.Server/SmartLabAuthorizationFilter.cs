@@ -1,6 +1,6 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
-using System.Security.Claims;
 
 namespace SmartLab.Server
 {
@@ -9,9 +9,18 @@ namespace SmartLab.Server
         public Task OnAuthorizationAsync(AuthorizationFilterContext context)
         {
             if (context.ActionDescriptor.EndpointMetadata
-                .OfType<Microsoft.AspNetCore.Authorization.AllowAnonymousAttribute>()
+                .OfType<AllowAnonymousAttribute>()
                 .Any())
             {
+                return Task.CompletedTask;
+            }
+
+            // Defense-in-depth for every controller/action, including endpoints
+            // that accidentally omit [Authorize]. Program.cs also has a fallback
+            // authorization policy for the same closed-LAN boundary.
+            if (!(context.HttpContext.User?.Identity?.IsAuthenticated ?? false))
+            {
+                context.Result = new UnauthorizedResult();
                 return Task.CompletedTask;
             }
 
@@ -38,12 +47,6 @@ namespace SmartLab.Server
             AuthorizationFilterContext context,
             string action)
         {
-            if (!(context.HttpContext.User?.Identity?.IsAuthenticated ?? false))
-            {
-                context.Result = new UnauthorizedResult();
-                return;
-            }
-
             if (action.Equals("GetAllPCs", StringComparison.OrdinalIgnoreCase) ||
                 action.Equals("GetPCsByLaboratory", StringComparison.OrdinalIgnoreCase) ||
                 action.Equals("GetPC", StringComparison.OrdinalIgnoreCase))
@@ -52,11 +55,13 @@ namespace SmartLab.Server
                 return;
             }
 
+            // PC ownership is a student operation. Teacher/Admin workstation
+            // actions go through PCCommandController and its existing lab checks.
             if (action.Equals("LoginToPC", StringComparison.OrdinalIgnoreCase) ||
                 action.Equals("ReleasePC", StringComparison.OrdinalIgnoreCase) ||
                 action.Equals("Heartbeat", StringComparison.OrdinalIgnoreCase))
             {
-                RequireAnyRole(context, "Student", "Teacher", "Admin");
+                RequireRole(context, "Student");
                 return;
             }
 
@@ -74,12 +79,6 @@ namespace SmartLab.Server
             AuthorizationFilterContext context,
             string action)
         {
-            if (!(context.HttpContext.User?.Identity?.IsAuthenticated ?? false))
-            {
-                context.Result = new UnauthorizedResult();
-                return;
-            }
-
             if (action.Equals("CreateTicket", StringComparison.OrdinalIgnoreCase) ||
                 action.Equals("GetTeacherTickets", StringComparison.OrdinalIgnoreCase))
             {
@@ -93,7 +92,7 @@ namespace SmartLab.Server
                 if (context.RouteData.Values.TryGetValue("teacherUserId", out object? routeValue) &&
                     int.TryParse(routeValue?.ToString(), out int teacherUserId) &&
                     int.TryParse(
-                        context.HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier),
+                        context.HttpContext.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier),
                         out int authenticatedUserId) &&
                     teacherUserId != authenticatedUserId)
                 {
