@@ -64,6 +64,21 @@ namespace SmartLab.Server.Controllers
                 return Unauthorized(new { message = "Invalid username or password." });
             }
 
+            if (user.Role.StartsWith("Disabled:", StringComparison.OrdinalIgnoreCase))
+            {
+                _context.ActivityLogs.Add(new ActivityLog
+                {
+                    UserId = user.UserId,
+                    PCId = null,
+                    Action = "Login Failed",
+                    Details = $"Login blocked for inactive user account: {normalizedUsername}",
+                    CreatedAt = DateTime.Now
+                });
+
+                await _context.SaveChangesAsync();
+                return Unauthorized(new { message = "This account is inactive." });
+            }
+
             PasswordVerificationResult result = _passwordHasher.VerifyHashedPassword(
                 user,
                 user.PasswordHash,
