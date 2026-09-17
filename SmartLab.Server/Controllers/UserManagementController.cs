@@ -26,6 +26,8 @@ public class UserManagementController : ControllerBase
         {
             userId = u.UserId,
             username = DisplayUsername(u.Username),
+            studentNumber = u.StudentNumber,
+            fullName = u.FullName,
             role = DisplayRole(u.Role),
             status = IsDisabled(u) ? "Inactive" : "Active",
             mustChangePassword = u.MustChangePassword,
@@ -49,6 +51,7 @@ public class UserManagementController : ControllerBase
         var user = new User
         {
             Username = username,
+            StudentNumber = role == "Student" ? username : null,
             Role = role,
             MustChangePassword = true,
             CreatedAt = DateTime.Now
@@ -58,6 +61,135 @@ public class UserManagementController : ControllerBase
         await _context.SaveChangesAsync();
         await LogAsync(user.UserId, "User Added", $"User {username} created with role {role}.");
         return Ok(new { message = "User created successfully.", userId = user.UserId, mustChangePassword = user.MustChangePassword });
+    }
+
+    [HttpPost("management/students/import")]
+    public async Task<IActionResult> ImportStudents([FromBody] StudentImportBatchRequest request)
+    {
+        if (request?.Rows == null || request.Rows.Count == 0)
+            return BadRequest(new { message = "At least one student row is required." });
+
+        if (request.Rows.Count > 2000)
+            return BadRequest(new { message = "A single import is limited to 2,000 students." });
+
+        string[] incomingNumbers = request.Rows
+            .Select(r => r.StudentNumber?.Trim() ?? string.Empty)
+            .Where(v => !string.IsNullOrWhiteSpace(v))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        HashSet<string> existingNumbers = new(
+            await _context.Users.AsNoTracking()
+                .Where(u => u.StudentNumber != null && incomingNumbers.Contains(u.StudentNumber!))
+                .Select(u => u.StudentNumber!)
+                .ToListAsync(),
+            StringComparer.OrdinalIgnoreCase);
+
+        HashSet<string> existingUsernames = new(
+            await _context.Users.AsNoTracking()
+                .Where(u => incomingNumbers.Contains(u.Username))
+                .Select(u => u.Username)
+                .ToListAsync(),
+            StringComparer.OrdinalIgnoreCase);
+
+        HashSet<string> seenNumbers = new(StringComparer.OrdinalIgnoreCase);
+        List<StudentImportRejectedRow> rejected = new();
+        List<User> importedUsers = new();
+
+        foreach (StudentImportRowRequest row in request.Rows)
+        {
+            string studentNumber = row.StudentNumber?.Trim() ?? string.Empty;
+            string studentName = row.StudentName?.Trim() ?? string.Empty;
+            int rowNumber = row.RowNumber > 0 ? row.RowNumber : 0;
+
+            if (string.IsNullOrWhiteSpace(studentNumber))
+            {
+                rejected.Add(new StudentImportRejectedRow(rowNumber, studentNumber, studentName, "Missing Student Number."));
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(studentName))
+            {
+                rejected.Add(new StudentImportRejectedRow(rowNumber, studentNumber, studentName, "Missing Student Name."));
+                continue;
+            }
+
+            if (studentNumber.Length > 80)
+            {
+                rejected.Add(new StudentImportRejectedRow(rowNumber, studentNumber, studentName, "Student Number exceeds 80 characters."));
+                continue;
+            }
+
+            if (studentName.Length > 200)
+            {
+                rejected.Add(new StudentImportRejectedRow(rowNumber, studentNumber, studentName, "Student Name exceeds 200 characters."));
+                continue;
+            }
+
+            if (!seenNumbers.Add(studentNumber))
+            {
+                rejected.Add(new StudentImportRejectedRow(rowNumber, studentNumber, studentName, "Duplicate Student Number in this import."));
+                continue;
+            }
+
+            if (existingNumbers.Contains(studentNumber) || existingUsernames.Contains(studentNumber))
+            {
+                rejected.Add(new StudentImportRejectedRow(rowNumber, studentNumber, studentName, "A SmartLab account already uses this Student Number."));
+                continue;
+            }
+
+            User user = new()
+            {
+                Username = studentNumber,
+                StudentNumber = studentNumber,
+                FullName = studentName,
+                Role = "Student",
+                MustChangePassword = true,
+                CreatedAt = DateTime.Now
+            };
+
+            user.PasswordHash = _hasher.HashPassword(user, studentNumber);
+            importedUsers.Add(user);
+            existingNumbers.Add(studentNumber);
+            existingUsernames.Add(studentNumber);
+        }
+
+        if (importedUsers.Count > 0)
+        {
+            _context.Users.AddRange(importedUsers);
+            await _context.SaveChangesAsync();
+
+            foreach (User user in importedUsers)
+            {
+                _context.ActivityLogs.Add(new ActivityLog
+                {
+                    UserId = user.UserId,
+                    PCId = null,
+                    Action = "Student Imported",
+                    Details = $"Student {user.StudentNumber} ({user.FullName}) was imported. Initial password was assigned as the Student Number and must be changed at first login.",
+                    CreatedAt = DateTime.Now
+                });
+            }
+
+            await _context.SaveChangesAsync();
+        }
+
+        return Ok(new
+        {
+            message = importedUsers.Count == 0
+                ? "No student records were imported."
+                : "Student import completed.",
+            importedCount = importedUsers.Count,
+            rejectedCount = rejected.Count,
+            imported = importedUsers.Select(u => new
+            {
+                userId = u.UserId,
+                studentNumber = u.StudentNumber,
+                fullName = u.FullName,
+                mustChangePassword = u.MustChangePassword
+            }),
+            rejected
+        });
     }
 
     [HttpPut("management/{id}/username")]
@@ -73,6 +205,8 @@ public class UserManagementController : ControllerBase
 
         string old = DisplayUsername(user.Username);
         user.Username = IsDisabled(user) ? PackDisabledUsername(username) : username;
+        if (string.Equals(DisplayRole(user.Role), "Student", StringComparison.OrdinalIgnoreCase) && !IsDisabled(user))
+            user.StudentNumber ??= username;
         await _context.SaveChangesAsync();
         await LogAsync(id, "Username Changed", $"Username changed from {old} to {username}.");
         return Ok(new { message = "Username updated successfully." });
@@ -95,6 +229,8 @@ public class UserManagementController : ControllerBase
 
         string old = user.Role;
         user.Role = role;
+        if (role == "Student" && string.IsNullOrWhiteSpace(user.StudentNumber))
+            user.StudentNumber = DisplayUsername(user.Username);
         await _context.SaveChangesAsync();
         await LogAsync(id, "User Role Changed", $"Role changed from {old} to {role}.");
         return Ok(new { message = "User role updated successfully." });
@@ -176,7 +312,9 @@ public class UserManagementController : ControllerBase
         _ => null
     };
 
-    private static bool IsDisabled(User user) => user.Username.StartsWith(DisabledPrefix, StringComparison.Ordinal);
+    private static bool IsDisabled(User user) =>
+        user.Username.StartsWith(DisabledPrefix, StringComparison.Ordinal) ||
+        user.Role.StartsWith("Disabled:", StringComparison.OrdinalIgnoreCase);
 
     private static string DisplayUsername(string username)
     {
@@ -214,4 +352,22 @@ public class UserManagementController : ControllerBase
     {
         public string NewPassword { get; set; } = string.Empty;
     }
+
+    public sealed class StudentImportBatchRequest
+    {
+        public List<StudentImportRowRequest> Rows { get; set; } = new();
+    }
+
+    public sealed class StudentImportRowRequest
+    {
+        public int RowNumber { get; set; }
+        public string StudentNumber { get; set; } = string.Empty;
+        public string StudentName { get; set; } = string.Empty;
+    }
+
+    public sealed record StudentImportRejectedRow(
+        int RowNumber,
+        string StudentNumber,
+        string StudentName,
+        string Reason);
 }
