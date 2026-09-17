@@ -160,67 +160,11 @@ namespace SmartLab.Server.Controllers
 
             return admin;
         }
-
-        [AllowAnonymous]
-        [HttpPost("register")]
-        public async Task<IActionResult> Register([FromBody] RegisterRequest request)
-        {
-            string normalizedUsername = request.Username?.Trim() ?? string.Empty;
-
-            if (string.IsNullOrWhiteSpace(normalizedUsername) || string.IsNullOrWhiteSpace(request.Password))
-            {
-                return BadRequest(new { message = "Username and password are required." });
-            }
-
-            User? existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Username == normalizedUsername);
-            if (existingUser != null)
-                return Conflict(new { message = "Username already exists." });
-
-            var user = new User
-            {
-                Username = normalizedUsername,
-                Role = "Student",
-                CreatedAt = DateTime.Now
-            };
-
-            user.PasswordHash = _passwordHasher.HashPassword(user, request.Password);
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
-
-            _context.ActivityLogs.Add(new ActivityLog
-            {
-                UserId = user.UserId,
-                PCId = null,
-                Action = "Registration",
-                Details = $"New Student account created: {user.Username}",
-                CreatedAt = DateTime.Now
-            });
-
-            await _context.SaveChangesAsync();
-
-            return Ok(new
-            {
-                message = "Registration successful!",
-                userId = user.UserId,
-                username = user.Username,
-                role = user.Role
-            });
-        }
     }
 
     public class LoginRequest
     {
         public string Username { get; set; } = string.Empty;
         public string Password { get; set; } = string.Empty;
-    }
-
-    public class RegisterRequest
-    {
-        public string Username { get; set; } = string.Empty;
-        public string Password { get; set; } = string.Empty;
-
-        // Kept for compatibility with the existing client.
-        // The server intentionally ignores this value and always creates public registrations as Student.
-        public string Role { get; set; } = "Student";
     }
 }
