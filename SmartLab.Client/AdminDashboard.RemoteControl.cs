@@ -294,7 +294,7 @@ namespace SmartLab.Client
                 if (closing)
                     return;
 
-                (double x, double y)? point = CalculateNormalizedImagePoint(image, e.GetPosition(image));
+                (double X, double Y)? point = CalculateNormalizedImagePoint(image, e.GetPosition(image));
                 if (point.HasValue)
                 {
                     await SendRemoteMouseClickAsync(pc.PcId, point.Value.X, point.Value.Y, "LEFT");
@@ -309,7 +309,7 @@ namespace SmartLab.Client
                 if (closing)
                     return;
 
-                (double x, double y)? point = CalculateNormalizedImagePoint(image, e.GetPosition(image));
+                (double X, double Y)? point = CalculateNormalizedImagePoint(image, e.GetPosition(image));
                 if (point.HasValue)
                 {
                     await SendRemoteMouseClickAsync(pc.PcId, point.Value.X, point.Value.Y, "RIGHT");
