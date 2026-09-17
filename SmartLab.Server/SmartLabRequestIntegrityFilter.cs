@@ -161,8 +161,6 @@ namespace SmartLab.Server
                         return;
                     }
 
-                    // A temporary network outage may have moved an owned PC to Offline.
-                    // The same authenticated student can restore Occupied by heartbeat.
                     if (string.Equals(ownedPc.Status, "Offline", StringComparison.OrdinalIgnoreCase))
                     {
                         ownedPc.Status = "Occupied";
@@ -200,6 +198,24 @@ namespace SmartLab.Server
             }
 
             await next();
+
+            // Preserve the account-wide password policy even for the older Admin user
+            // controller, which is still retained for client compatibility. The
+            // canonical management controller already sets this flag itself.
+            if (controller == "UserController" &&
+                action.Equals("ResetPassword", StringComparison.OrdinalIgnoreCase) &&
+                context.Result is ObjectResult result &&
+                (result.StatusCode == null || (result.StatusCode >= 200 && result.StatusCode < 300)) &&
+                TryGetRouteInt(context, "id", out int resetUserId))
+            {
+                User? resetUser = await _context.Users.FirstOrDefaultAsync(u => u.UserId == resetUserId);
+                if (resetUser != null && !resetUser.MustChangePassword)
+                {
+                    resetUser.MustChangePassword = true;
+                    _context.Entry(resetUser).Property(u => u.MustChangePassword).IsModified = true;
+                    await _context.SaveChangesAsync();
+                }
+            }
         }
 
         private async Task<List<object>> GetAuthorizedTeacherPcsAsync(int teacherUserId, int? laboratoryId = null)
