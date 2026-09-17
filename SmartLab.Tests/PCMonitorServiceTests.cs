@@ -19,7 +19,7 @@ public sealed class PCMonitorServiceTests
 
         await using ServiceProvider provider = services.BuildServiceProvider();
 
-        await using (IServiceScope seedScope = provider.CreateAsyncScope())
+        using (IServiceScope seedScope = provider.CreateScope())
         {
             AppDbContext context = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
             context.Users.Add(new User
@@ -62,7 +62,7 @@ public sealed class PCMonitorServiceTests
         {
             await Task.Delay(50);
 
-            await using IServiceScope verifyScope = provider.CreateAsyncScope();
+            using IServiceScope verifyScope = provider.CreateScope();
             AppDbContext context = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
             monitoredPc = await context.PCs.SingleAsync(p => p.PCId == 70);
 
