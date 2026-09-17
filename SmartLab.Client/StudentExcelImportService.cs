@@ -1,3 +1,4 @@
+using System.IO;
 using System.IO.Compression;
 using System.Xml.Linq;
 
@@ -133,7 +134,7 @@ public static class StudentExcelImportService
     }
 
     private static string NormalizeHeader(string value) =>
-        new(value.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+        new string(value.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
 
     private static Dictionary<int, string> ReadSharedStrings(ZipArchive archive)
     {
