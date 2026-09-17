@@ -12,6 +12,7 @@ namespace SmartLab.Server.Controllers
     {
         private static readonly TimeSpan ShareMaxAge = TimeSpan.FromSeconds(30);
         private readonly AppDbContext _context;
+        private readonly TeacherScheduleService _scheduleService;
 
         private sealed class TeacherShareState
         {
@@ -25,7 +26,11 @@ namespace SmartLab.Server.Controllers
         private static readonly ConcurrentDictionary<int, TeacherShareState> ActiveShares = new();
         private static long _frameVersion;
 
-        public TeacherScreenShareController(AppDbContext context) => _context = context;
+        public TeacherScreenShareController(AppDbContext context, TeacherScheduleService scheduleService)
+        {
+            _context = context;
+            _scheduleService = scheduleService;
+        }
 
         [Authorize(Roles = "Admin,Teacher")]
         [HttpPost("{laboratoryId}/start")]
@@ -120,7 +125,7 @@ namespace SmartLab.Server.Controllers
         {
             if (User.IsInRole("Admin")) return true;
             if (!User.IsInRole("Teacher")) return false;
-            return await _context.TeacherLaboratoryAuthorizations.AsNoTracking().AnyAsync(a => a.TeacherUserId == userId && a.LaboratoryId == laboratoryId);
+            return await _scheduleService.IsTeacherScheduledAsync(userId, laboratoryId);
         }
 
         private bool TryGetCurrentUserId(out int userId) => int.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out userId);
