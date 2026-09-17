@@ -113,7 +113,7 @@ Only LEFT and RIGHT mouse clicks are accepted by the server. Keyboard commands u
 
 The viewer refreshes live screen traffic while the remote session is open. The server also maintains a short remote-control session lease and removes the session after inactivity or when the PC is Offline, so an unexpected viewer/client failure cannot leave remote control active indefinitely.
 
-The repository contains deterministic JSON contract tests for the remote mouse and keyboard payloads. Actual Windows cursor movement, SendInput behavior, multi-monitor hardware behavior, and end-to-end remote control still require physical Windows validation.
+The repository contains deterministic JSON contract tests for the remote mouse and keyboard payloads, plus controller-level tests for workstation identity and PC ownership rules. Actual Windows cursor movement, SendInput behavior, multi-monitor hardware behavior, and end-to-end remote control still require physical Windows validation.
 
 ## Production networking
 
