@@ -113,7 +113,7 @@ public sealed class StudentAccountWorkflowTests
             new TestHostEnvironment(),
             configuration);
 
-        IActionResult result = await controller.Login(new AuthController.LoginRequest
+        IActionResult result = await controller.Login(new LoginRequest
         {
             Username = "disabled-user",
             Password = "Password123"
