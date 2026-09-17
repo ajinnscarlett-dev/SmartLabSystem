@@ -1,4 +1,4 @@
-﻿<Window x:Class="SmartLab.Client.SmartLabWidget"
+<Window x:Class="SmartLab.Client.SmartLabWidget"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="SmartLab"
@@ -12,13 +12,11 @@
         Topmost="True"
         WindowStartupLocation="Manual"
         MouseLeftButtonDown="Window_MouseLeftButtonDown">
-
-    <Border Background="#E8F0F8"
-            CornerRadius="12"
-            BorderBrush="#B8C7D9"
+    <Border Background="{StaticResource SmartLabSurface}"
+            CornerRadius="8"
+            BorderBrush="{StaticResource SmartLabBorder}"
             BorderThickness="1"
             Padding="12">
-
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -26,49 +24,42 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
-
             <Grid Grid.Row="0">
-                <TextBlock Text="SmartLab"
-                           FontSize="16"
-                           FontWeight="Bold"
-                           Foreground="#182536"
+                <TextBlock Text="SMARTLAB"
+                           FontSize="15"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource SmartLabText}"
                            HorizontalAlignment="Left"/>
-
                 <TextBlock x:Name="PcNumberText"
                            Text="PC-01"
                            FontSize="11"
-                           Foreground="#5A6B7D"
+                           Foreground="{StaticResource SmartLabMuted}"
                            HorizontalAlignment="Right"
                            VerticalAlignment="Center"/>
             </Grid>
-
             <TextBlock x:Name="UsernameText"
                        Grid.Row="1"
                        Text="student01"
                        FontSize="12"
-                       Foreground="#4B5D70"
-                       Margin="0,5,0,7"/>
-
-            <Grid Grid.Row="2"
-                  Margin="0,0,0,8">
+                       Foreground="{StaticResource SmartLabMuted}"
+                       Margin="0,5,0,8"/>
+            <Grid Grid.Row="2" Margin="0,0,0,8">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-
                 <Grid Grid.Column="0">
                     <Button x:Name="NotificationButton"
                             Content="NOTIFICATIONS"
                             Width="125"
                             Height="30"
                             Click="NotificationButton_Click"/>
-
                     <Border x:Name="NotificationCountBadge"
                             Width="20"
                             Height="20"
                             CornerRadius="10"
-                            Background="#C62828"
+                            Background="{StaticResource SmartLabDanger}"
                             HorizontalAlignment="Left"
                             VerticalAlignment="Top"
                             Margin="112,-7,0,0"
@@ -83,29 +74,28 @@
                                    TextAlignment="Center"/>
                     </Border>
                 </Grid>
-
                 <Button Grid.Column="1"
                         x:Name="NeedAssistanceButton"
                         Content="NEED HELP"
                         Width="82"
                         Height="30"
                         Margin="8,0,0,0"
+                        Style="{StaticResource SmartLabPrimaryButton}"
                         Click="NeedAssistanceButton_Click"/>
-
                 <Button Grid.Column="2"
                         x:Name="LogoutButton"
-                        Content="Logout"
-                        Width="65"
+                        Content="LOGOUT"
+                        Width="70"
                         Height="30"
                         HorizontalAlignment="Right"
+                        Style="{StaticResource SmartLabDangerButton}"
                         Click="LogoutButton_Click"/>
             </Grid>
-
             <TextBlock x:Name="ConnectionStatusText"
                        Grid.Row="3"
                        Text="Connected • workstation presence active"
                        FontSize="9"
-                       Foreground="#4E6A84"/>
+                       Foreground="{StaticResource SmartLabMuted}"/>
         </Grid>
     </Border>
 </Window>
