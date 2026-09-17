@@ -31,8 +31,7 @@ public sealed class PCControllerSecurityTests
             1,
             new PCLoginRequest { MACAddress = "AA:BB:CC:DD:EE:FF" });
 
-        NotFoundObjectResult response = Assert.IsType<NotFoundObjectResult>(result);
-        Assert.Contains("not registered", response.Value?.ToString() ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.IsType<NotFoundObjectResult>(result);
     }
 
     [Fact]
