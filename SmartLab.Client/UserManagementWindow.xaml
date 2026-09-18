@@ -2,13 +2,13 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="User Management"
-        Width="1180"
-        Height="720"
-        MinWidth="980"
-        MinHeight="600"
+        Width="1240"
+        Height="760"
+        MinWidth="1040"
+        MinHeight="620"
         WindowStartupLocation="CenterOwner"
-        Background="#081018"
-        Foreground="#E9EEF2">
+        Background="{StaticResource SmartLabPageBackground}"
+        Foreground="{StaticResource SmartLabText}">
     <Grid Margin="18">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -19,8 +19,8 @@
 
         <Grid Grid.Row="0" Margin="0,0,0,14">
             <StackPanel>
-                <TextBlock Text="USER MANAGEMENT" FontSize="22" FontWeight="SemiBold"/>
-                <TextBlock Text="Manage Student, Teacher, and Admin accounts" Margin="0,4,0,0" Foreground="#8B9AA5"/>
+                <TextBlock Text="USER MANAGEMENT" FontSize="20" FontWeight="SemiBold"/>
+                <TextBlock Text="Students, teachers, and administrators" Margin="0,4,0,0" Foreground="{StaticResource SmartLabMuted}"/>
             </StackPanel>
             <Button x:Name="CloseButton" Content="CLOSE" Width="90" Height="34" HorizontalAlignment="Right" Click="CloseButton_Click"/>
         </Grid>
@@ -30,10 +30,12 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <TextBox x:Name="SearchBox" Grid.Column="0" Height="36" Padding="10" Background="#101C24" Foreground="#E9EEF2" BorderBrush="#2A3A45" TextChanged="SearchBox_TextChanged"/>
-            <Button Grid.Column="1" Content="ADD ACCOUNT" Width="120" Height="36" Margin="8,0,0,0" Click="AddButton_Click"/>
-            <Button Grid.Column="2" Content="REFRESH" Width="90" Height="36" Margin="8,0,0,0" Click="RefreshButton_Click"/>
+            <TextBox x:Name="SearchBox" Grid.Column="0" Height="36" Padding="10" Background="{StaticResource SmartLabControlBackground}" Foreground="{StaticResource SmartLabText}" BorderBrush="{StaticResource SmartLabBorder}" TextChanged="SearchBox_TextChanged" ToolTip="Search username, Student Number, name, role, or status"/>
+            <Button Grid.Column="1" Content="IMPORT STUDENTS" Width="142" Height="36" Margin="8,0,0,0" Style="{StaticResource SmartLabPrimaryButton}" Click="ImportStudentsButton_Click"/>
+            <Button Grid.Column="2" Content="ADD ACCOUNT" Width="120" Height="36" Margin="8,0,0,0" Click="AddButton_Click"/>
+            <Button Grid.Column="3" Content="REFRESH" Width="90" Height="36" Margin="8,0,0,0" Click="RefreshButton_Click"/>
         </Grid>
 
         <DataGrid x:Name="UsersGrid"
@@ -41,29 +43,35 @@
                   AutoGenerateColumns="False"
                   IsReadOnly="True"
                   CanUserAddRows="False"
+                  CanUserSortColumns="True"
                   SelectionMode="Single"
-                  Background="#0A141B"
-                  Foreground="#E9EEF2"
-                  BorderBrush="#23333E"
-                  RowBackground="#0C171E"
-                  AlternatingRowBackground="#101C24"
+                  Background="{StaticResource SmartLabSurface}"
+                  Foreground="{StaticResource SmartLabText}"
+                  BorderBrush="{StaticResource SmartLabBorder}"
+                  RowBackground="#FFFFFF"
+                  AlternatingRowBackground="#F7F9FB"
                   GridLinesVisibility="Horizontal"
+                  HorizontalGridLinesBrush="#E2E7EC"
+                  RowHeight="36"
                   Margin="0,0,0,12">
             <DataGrid.Columns>
-                <DataGridTextColumn Header="ID" Binding="{Binding UserId}" Width="70"/>
-                <DataGridTextColumn Header="USERNAME" Binding="{Binding Username}" Width="2*"/>
-                <DataGridTextColumn Header="ROLE" Binding="{Binding Role}" Width="120"/>
-                <DataGridTextColumn Header="STATUS" Binding="{Binding Status}" Width="100"/>
-                <DataGridTextColumn Header="CREATED" Binding="{Binding CreatedAt, StringFormat={}{0:yyyy-MM-dd HH:mm}}" Width="160"/>
-                <DataGridTemplateColumn Header="ACTIONS" Width="360">
+                <DataGridTextColumn Header="ID" Binding="{Binding UserId}" Width="65"/>
+                <DataGridTextColumn Header="STUDENT NO." Binding="{Binding StudentNumber}" Width="140"/>
+                <DataGridTextColumn Header="NAME" Binding="{Binding FullName}" Width="2*"/>
+                <DataGridTextColumn Header="USERNAME" Binding="{Binding Username}" Width="1.2*"/>
+                <DataGridTextColumn Header="ROLE" Binding="{Binding Role}" Width="100"/>
+                <DataGridTextColumn Header="STATUS" Binding="{Binding Status}" Width="95"/>
+                <DataGridTextColumn Header="PASSWORD STATUS" Binding="{Binding PasswordStatus}" Width="135"/>
+                <DataGridTextColumn Header="CREATED" Binding="{Binding CreatedAt, StringFormat={}{0:yyyy-MM-dd HH:mm}}" Width="150"/>
+                <DataGridTemplateColumn Header="ACTIONS" Width="365">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <StackPanel Orientation="Horizontal">
-                                <Button Content="USERNAME" Width="82" Height="30" Margin="2" Tag="{Binding}" Click="RenameButton_Click"/>
-                                <Button Content="ROLE" Width="58" Height="30" Margin="2" Tag="{Binding}" Click="RoleButton_Click"/>
-                                <Button Content="PASSWORD" Width="82" Height="30" Margin="2" Tag="{Binding}" Click="PasswordButton_Click"/>
-                                <Button Content="DELETE" Width="68" Height="30" Margin="2" Tag="{Binding}" Click="DeleteButton_Click"/>
-                                <Button Content="RESTORE" Width="68" Height="30" Margin="2" Tag="{Binding}" Click="RestoreButton_Click"/>
+                                <Button Content="USERNAME" Width="82" Height="30" Margin="2" Tag="{Binding}" Click="RenameButton_Click" ToolTip="Change username"/>
+                                <Button Content="ROLE" Width="58" Height="30" Margin="2" Tag="{Binding}" Click="RoleButton_Click" ToolTip="Change role"/>
+                                <Button Content="RESET" Width="62" Height="30" Margin="2" Tag="{Binding}" Click="PasswordButton_Click" ToolTip="Reset password"/>
+                                <Button Content="DISABLE" Width="68" Height="30" Margin="2" Tag="{Binding}" Click="DeleteButton_Click" ToolTip="Disable account"/>
+                                <Button Content="ENABLE" Width="68" Height="30" Margin="2" Tag="{Binding}" Click="RestoreButton_Click" ToolTip="Re-enable account"/>
                             </StackPanel>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
@@ -71,6 +79,13 @@
             </DataGrid.Columns>
         </DataGrid>
 
-        <TextBlock x:Name="StatusText" Grid.Row="3" Text="Ready" Foreground="#8B9AA5"/>
+        <Grid Grid.Row="3">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="StatusText" Text="Ready" Foreground="{StaticResource SmartLabMuted}" VerticalAlignment="Center"/>
+            <TextBlock Grid.Column="1" Text="Imported students use Student Number as the initial password." Foreground="{StaticResource SmartLabMuted}" FontSize="11" VerticalAlignment="Center"/>
+        </Grid>
     </Grid>
 </Window>

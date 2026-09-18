@@ -14,6 +14,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     ));
 
 builder.Services.AddHostedService<DatabaseMigrationHostedService>();
+builder.Services.AddScoped<TeacherScheduleService>();
 
 builder.Services.AddScoped<SmartLabAuthorizationFilter>();
 builder.Services.AddScoped<SmartLabRequestIntegrityFilter>();
@@ -65,6 +66,7 @@ builder.Services.AddSingleton<AuthTokenService>();
 builder.Services.AddHostedService<PCMonitorService>();
 builder.Services.AddHostedService<CommandLifecycleHostedService>();
 builder.Services.AddHostedService<ServerDiscoveryService>();
+builder.Services.AddHostedService<TeacherScheduleAuthorizationCacheService>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>

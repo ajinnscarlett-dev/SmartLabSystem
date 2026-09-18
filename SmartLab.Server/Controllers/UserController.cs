@@ -29,7 +29,8 @@ namespace SmartLab.Server.Controllers
                     userId = u.UserId,
                     username = u.Username,
                     role = u.Role,
-                    createdAt = u.CreatedAt
+                    createdAt = u.CreatedAt,
+                    mustChangePassword = u.MustChangePassword
                 })
                 .ToListAsync();
 
@@ -46,7 +47,8 @@ namespace SmartLab.Server.Controllers
                     userId = u.UserId,
                     username = u.Username,
                     role = u.Role,
-                    createdAt = u.CreatedAt
+                    createdAt = u.CreatedAt,
+                    mustChangePassword = u.MustChangePassword
                 })
                 .FirstOrDefaultAsync();
 
@@ -153,7 +155,8 @@ namespace SmartLab.Server.Controllers
             {
                 Username = username,
                 Role = role,
-                CreatedAt = DateTime.Now
+                CreatedAt = DateTime.Now,
+                MustChangePassword = true
             };
 
             user.PasswordHash =
@@ -184,7 +187,8 @@ namespace SmartLab.Server.Controllers
                 userId = user.UserId,
                 username = user.Username,
                 role = user.Role,
-                createdAt = user.CreatedAt
+                createdAt = user.CreatedAt,
+                mustChangePassword = user.MustChangePassword
             });
         }
 
@@ -281,7 +285,8 @@ namespace SmartLab.Server.Controllers
                     "User role updated successfully.",
                 userId = user.UserId,
                 username = user.Username,
-                role = user.Role
+                role = user.Role,
+                mustChangePassword = user.MustChangePassword
             });
         }
 
@@ -329,6 +334,8 @@ namespace SmartLab.Server.Controllers
                     user,
                     newPassword);
 
+            user.MustChangePassword = true;
+
             await _context.SaveChangesAsync();
 
             _context.ActivityLogs.Add(
@@ -338,7 +345,7 @@ namespace SmartLab.Server.Controllers
                     UserId = user.UserId,
                     Action = "Password Reset",
                     Details =
-                        $"Password was reset for user {user.Username}.",
+                        $"Password was reset for user {user.Username}. User must change it before normal operation.",
                     CreatedAt = DateTime.Now
                 });
 
@@ -347,9 +354,10 @@ namespace SmartLab.Server.Controllers
             return Ok(new
             {
                 message =
-                    "Password reset successfully.",
+                    "Password reset successfully. The user must change the temporary password at next login.",
                 userId = user.UserId,
-                username = user.Username
+                username = user.Username,
+                mustChangePassword = user.MustChangePassword
             });
         }
     }

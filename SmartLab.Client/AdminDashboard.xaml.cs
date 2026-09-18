@@ -1273,11 +1273,11 @@ namespace SmartLab.Client
             object sender,
             RoutedEventArgs e)
         {
-            MessageBox.Show(
-                "Settings is reserved for the next admin module.",
-                "SmartLab",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
+            var settingsWindow = new SettingsWindow(
+                this,
+                AdminNameText.Text);
+
+            settingsWindow.ShowDialog();
         }
 
         private void HeaderThemeButton_Click(

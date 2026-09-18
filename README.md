@@ -54,12 +54,13 @@ The server contains EF Core migrations. Current schema includes:
 - Activity logs
 - Announcements
 - Service Desk tickets
-- Teacher laboratory authorization
+- Teacher laboratory authorization compatibility table
 - Persistent PC usage history
 - Maintenance history
 - Hardware inventory
 - Notifications
 - Student Need Assistance requests
+- Per-user first-login password-change state
 
 By default `SmartLab:ApplyMigrationsOnStartup` is `true`, so the server applies pending migrations before serving requests. Set it to `false` in environments where migrations are applied manually.
 
@@ -69,7 +70,7 @@ Manual migration commands:
 dotnet ef database update --project SmartLab.Server --startup-project SmartLab.Server
 ```
 
-## Machine presence
+## Machine presence and PC registration
 
 The WPF client starts a background machine-presence service before student authentication. It resolves the Main Server from the configured `ServerUrl` or available LAN discovery, then announces:
 
@@ -79,6 +80,10 @@ The WPF client starts a background machine-presence service before student authe
 
 The server only accepts anonymous presence when the PC number and MAC match an already registered workstation. An unregistered client cannot create a workstation or reassign another PC.
 
+Initial PC registration/provisioning is an Admin/MIS operation. Student login verifies the current workstation MAC against that pre-registered PC identity before changing the PC to Occupied.
+
+IP address is dynamic operational metadata and may change without changing workstation identity.
+
 The four operational PC states are:
 
 - Available
@@ -87,6 +92,66 @@ The four operational PC states are:
 - Maintenance
 
 Maintenance has priority over automatic heartbeat/offline state changes.
+
+## Authentication and password policy
+
+Passwords are stored as ASP.NET Identity password hashes, not plaintext values.
+
+Newly provisioned accounts and administrator-reset accounts are marked as requiring a password change. Login returns that state, the WPF client opens the Change Password dialog, and the server blocks operational APIs until the authenticated user completes the password change.
+
+The authenticated change-password endpoint verifies the current password, hashes the new password, clears the requirement flag, and writes an activity log entry. Closing or cancelling the change-password dialog clears the client session.
+
+Deactivated accounts are rejected before a usable JWT is issued. Existing authenticated requests are also checked against current persisted account state and role claims.
+
+## Student account management
+
+Admin/MIS can create individual accounts or use the bulk `.xlsx` student import workflow.
+
+The minimum Excel columns are:
+
+- `Student Number`
+- `Student Name`
+
+The import workflow:
+
+1. Select an `.xlsx` workbook.
+2. SmartLab reads the first worksheet and previews the rows.
+3. Missing Student Number/Name, duplicate Student Numbers, and oversized values are rejected before import.
+4. The server checks existing SmartLab Student Numbers/usernames again to prevent duplicate accounts.
+5. Valid records are created as enabled Student accounts with:
+   - Username = Student Number
+   - Initial password = Student Number
+   - `MustChangePassword = true`
+   - Student Number and Student Name persisted on the User record
+6. The result reports imported rows and rejected rows/reasons.
+
+Imported passwords are immediately hashed with `PasswordHasher<User>`; the plaintext Student Number is never stored as the password.
+
+Admin can disable and restore accounts. Disabling does not delete usage/history records.
+
+## Teacher workflow and schedule-based laboratory access
+
+Teacher login is a dedicated WPF login surface, but it uses the same `/api/Auth/login` endpoint, JWT validation, role claims, and password-change flow as the other roles.
+
+Teacher laboratory access is schedule-based rather than permanently assigning a teacher to a laboratory. The existing `ClassSchedule` model and schedule service determine whether a Teacher is scheduled in a laboratory at the current date/time. Relevant PC monitoring, screen viewing, commands, and teacher screen sharing are therefore checked against the active schedule context.
+
+The existing TeacherLaboratoryAuthorizations table remains as a compatibility cache for the legacy PC command path; the schedule service is the source of current operational access, and a background synchronizer refreshes the compatibility table from currently active schedules.
+
+## Remote control
+
+Remote control uses the existing SmartLab command and screen-monitoring pipeline:
+
+`Admin/Teacher viewer -> normalized mouse coordinates -> server command queue -> shared JSON contract -> Student WPF client -> Windows virtual desktop mapping -> SetCursorPos/SendInput`
+
+Mouse X/Y values are normalized to `0..1`. The viewer accounts for `Stretch.Uniform` letterboxing before creating the normalized coordinates. The student client maps those coordinates against Windows virtual-desktop metrics (`SM_XVIRTUALSCREEN`, `SM_YVIRTUALSCREEN`, `SM_CXVIRTUALSCREEN`, `SM_CYVIRTUALSCREEN`), which supports negative desktop origins and multi-monitor layouts.
+
+Only LEFT and RIGHT mouse clicks are accepted by the server. Keyboard commands use validated Windows virtual-key codes. Remote input is accepted only while an active, authorized remote-control session exists for the requesting Admin/Teacher.
+
+For physical LAN responsiveness, screen frames are reduced to a practical monitoring size/quality, the remote viewer avoids a separate metadata round trip when polling for newer frames, and interactive input requests do not wait for an extra completion-polling round trip.
+
+The viewer refreshes live screen traffic while the remote session is open. The server also maintains a short remote-control session lease and removes the session after inactivity or when the PC is Offline, so an unexpected viewer/client failure cannot leave remote control active indefinitely.
+
+The repository contains deterministic JSON contract tests for the remote mouse and keyboard payloads, plus controller-level tests for workstation identity and PC ownership rules. Actual Windows cursor movement, SendInput behavior, multi-monitor hardware behavior, and end-to-end remote control still require physical Windows validation.
 
 ## Production networking
 
@@ -100,22 +165,28 @@ Ensure the school network permits client-to-server TCP access to the SmartLab AP
 
 1. SmartLab Client starts.
 2. Machine presence begins before login.
-3. Registered workstation is shown as Available.
+3. Registered workstation is observed as Available when enabled and not occupied/under maintenance.
 4. Student authenticates.
-5. PC becomes Occupied and a persistent usage session is created.
-6. Heartbeat continues.
-7. Announcements and notifications are available.
-8. Need Assistance can create a persistent request and notify authorized Teacher/MIS users.
-9. Student logs out.
-10. Usage session is closed and the PC returns to Available.
+5. If required, the student must complete the password-change flow before continuing.
+6. Student PC login verifies the registered workstation MAC.
+7. PC becomes Occupied and a persistent usage session is created.
+8. Heartbeat continues.
+9. Announcements and notifications are available.
+10. Need Assistance can create a persistent request and notify authorized Teacher/MIS users.
+11. Student logs out.
+12. Usage session is closed and the PC returns to Available.
 
-## Teacher workflow
+## Teacher dashboard priorities
 
-Teacher access is restricted server-side to authorized laboratories. The existing teacher dashboard uses real PC/API data for monitoring, screen viewing, commands, Service Desk, and teacher screen sharing.
+The Teacher dashboard exposes the current schedule context alongside laboratory/PC operations. The current schedule summary is sourced from the existing schedule API and refreshed during the session.
+
+Teacher actions remain server-authorized for the selected/scheduled laboratory and include monitoring, screen viewing, Send Message, Lock, Logoff, Restart, Shutdown, Remote Control, Need Assistance, Service Desk, announcements, and notifications where the existing client supports them.
 
 ## Admin/MIS workflow
 
-Admin/MIS manages laboratories, PCs, users, teacher authorization, commands, announcements, Service Desk, maintenance, hardware inventory, usage history, reporting, analytics, and system health.
+Admin/MIS manages laboratories, PCs, users, teacher authorization compatibility data, commands, announcements, Service Desk, maintenance, hardware inventory, usage history, reporting, analytics, archive, activity logs, and system health.
+
+PC registration/configuration, MAC identity changes, enable/disable, maintenance, teacher laboratory authorization, user management, and other administrative mutations are enforced server-side with Admin authorization.
 
 ## Hardware inventory
 
@@ -133,9 +204,12 @@ Archive support provides a retention plan and historical usage CSV export. The a
 
 - JWT validation checks issuer, audience, signing key, and lifetime.
 - Administrative and teacher controller boundaries are enforced server-side.
-- Teacher laboratory access is checked on relevant APIs.
+- Teacher laboratory access is checked on relevant APIs against current schedule context.
 - Student-owned operations are restricted to the authenticated student/session.
 - Anonymous presence is bound to a pre-registered workstation MAC.
+- Student login cannot auto-create an unknown workstation.
+- Deactivated accounts are rejected by both persisted account state and authentication role checks.
+- First-login password changes are enforced server-side; client-side UX is not the security boundary.
 - Historical records use restricted foreign keys to avoid accidental cascade deletion.
 - JWT signing keys must not be committed to Git.
 
@@ -150,14 +224,16 @@ Archive support provides a retention plan and historical usage CSV export. The a
 5. Choose a stable server IP/DNS name.
 6. Open the required API TCP port in Windows Firewall.
 7. Start SmartLab Server.
+8. Run the latest EF migration before first production use if startup migration is disabled.
 
 ### Laboratory clients
 
 1. Install the WPF SmartLab Client.
 2. Set `ServerUrl` to the stable Main Server address for production.
-3. Give each workstation its intended SmartLab PC number and registered MAC identity.
+3. Give each workstation its intended SmartLab PC number and register its MAC identity through Admin/MIS.
 4. Configure SmartLab Client to start with Windows where appropriate.
-5. Validate presence before student login.
+5. Validate anonymous presence before student login.
+6. Validate student login, heartbeat, screen sharing, and commands on one PC before expanding the deployment.
 
 ## LAN smoke testing
 
@@ -167,21 +243,30 @@ At every stage verify:
 
 - server discovery/configuration
 - pre-login presence
+- registered MAC validation
 - Available/Occupied/Offline/Maintenance
+- first-login password-change enforcement
 - student login/logout
 - usage history
 - dynamic IP change
 - reconnect after short outage
 - server restart recovery
 - client restart recovery
-- Teacher authorization
+- Teacher authorization against the active schedule
 - command execution/result handling
 - screen monitoring
+- remote-control lease cleanup after an unexpected viewer close
 - Need Assistance notifications
+
+## Automated verification
+
+The repository CI workflow uses Windows Server, restores the solution, builds Release, runs EF model validation with `dotnet ef migrations has-pending-model-changes`, and runs the full test suite. Do not bypass or disable these steps.
 
 ## Environment-specific validation
 
-The source tree can be inspected and modified here, but this environment does not provide a Windows desktop, your SQL Server instance, or the physical school LAN. Therefore the following remain mandatory on the target environment:
+The source tree can be inspected and modified in a development environment, but final capstone deployment still requires validation against the target Windows hardware, SQL Server instance, and school LAN.
+
+Mandatory target-environment checks include:
 
 - physical WPF execution
 - SQL Server integration against the real SmartLabDB
@@ -190,4 +275,6 @@ The source tree can be inspected and modified here, but this environment does no
 - cross-subnet routing validation
 - actual PC command execution
 - real screen-monitoring and teacher-sharing validation
+- actual remote-control cursor/keyboard behavior
+- multi-monitor coordinate behavior on the target hardware
 - multi-PC/load testing up to the target fleet size

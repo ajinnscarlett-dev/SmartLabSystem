@@ -1,20 +1,39 @@
-﻿using System.Windows;
+using System;
+using System.Net.Http;
+using System.Windows;
 
 namespace SmartLab.Client
 {
     public partial class StudentDashboard : Window
     {
+        private readonly HttpClient _httpClient;
+        private readonly string _username;
+
         public StudentDashboard()
         {
             InitializeComponent();
+
+            _username = string.IsNullOrWhiteSpace(AuthSession.Username)
+                ? "Student"
+                : AuthSession.Username;
+
+            _httpClient = new HttpClient
+            {
+                BaseAddress = new Uri(SmartLabServerConfig.BaseUrl)
+            };
+            AuthSession.Apply(_httpClient);
+
+            if (WelcomeText != null)
+                WelcomeText.Text = $"Welcome, {_username}";
+
+            if (UsernameText != null)
+                UsernameText.Text = _username;
         }
 
         private void ProfileButton_Click(object sender, RoutedEventArgs e)
         {
             MessageBox.Show(
-                "Student Profile\n\n" +
-                "Username: " + UsernameText.Text + "\n" +
-                "Role: Student",
+                $"Student Profile\n\nUsername: {_username}\nRole: Student",
                 "My Profile",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
@@ -22,28 +41,47 @@ namespace SmartLab.Client
 
         private void ChangePasswordButton_Click(object sender, RoutedEventArgs e)
         {
-            MessageBox.Show(
-                "Change Password feature will be connected to the server next.",
-                "Change Password",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
+            try
+            {
+                var dialog = new ChangePasswordWindow(_httpClient, _username)
+                {
+                    Owner = this
+                };
+                dialog.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Unable to open Change Password.\n\n{ex.Message}",
+                    "SmartLab",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
         }
 
         private void LogoutButton_Click(object sender, RoutedEventArgs e)
         {
             MessageBoxResult result = MessageBox.Show(
-                "Are you sure you want to logout?",
-                "Logout",
+                "Are you sure you want to log out?",
+                "Log Out",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
 
-            if (result == MessageBoxResult.Yes)
-            {
-                MainWindow loginWindow = new MainWindow();
-                loginWindow.Show();
+            if (result != MessageBoxResult.Yes)
+                return;
 
-                this.Close();
-            }
+            AuthSession.Clear();
+            AuthSession.Apply(_httpClient);
+
+            MainWindow loginWindow = new MainWindow();
+            loginWindow.Show();
+            Close();
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            _httpClient.Dispose();
+            base.OnClosed(e);
         }
     }
 }
