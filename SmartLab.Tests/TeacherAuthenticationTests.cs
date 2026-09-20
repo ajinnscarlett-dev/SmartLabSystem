@@ -291,6 +291,29 @@ public sealed class TeacherAuthenticationTests
     }
 
     [Fact]
+    public async Task TeacherRenamePreservesTeacherRole()
+    {
+        await using AppDbContext context = CreateContext();
+        User teacher = CreateTeacher(17, "teacher-rename", "TeacherPass123", mustChangePassword: false);
+        context.Users.Add(teacher);
+        await context.SaveChangesAsync();
+
+        UserManagementController controller = new(context);
+        IActionResult result = await controller.Rename(
+            teacher.UserId,
+            new UserManagementController.RenameRequest
+            {
+                Username = "teacher-renamed"
+            });
+
+        Assert.IsType<OkObjectResult>(result);
+
+        User updated = await context.Users.SingleAsync();
+        Assert.Equal("teacher-renamed", updated.Username);
+        Assert.Equal("Teacher", updated.Role);
+    }
+
+    [Fact]
     public void TeacherLoginClientRoutesTeacherToTeacherDashboard()
     {
         string sourcePath = FindRepositoryFile("SmartLab.Client", "TeacherLoginWindow.xaml.cs");
