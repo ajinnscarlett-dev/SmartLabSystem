@@ -18,11 +18,26 @@ namespace SmartLab.Server
         protected override async Task ExecuteAsync(
             CancellationToken stoppingToken)
         {
-            using UdpClient udpClient =
-                new UdpClient(
+            UdpClient udpClient;
+
+            try
+            {
+                udpClient = new UdpClient(
                     new IPEndPoint(
                         IPAddress.Any,
                         DiscoveryPort));
+            }
+            catch (SocketException ex)
+            {
+                // Discovery is optional to HTTP/API availability. A stale
+                // process or another service may already own UDP 5048; do not
+                // let that prevent the SmartLab HTTP server from staying up.
+                Console.WriteLine(
+                    $"SmartLab discovery could not bind UDP {DiscoveryPort}: {ex.Message}");
+                return;
+            }
+
+            using (udpClient)
 
             byte[] responseBytes =
                 Encoding.UTF8.GetBytes(
