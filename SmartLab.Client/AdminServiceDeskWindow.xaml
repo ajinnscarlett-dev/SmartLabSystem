@@ -25,7 +25,7 @@
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions><ColumnDefinition Width="0.95*"/><ColumnDefinition Width="1.05*"/></Grid.ColumnDefinitions>
             <Border Grid.Column="0" Style="{StaticResource SmartLabSectionBorder}" Padding="0" Margin="0,0,8,0">
-                <DataGrid x:Name="TicketGrid" Style="{StaticResource SmartLabDataGrid}" SelectionChanged="TicketGrid_SelectionChanged">
+                <DataGrid x:Name="TicketGrid" Style="{StaticResource SmartLabDataGrid}">
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="ID" Binding="{Binding ServiceDeskTicketId}" Width="60"/>
                         <DataGridTextColumn Header="REQUESTER" Binding="{Binding TeacherUsername}" Width="120"/>
