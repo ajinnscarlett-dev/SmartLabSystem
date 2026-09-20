@@ -57,10 +57,14 @@ namespace SmartLab.Client
 
         private void ShowPcDetailsPanel()
         {
-            RightSidebarColumn.Width =
-                new GridLength(
-                    PcSidebarWidth,
-                    GridUnitType.Pixel);
+            if (SelectedPcSidebar != null)
+            {
+                SelectedPcSidebar.Visibility = Visibility.Visible;
+            }
+
+            // The redesigned dashboard keeps the details panel in the main
+            // operations workspace rather than relying on the legacy right column.
+            RightSidebarColumn.Width = new GridLength(0);
         }
 
         // ==========================================================
@@ -191,6 +195,7 @@ namespace SmartLab.Client
             if (e.Key == Key.Escape)
             {
                 HidePcDetailsPanelUntilSelection();
+                e.Handled = true;
             }
         }
     }
