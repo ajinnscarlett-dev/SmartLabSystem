@@ -45,37 +45,37 @@ namespace SmartLab.Server
 
                 while (!stoppingToken.IsCancellationRequested)
                 {
-                try
-                {
-                    UdpReceiveResult received =
-                        await udpClient.ReceiveAsync(
-                            stoppingToken);
-
-                    string request =
-                        Encoding.UTF8.GetString(
-                            received.Buffer);
-
-                    if (!string.Equals(
-                        request,
-                        DiscoveryRequest,
-                        StringComparison.Ordinal))
+                    try
                     {
-                        continue;
-                    }
+                        UdpReceiveResult received =
+                            await udpClient.ReceiveAsync(
+                                stoppingToken);
 
-                    await udpClient.SendAsync(
-                        responseBytes,
-                        responseBytes.Length,
-                        received.RemoteEndPoint);
-                }
-                catch (OperationCanceledException)
-                {
-                    break;
-                }
-                catch (ObjectDisposedException)
-                {
-                    break;
-                }
+                        string request =
+                            Encoding.UTF8.GetString(
+                                received.Buffer);
+
+                        if (!string.Equals(
+                            request,
+                            DiscoveryRequest,
+                            StringComparison.Ordinal))
+                        {
+                            continue;
+                        }
+
+                        await udpClient.SendAsync(
+                            responseBytes,
+                            responseBytes.Length,
+                            received.RemoteEndPoint);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        break;
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        break;
+                    }
                     catch (SocketException)
                     {
                         if (stoppingToken.IsCancellationRequested)
