@@ -38,13 +38,13 @@ namespace SmartLab.Server
             }
 
             using (udpClient)
-
-            byte[] responseBytes =
-                Encoding.UTF8.GetBytes(
-                    DiscoveryResponse);
-
-            while (!stoppingToken.IsCancellationRequested)
             {
+                byte[] responseBytes =
+                    Encoding.UTF8.GetBytes(
+                        DiscoveryResponse);
+
+                while (!stoppingToken.IsCancellationRequested)
+                {
                 try
                 {
                     UdpReceiveResult received =
@@ -76,11 +76,12 @@ namespace SmartLab.Server
                 {
                     break;
                 }
-                catch (SocketException)
-                {
-                    if (stoppingToken.IsCancellationRequested)
+                    catch (SocketException)
                     {
-                        break;
+                        if (stoppingToken.IsCancellationRequested)
+                        {
+                            break;
+                        }
                     }
                 }
             }
