@@ -219,7 +219,7 @@ public sealed class TeacherAuthenticationTests
 
         var controller = new ScheduleController(context, new TeacherScheduleService(context))
         {
-            ControllerContext = CreateControllerContext(teacher.UserId, "Teacher")
+            ControllerContext = CreateHttpContext(teacher.UserId, "Teacher")
         };
 
         IActionResult result = await controller.GetLaboratory(603, DateTime.Today);
@@ -297,7 +297,7 @@ public sealed class TeacherAuthenticationTests
         if (userId.HasValue)
             controller.ControllerContext = new ControllerContext
             {
-                HttpContext = CreateControllerContext(userId.Value, role ?? "Teacher")
+                HttpContext = CreateHttpContext(userId.Value, role ?? "Teacher")
             };
 
         return controller;
