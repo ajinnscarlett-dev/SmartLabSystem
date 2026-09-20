@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
@@ -180,7 +181,7 @@ public sealed class TeacherAuthenticationTests
 
         var controller = new ScheduleController(context, new TeacherScheduleService(context))
         {
-            ControllerContext = CreateControllerContext(teacher.UserId, "Teacher")
+            ControllerContext = new ControllerContext { HttpContext = CreateHttpContext(teacher.UserId, "Teacher") }
         };
 
         IActionResult result = await controller.GetCurrent();
@@ -253,11 +254,13 @@ public sealed class TeacherAuthenticationTests
             });
 
         var filter = new SmartLabAuthorizationFilter();
-        await filter.OnAuthorizationAsync(new Microsoft.AspNetCore.Mvc.Filters.AuthorizationFilterContext(
+        var filterContext = new Microsoft.AspNetCore.Mvc.Filters.AuthorizationFilterContext(
             actionContext,
-            new List<IFilterMetadata>()));
+            new List<Microsoft.AspNetCore.Mvc.Filters.IFilterMetadata>());
 
-        Assert.IsType<ForbidResult>(actionContext.Result);
+        await filter.OnAuthorizationAsync(filterContext);
+
+        Assert.IsType<ForbidResult>(filterContext.Result);
     }
 
     private static User CreateTeacher(
@@ -300,7 +303,7 @@ public sealed class TeacherAuthenticationTests
         return controller;
     }
 
-    private static DefaultHttpContext CreateControllerContext(int userId, string role)
+    private static DefaultHttpContext CreateHttpContext(int userId, string role)
     {
         return new DefaultHttpContext
         {
