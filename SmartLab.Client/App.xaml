@@ -62,7 +62,7 @@
             <Setter Property="Padding" Value="12"/>
         </Style>
 
-        <Style x:Key="SmartLabBorderStrong" TargetType="Border">
+        <Style x:Key="SmartLabStrongBorderStyle" TargetType="Border">
             <Setter Property="Background" Value="{StaticResource SmartLabSurface}"/>
             <Setter Property="BorderBrush" Value="{StaticResource SmartLabBorderStrong}"/>
             <Setter Property="BorderThickness" Value="1"/>
