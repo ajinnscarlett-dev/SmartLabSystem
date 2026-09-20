@@ -219,7 +219,10 @@ public sealed class TeacherAuthenticationTests
 
         var controller = new ScheduleController(context, new TeacherScheduleService(context))
         {
-            ControllerContext = CreateHttpContext(teacher.UserId, "Teacher")
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = CreateHttpContext(teacher.UserId, "Teacher")
+            }
         };
 
         IActionResult result = await controller.GetLaboratory(603, DateTime.Today);
