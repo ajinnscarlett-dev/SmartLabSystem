@@ -24,11 +24,7 @@ namespace SmartLab.Client
             AuthSession.Apply(_httpClient);
 
             if (WelcomeText != null)
-                WelcomeText.Text = $"Welcome, {_username}";
-
-            if (UsernameText != null)
-                UsernameText.Text = _username;
-        }
+                WelcomeText.Text = $"Welcome, {_username}";}
 
         private void ProfileButton_Click(object sender, RoutedEventArgs e)
         {
