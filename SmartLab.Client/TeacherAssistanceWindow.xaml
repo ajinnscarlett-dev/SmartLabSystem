@@ -1,66 +1,57 @@
 <Window x:Class="SmartLab.Client.TeacherAssistanceWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="SmartLab — Assistance Queue"
-        Width="1260" Height="720" MinWidth="950" MinHeight="520"
+        Title="SmartLabSystem — Assistance Queue"
+        Width="1200" Height="740" MinWidth="1000" MinHeight="600"
+        WindowStartupLocation="CenterOwner"
         Background="{StaticResource SmartLabPageBackground}"
-        Foreground="{StaticResource SmartLabText}"
-        FontFamily="Segoe UI" WindowStartupLocation="CenterOwner"
         Loaded="Window_Loaded">
     <Grid Margin="20">
-        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
 
-        <Grid Grid.Row="0" Margin="0,0,0,12">
-            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+        <Grid Grid.Row="0" Margin="0,0,0,14">
             <StackPanel>
-                <TextBlock Text="ASSISTANCE QUEUE" Style="{StaticResource SmartLabPageTitle}"/>
-                <TextBlock Text="Student requests from laboratories covered by your schedule."
-                           Style="{StaticResource SmartLabCaption}" Margin="0,4,0,0"/>
+                <TextBlock Text="Assistance Queue" Style="{StaticResource SmartLabPageTitle}"/>
+                <TextBlock Text="Review requests from the current laboratory and update their state." Style="{StaticResource SmartLabCaption}" Margin="0,3,0,0"/>
             </StackPanel>
-            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock x:Name="StatusText" Style="{StaticResource SmartLabCaption}" Margin="0,0,12,0"/>
-                <Button Content="REFRESH" Width="92" Style="{StaticResource SmartLabPrimaryButton}" Click="Refresh_Click"/>
-                <Button Content="CLOSE" Width="82" Margin="8,0,0,0" Click="Close_Click"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <TextBlock x:Name="StatusText" Text="Ready" Style="{StaticResource SmartLabCaption}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                <Button Content="REFRESH" Width="82" Height="34" Click="Refresh_Click"/>
+                <Button Content="CLOSE" Width="78" Height="34" Margin="8,0,0,0" Click="Close_Click"/>
             </StackPanel>
         </Grid>
 
-        <Border Grid.Row="1" Style="{StaticResource SmartLabToolbarBorder}" Margin="0,0,0,12">
-            <WrapPanel>
-                <Button Content="ACKNOWLEDGE" Margin="0,0,7,0" Click="Acknowledge_Click"/>
-                <Button Content="IN PROGRESS" Margin="0,0,7,0" Click="Start_Click"/>
-                <Button Content="RESOLVE" Style="{StaticResource SmartLabPrimaryButton}" Margin="0,0,7,0" Click="Resolve_Click"/>
-                <Button Content="CLOSE" Click="CloseRequest_Click"/>
-            </WrapPanel>
-        </Border>
-
-        <Grid Grid.Row="2">
-            <Grid.ColumnDefinitions><ColumnDefinition Width="1.25*"/><ColumnDefinition Width="0.75*"/></Grid.ColumnDefinitions>
-            <Border Grid.Column="0" Style="{StaticResource SmartLabSectionBorder}" Margin="0,0,8,0">
-                <DataGrid x:Name="QueueGrid" Style="{StaticResource SmartLabDataGrid}"
-                          SelectionChanged="QueueGrid_SelectionChanged">
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="1.0*"/><ColumnDefinition Width="1.0*"/></Grid.ColumnDefinitions>
+            <Border Grid.Column="0" Style="{StaticResource SmartLabSectionBorder}" Padding="0" Margin="0,0,8,0">
+                <DataGrid x:Name="QueueGrid" Style="{StaticResource SmartLabDataGrid}" SelectionChanged="QueueGrid_SelectionChanged">
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="STUDENT" Binding="{Binding StudentUsername}" Width="135"/>
-                        <DataGridTextColumn Header="PC" Binding="{Binding PCNumber}" Width="90"/>
-                        <DataGridTextColumn Header="LABORATORY" Binding="{Binding LaboratoryName}" Width="125"/>
-                        <DataGridTextColumn Header="CATEGORY" Binding="{Binding Category}" Width="120"/>
-                        <DataGridTextColumn Header="STATUS" Binding="{Binding Status}" Width="105"/>
-                        <DataGridTextColumn Header="CREATED" Binding="{Binding CreatedAt}" Width="145"/>
-                        <DataGridTextColumn Header="ISSUE" Binding="{Binding Description}" Width="*"/>
+                        <DataGridTextColumn Header="ID" Binding="{Binding AssistanceRequestId}" Width="60"/>
+                        <DataGridTextColumn Header="CATEGORY" Binding="{Binding Category}" Width="130"/>
+                        <DataGridTextColumn Header="REQUESTER" Binding="{Binding StudentUsername}" Width="125"/>
+                        <DataGridTextColumn Header="PC" Binding="{Binding PCNumber}" Width="75"/>
+                        <DataGridTextColumn Header="STATUS" Binding="{Binding Status}" Width="95"/>
+                        <DataGridTextColumn Header="CREATED" Binding="{Binding CreatedAt, StringFormat={}{0:HH:mm:ss}}" Width="105"/>
                     </DataGrid.Columns>
                 </DataGrid>
             </Border>
-            <Border Grid.Column="1" Style="{StaticResource SmartLabSectionBorder}" Margin="8,0,0,0">
+
+            <Border Grid.Column="1" Style="{StaticResource SmartLabSectionBorder}" Padding="18" Margin="8,0,0,0">
                 <StackPanel>
-                    <TextBlock Text="SELECTED REQUEST" Style="{StaticResource SmartLabSectionTitle}"/>
-                    <TextBlock Text="Select a row to review the request." Style="{StaticResource SmartLabCaption}" Margin="0,3,0,16"/>
-                    <TextBlock x:Name="SelectedRequestText" Text="" FontWeight="SemiBold"
-                               TextWrapping="Wrap"/>
-                    <Border Height="1" Background="{StaticResource SmartLabBorder}" Margin="0,14,0,12"/>
-                    <TextBlock Text="RESOLUTION / STATUS" Style="{StaticResource SmartLabCaption}"/>
-                    <TextBlock x:Name="ResolutionText" Grid.Row="1" TextWrapping="Wrap"
-                               Foreground="{StaticResource SmartLabMuted}" Margin="0,5,0,0"/>
+                    <TextBlock Text="REQUEST DETAILS" Style="{StaticResource SmartLabSectionTitle}"/>
+                    <TextBlock x:Name="SelectedRequestText" Text="Select a request" FontSize="17" FontWeight="SemiBold" Margin="0,6,0,14"/>
+                    <TextBlock Text="RESOLUTION / RESPONSE" Style="{StaticResource SmartLabCaption}"/>
+                    <TextBox x:Name="ResolutionText" Height="170" Margin="0,6,0,16" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
+                    <WrapPanel HorizontalAlignment="Right">
+                        <Button Content="ACKNOWLEDGE" Width="118" Height="34" Margin="0,0,8,8" Click="Acknowledge_Click"/>
+                        <Button Content="START" Width="78" Height="34" Margin="0,0,8,8" Click="Start_Click"/>
+                        <Button Content="RESOLVE" Width="92" Height="34" Margin="0,0,8,8" Style="{StaticResource SmartLabPrimaryButton}" Click="Resolve_Click"/>
+                        <Button Content="CLOSE REQUEST" Width="112" Height="34" Margin="0,0,0,8" Style="{StaticResource SmartLabDangerButton}" Click="CloseRequest_Click"/>
+                    </WrapPanel>
                 </StackPanel>
             </Border>
         </Grid>
+
+        <TextBlock Grid.Row="2" Text="Only actions supported by the existing service workflow are exposed." Style="{StaticResource SmartLabCaption}" Margin="2,10,0,0"/>
     </Grid>
 </Window>
