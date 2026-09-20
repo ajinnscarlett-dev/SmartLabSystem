@@ -12,7 +12,9 @@
         <Style x:Key="DangerButton" TargetType="Button" BasedOn="{StaticResource SmartLabDangerButton}"><Setter Property="MinWidth" Value="95"/><Setter Property="Margin" Value="0,0,7,0"/></Style>
         <Style x:Key="FieldBox" TargetType="ComboBox" BasedOn="{StaticResource SmartLabFieldBox}"/>
         <Style x:Key="FieldText" TargetType="TextBox" BasedOn="{StaticResource SmartLabFieldBox}"/>
-        <Style x:Key="DarkGrid" TargetType="DataGrid" BasedOn="{StaticResource SmartLabDataGrid}"/>
+        <Style x:Key="DarkGrid" TargetType="DataGrid" BasedOn="{StaticResource SmartLabDataGrid}">
+            <Setter Property="AutoGenerateColumns" Value="True"/>
+        </Style>
     </Window.Resources>
 
     <DockPanel>
@@ -128,7 +130,16 @@
                         <Button Content="REFRESH" Style="{StaticResource ActionButton}" Click="RefreshAll_Click"/>
                         <Button Content="EXPORT CSV" Style="{StaticResource ActionButton}" Click="ExportActivity_Click"/>
                     </StackPanel>
-                    <DataGrid x:Name="ActivityLogGrid" Style="{StaticResource DarkGrid}"/>
+                    <DataGrid x:Name="ActivityLogGrid" Style="{StaticResource DarkGrid}" AutoGenerateColumns="False">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="TIME" Binding="{Binding CreatedAt, StringFormat={}{0:yyyy-MM-dd HH:mm:ss}}" Width="150"/>
+                            <DataGridTextColumn Header="USER" Binding="{Binding Username}" Width="130"/>
+                            <DataGridTextColumn Header="ROLE" Binding="{Binding Role}" Width="90"/>
+                            <DataGridTextColumn Header="ACTION" Binding="{Binding Action}" Width="150"/>
+                            <DataGridTextColumn Header="PC" Binding="{Binding PcNumber}" Width="90"/>
+                            <DataGridTextColumn Header="DETAILS" Binding="{Binding Details}" Width="*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
                 </DockPanel>
             </TabItem>
 
