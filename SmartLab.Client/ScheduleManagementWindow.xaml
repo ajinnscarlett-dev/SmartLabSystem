@@ -1,54 +1,50 @@
 <Window x:Class="SmartLab.Client.ScheduleManagementWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="SmartLab — Schedule Management"
-        Width="1320" Height="760" MinWidth="1050" MinHeight="620"
+        Title="SmartLabSystem — Schedules"
+        Width="1180" Height="720" MinWidth="980" MinHeight="560"
         WindowStartupLocation="CenterOwner"
-        Background="{StaticResource SmartLabPageBackground}"
-        Foreground="{StaticResource SmartLabText}">
+        Background="{StaticResource SmartLabPageBackground}">
     <Grid Margin="20">
         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
 
-        <Grid Grid.Row="0" Margin="0,0,0,12">
+        <Grid Grid.Row="0" Margin="0,0,0,14">
             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
             <StackPanel>
-                <TextBlock Text="SCHEDULE MANAGEMENT" Style="{StaticResource SmartLabPageTitle}"/>
-                <TextBlock Text="Create and maintain time-bound Teacher laboratory assignments."
-                           Style="{StaticResource SmartLabCaption}" Margin="0,4,0,0"/>
+                <TextBlock Text="Schedules" Style="{StaticResource SmartLabPageTitle}"/>
+                <TextBlock Text="Review laboratory allocations without permanently assigning teachers to rooms." Style="{StaticResource SmartLabCaption}" Margin="0,3,0,0"/>
             </StackPanel>
             <Button Grid.Column="1" Content="BACK" Style="{StaticResource SmartLabBackButton}" Click="CloseButton_Click"/>
         </Grid>
 
-        <Border Grid.Row="1" Style="{StaticResource SmartLabToolbarBorder}" Margin="0,0,0,12">
+        <Border Grid.Row="1" Style="{StaticResource SmartLabToolbarBorder}" Padding="10" Margin="0,0,0,12">
             <Grid>
-                <Grid.ColumnDefinitions><ColumnDefinition Width="220"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <DatePicker x:Name="ScheduleDatePicker" Grid.Column="0" Height="34"/>
-                <Button Grid.Column="1" Content="ADD SCHEDULE" Width="132" Margin="8,0,0,0"
-                        Style="{StaticResource SmartLabPrimaryButton}" Click="AddButton_Click"/>
-                <Button Grid.Column="2" Content="REFRESH" Width="90" Margin="8,0,0,0" Click="RefreshButton_Click"/>
-                <TextBlock x:Name="StatusText" Grid.Column="3" Text="Ready" Margin="12,0,0,0"
-                           VerticalAlignment="Center" Style="{StaticResource SmartLabCaption}"/>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="220"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <TextBlock Text="DATE" FontSize="9" FontWeight="SemiBold" Foreground="{StaticResource SmartLabMuted}" VerticalAlignment="Center"/>
+                <DatePicker x:Name="ScheduleDatePicker" Grid.Column="1" Margin="10,0,0,0" Height="34"/>
+                <TextBlock Grid.Column="2" Text="Filter the schedule to answer who is using a laboratory today or later." Style="{StaticResource SmartLabCaption}" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                <Button Grid.Column="3" Content="NEW SCHEDULE" Width="112" Height="34" Margin="8,0,0,0" Style="{StaticResource SmartLabPrimaryButton}" Click="AddButton_Click"/>
+                <Button Grid.Column="4" Content="REFRESH" Width="82" Height="34" Margin="8,0,0,0" Click="RefreshButton_Click"/>
             </Grid>
         </Border>
 
         <Border Grid.Row="2" Style="{StaticResource SmartLabSectionBorder}" Padding="0">
             <DataGrid x:Name="ScheduleGrid" Style="{StaticResource SmartLabDataGrid}">
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="TIME" Binding="{Binding TimeText}" Width="120"/>
-                    <DataGridTextColumn Header="LABORATORY" Binding="{Binding LaboratoryName}" Width="150"/>
-                    <DataGridTextColumn Header="SUBJECT" Binding="{Binding SubjectName}" Width="210"/>
-                    <DataGridTextColumn Header="CLASS" Binding="{Binding ClassName}" Width="180"/>
-                    <DataGridTextColumn Header="TEACHER" Binding="{Binding TeacherName}" Width="210"/>
+                    <DataGridTextColumn Header="TEACHER" Binding="{Binding TeacherUsername}" Width="150"/>
+                    <DataGridTextColumn Header="LABORATORY" Binding="{Binding LaboratoryName}" Width="160"/>
+                    <DataGridTextColumn Header="SUBJECT" Binding="{Binding Subject}" Width="180"/>
+                    <DataGridTextColumn Header="CLASS" Binding="{Binding ClassName}" Width="150"/>
+                    <DataGridTextColumn Header="DATE" Binding="{Binding ScheduleDate, StringFormat={}{0:yyyy-MM-dd}}" Width="110"/>
+                    <DataGridTextColumn Header="START" Binding="{Binding StartTime}" Width="85"/>
+                    <DataGridTextColumn Header="END" Binding="{Binding EndTime}" Width="85"/>
                     <DataGridTextColumn Header="STATUS" Binding="{Binding Status}" Width="100"/>
-                    <DataGridTemplateColumn Header="ACTIONS" Width="155">
+                    <DataGridTemplateColumn Header="ACTIONS" Width="170">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <StackPanel Orientation="Horizontal">
-                                    <Button Content="EDIT" Width="58" Height="30" Margin="2"
-                                            Tag="{Binding}" Click="EditButton_Click"/>
-                                    <Button Content="DELETE" Width="68" Height="30" Margin="2"
-                                            Style="{StaticResource SmartLabDangerButton}"
-                                            Tag="{Binding}" Click="DeleteButton_Click"/>
+                                    <Button Content="EDIT" Width="55" Height="28" Margin="2" Tag="{Binding}" Click="EditButton_Click"/>
+                                    <Button Content="DELETE" Width="65" Height="28" Margin="2" Tag="{Binding}" Style="{StaticResource SmartLabDangerButton}" Click="DeleteButton_Click"/>
                                 </StackPanel>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
@@ -57,7 +53,6 @@
             </DataGrid>
         </Border>
 
-        <TextBlock Grid.Row="3" Text="Teacher access to a laboratory is determined by the active schedule."
-                   Style="{StaticResource SmartLabCaption}" Margin="2,10,0,0"/>
+        <TextBlock x:Name="StatusText" Grid.Row="3" Text="Ready" Style="{StaticResource SmartLabCaption}" Margin="2,10,0,0"/>
     </Grid>
 </Window>
