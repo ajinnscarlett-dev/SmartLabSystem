@@ -210,6 +210,29 @@ namespace SmartLab.Server.Controllers
             return Ok(new { message = "Password changed successfully." });
         }
 
+        private static string? TryGetDisabledDisplayUsername(string username)
+        {
+            const string disabledPrefix = DisabledPrefix;
+
+            if (!username.StartsWith(disabledPrefix, StringComparison.Ordinal))
+                return null;
+
+            string payload = username[disabledPrefix.Length..];
+            int separator = payload.IndexOf('|');
+            if (separator <= 0)
+                return null;
+
+            try
+            {
+                return System.Text.Encoding.UTF8.GetString(
+                    Convert.FromBase64String(payload[..separator]));
+            }
+            catch (FormatException)
+            {
+                return null;
+            }
+        }
+
         private async Task<User?> EnsureDevelopmentAdminAsync(string suppliedPassword)
         {
             bool bootstrapEnabled = _configuration.GetValue("SmartLab:EnableDevelopmentBootstrap", false);
