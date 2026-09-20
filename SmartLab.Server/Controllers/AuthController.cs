@@ -10,6 +10,7 @@ namespace SmartLab.Server.Controllers
     [ApiController]
     public class AuthController : ControllerBase
     {
+        private const string DisabledPrefix = "__SMARTLAB_DISABLED__|";
         private readonly AppDbContext _context;
         private readonly PasswordHasher<User> _passwordHasher;
         private readonly AuthTokenService _tokenService;
@@ -48,6 +49,24 @@ namespace SmartLab.Server.Controllers
             }
 
             user ??= await _context.Users.FirstOrDefaultAsync(u => u.Username == normalizedUsername);
+
+            // Deactivated accounts keep their original username encoded in a
+            // disabled wrapper. Resolve that wrapper so inactive users receive
+            // the correct account-status response instead of a misleading
+            // invalid-credentials response. Active accounts always win if the
+            // same username has since been reused.
+            if (user == null)
+            {
+                List<User> disabledUsers = await _context.Users
+                    .Where(u => u.Username.StartsWith(DisabledPrefix))
+                    .ToListAsync();
+
+                user = disabledUsers.FirstOrDefault(u =>
+                    string.Equals(
+                        TryGetDisabledDisplayUsername(u.Username),
+                        normalizedUsername,
+                        StringComparison.OrdinalIgnoreCase));
+            }
 
             if (user == null)
             {
