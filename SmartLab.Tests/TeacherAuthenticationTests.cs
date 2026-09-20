@@ -373,6 +373,19 @@ public sealed class TeacherAuthenticationTests
         return controller;
     }
 
+    private static UserManagementController CreateManagementController(
+        AppDbContext context,
+        int currentUserId)
+    {
+        return new UserManagementController(context)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = CreateHttpContext(currentUserId, "Admin")
+            }
+        };
+    }
+
     private static DefaultHttpContext CreateHttpContext(int userId, string role)
     {
         return new DefaultHttpContext
