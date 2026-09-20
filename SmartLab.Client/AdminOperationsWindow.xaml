@@ -128,7 +128,7 @@
                         <Button Content="REFRESH" Style="{StaticResource ActionButton}" Click="RefreshAll_Click"/>
                         <Button Content="EXPORT CSV" Style="{StaticResource ActionButton}" Click="ExportActivity_Click"/>
                     </StackPanel>
-                    <DataGrid Style="{StaticResource DarkGrid}"/>
+                    <DataGrid x:Name="ActivityLogGrid" Style="{StaticResource DarkGrid}"/>
                 </DockPanel>
             </TabItem>
 
