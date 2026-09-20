@@ -2,34 +2,79 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Application.Resources>
+        <!-- SmartLab desktop design system: restrained, operational, Windows-native. -->
         <SolidColorBrush x:Key="SmartLabPageBackground" Color="#F3F5F8"/>
         <SolidColorBrush x:Key="SmartLabSurface" Color="#FFFFFF"/>
         <SolidColorBrush x:Key="SmartLabSurfaceAlt" Color="#F7F9FB"/>
-        <SolidColorBrush x:Key="SmartLabBorder" Color="#D7DEE6"/>
-        <SolidColorBrush x:Key="SmartLabBorderStrong" Color="#C3CDD7"/>
+        <SolidColorBrush x:Key="SmartLabBorder" Color="#D5DDE5"/>
+        <SolidColorBrush x:Key="SmartLabBorderStrong" Color="#BCC7D2"/>
         <SolidColorBrush x:Key="SmartLabText" Color="#1F2933"/>
         <SolidColorBrush x:Key="SmartLabMuted" Color="#667583"/>
-        <SolidColorBrush x:Key="SmartLabAccent" Color="#2467A9"/>
-        <SolidColorBrush x:Key="SmartLabAccentHover" Color="#1D568F"/>
-        <SolidColorBrush x:Key="SmartLabAccentSoft" Color="#EAF2F9"/>
-        <SolidColorBrush x:Key="SmartLabSuccess" Color="#2C7A52"/>
-        <SolidColorBrush x:Key="SmartLabWarning" Color="#9A6A13"/>
-        <SolidColorBrush x:Key="SmartLabDanger" Color="#B43D3D"/>
-        <SolidColorBrush x:Key="SmartLabDangerSoft" Color="#F9EEEE"/>
-        <SolidColorBrush x:Key="SmartLabDisabled" Color="#9AA6B2"/>
-
-        <!-- Backward-compatible names used by older WPF windows. -->
-        <SolidColorBrush x:Key="SmartLabControlBorder" Color="#D7DEE6"/>
+        <SolidColorBrush x:Key="SmartLabAccent" Color="#245F96"/>
+        <SolidColorBrush x:Key="SmartLabAccentHover" Color="#1B4F7D"/>
+        <SolidColorBrush x:Key="SmartLabAccentSoft" Color="#EAF1F7"/>
+        <SolidColorBrush x:Key="SmartLabSuccess" Color="#2D7650"/>
+        <SolidColorBrush x:Key="SmartLabWarning" Color="#946614"/>
+        <SolidColorBrush x:Key="SmartLabDanger" Color="#B33F3F"/>
+        <SolidColorBrush x:Key="SmartLabDangerSoft" Color="#FAEEEE"/>
+        <SolidColorBrush x:Key="SmartLabDisabled" Color="#98A4AF"/>
+        <SolidColorBrush x:Key="SmartLabHeader" Color="#FFFFFF"/>
         <SolidColorBrush x:Key="SmartLabControlBackground" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="SmartLabControlBorder" Color="#D5DDE5"/>
+        <SolidColorBrush x:Key="SmartLabSelection" Color="#EAF1F7"/>
+
+        <!-- Compatibility aliases used by existing code-behind/XAML. -->
+        <SolidColorBrush x:Key="Bg" Color="#F3F5F8"/>
+        <SolidColorBrush x:Key="Panel" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="Panel2" Color="#F7F9FB"/>
+        <SolidColorBrush x:Key="Border" Color="#D5DDE5"/>
+        <SolidColorBrush x:Key="Text" Color="#1F2933"/>
+        <SolidColorBrush x:Key="Muted" Color="#667583"/>
+        <SolidColorBrush x:Key="Blue" Color="#245F96"/>
+        <SolidColorBrush x:Key="Green" Color="#2D7650"/>
+        <SolidColorBrush x:Key="Orange" Color="#946614"/>
+        <SolidColorBrush x:Key="Red" Color="#B33F3F"/>
+        <SolidColorBrush x:Key="Purple" Color="#245F96"/>
+        <SolidColorBrush x:Key="Header" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="GridArea" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="ControlBg" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="PageBackground" Color="#F3F5F8"/>
+        <SolidColorBrush x:Key="Surface" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="SurfaceAlt" Color="#F7F9FB"/>
+        <SolidColorBrush x:Key="TextPrimary" Color="#1F2933"/>
+        <SolidColorBrush x:Key="TextSecondary" Color="#667583"/>
+        <SolidColorBrush x:Key="Accent" Color="#245F96"/>
+        <SolidColorBrush x:Key="AccentHover" Color="#1B4F7D"/>
+        <SolidColorBrush x:Key="Danger" Color="#B33F3F"/>
 
         <Style TargetType="Window">
             <Setter Property="FontFamily" Value="Segoe UI"/>
             <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Background" Value="{StaticResource SmartLabPageBackground}"/>
+            <Setter Property="Foreground" Value="{StaticResource SmartLabText}"/>
+        </Style>
+
+        <Style x:Key="SmartLabPageTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="21"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource SmartLabText}"/>
+        </Style>
+
+        <Style x:Key="SmartLabSectionTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource SmartLabText}"/>
+        </Style>
+
+        <Style x:Key="SmartLabCaption" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{StaticResource SmartLabMuted}"/>
         </Style>
 
         <Style x:Key="SmartLabButtonBase" TargetType="Button">
             <Setter Property="FontFamily" Value="Segoe UI"/>
             <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="{StaticResource SmartLabText}"/>
             <Setter Property="Background" Value="{StaticResource SmartLabSurface}"/>
             <Setter Property="BorderBrush" Value="{StaticResource SmartLabBorder}"/>
@@ -37,20 +82,65 @@
             <Setter Property="Padding" Value="11,7"/>
             <Setter Property="MinHeight" Value="34"/>
             <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
         </Style>
 
         <Style x:Key="SmartLabPrimaryButton" TargetType="Button" BasedOn="{StaticResource SmartLabButtonBase}">
             <Setter Property="Background" Value="{StaticResource SmartLabAccent}"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="BorderBrush" Value="{StaticResource SmartLabAccent}"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{StaticResource SmartLabAccentHover}"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource SmartLabAccentHover}"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Background" Value="{StaticResource SmartLabDisabled}"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource SmartLabDisabled}"/>
+                    <Setter Property="Foreground" Value="White"/>
+                </Trigger>
+            </Style.Triggers>
         </Style>
 
         <Style x:Key="SmartLabDangerButton" TargetType="Button" BasedOn="{StaticResource SmartLabButtonBase}">
             <Setter Property="Background" Value="{StaticResource SmartLabDanger}"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="BorderBrush" Value="{StaticResource SmartLabDanger}"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#963333"/>
+                    <Setter Property="BorderBrush" Value="#963333"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Background" Value="{StaticResource SmartLabDisabled}"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource SmartLabDisabled}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SmartLabNavButton" TargetType="Button" BasedOn="{StaticResource SmartLabButtonBase}">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="Margin" Value="0,1"/>
+            <Setter Property="FontWeight" Value="Normal"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{StaticResource SmartLabSurfaceAlt}"/>
+                    <Setter Property="Foreground" Value="{StaticResource SmartLabAccent}"/>
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="{StaticResource SmartLabAccentSoft}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SmartLabBackButton" TargetType="Button" BasedOn="{StaticResource SmartLabButtonBase}">
+            <Setter Property="MinWidth" Value="82"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Padding" Value="10,5"/>
         </Style>
 
         <Style x:Key="SmartLabSectionBorder" TargetType="Border">
@@ -60,66 +150,120 @@
             <Setter Property="Padding" Value="14"/>
         </Style>
 
-        <Style TargetType="Button" BasedOn="{StaticResource SmartLabButtonBase}"/>
-
-        <Style TargetType="TextBox">
-            <Setter Property="FontFamily" Value="Segoe UI"/>
-            <Setter Property="FontSize" Value="13"/>
-            <Setter Property="Foreground" Value="{StaticResource SmartLabText}"/>
+        <Style x:Key="SmartLabToolbarBorder" TargetType="Border">
             <Setter Property="Background" Value="{StaticResource SmartLabSurface}"/>
             <Setter Property="BorderBrush" Value="{StaticResource SmartLabBorder}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="8,6"/>
-            <Setter Property="MinHeight" Value="34"/>
+            <Setter Property="Padding" Value="10"/>
         </Style>
 
+        <Style x:Key="SmartLabDataGrid" TargetType="DataGrid">
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Background" Value="{StaticResource SmartLabSurface}"/>
+            <Setter Property="Foreground" Value="{StaticResource SmartLabText}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource SmartLabBorder}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="RowBackground" Value="#FFFFFF"/>
+            <Setter Property="AlternatingRowBackground" Value="#F7F9FB"/>
+            <Setter Property="GridLinesVisibility" Value="Horizontal"/>
+            <Setter Property="HorizontalGridLinesBrush" Value="#E1E6EB"/>
+            <Setter Property="VerticalGridLinesBrush" Value="#E1E6EB"/>
+            <Setter Property="RowHeight" Value="34"/>
+            <Setter Property="ColumnHeaderHeight" Value="32"/>
+            <Setter Property="CanUserAddRows" Value="False"/>
+            <Setter Property="IsReadOnly" Value="True"/>
+            <Setter Property="SelectionMode" Value="Single"/>
+        </Style>
+
+        <Style x:Key="SmartLabTabItem" TargetType="TabItem">
+            <Setter Property="Foreground" Value="{StaticResource SmartLabText}"/>
+            <Setter Property="Padding" Value="13,7"/>
+            <Setter Property="Margin" Value="0,0,2,0"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+
+        <Style x:Key="SmartLabFieldBox" TargetType="ComboBox">
+            <Setter Property="Background" Value="{StaticResource SmartLabSurface}"/>
+            <Setter Property="Foreground" Value="{StaticResource SmartLabText}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource SmartLabBorder}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+        </Style>
+
+        <Style x:Key="SmartLabFieldText" TargetType="TextBox">
+            <Setter Property="Background" Value="{StaticResource SmartLabSurface}"/>
+            <Setter Property="Foreground" Value="{StaticResource SmartLabText}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource SmartLabBorder}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+        </Style>
+
+        <!-- Existing named styles are now aliases to the same shared design language. -->
+        <Style x:Key="ButtonBase" TargetType="Button" BasedOn="{StaticResource SmartLabButtonBase}"/>
+        <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource SmartLabPrimaryButton}"/>
+        <Style x:Key="DangerButton" TargetType="Button" BasedOn="{StaticResource SmartLabDangerButton}"/>
+        <Style x:Key="ActionButton" TargetType="Button" BasedOn="{StaticResource SmartLabButtonBase}"/>
+        <Style x:Key="BlueButton" TargetType="Button" BasedOn="{StaticResource SmartLabPrimaryButton}"/>
+        <Style x:Key="PurpleButton" TargetType="Button" BasedOn="{StaticResource SmartLabPrimaryButton}"/>
+        <Style x:Key="RedButton" TargetType="Button" BasedOn="{StaticResource SmartLabDangerButton}"/>
+        <Style x:Key="NavButton" TargetType="Button" BasedOn="{StaticResource SmartLabNavButton}"/>
+        <Style x:Key="FieldBox" TargetType="ComboBox" BasedOn="{StaticResource SmartLabFieldBox}"/>
+        <Style x:Key="FieldText" TargetType="TextBox" BasedOn="{StaticResource SmartLabFieldText}"/>
+        <Style x:Key="DarkCombo" TargetType="ComboBox" BasedOn="{StaticResource SmartLabFieldBox}"/>
+        <Style x:Key="DarkTextBox" TargetType="TextBox" BasedOn="{StaticResource SmartLabFieldText}"/>
+        <Style x:Key="AdminTabItem" TargetType="TabItem" BasedOn="{StaticResource SmartLabTabItem}"/>
+        <Style x:Key="SmartLabDenseGrid" TargetType="DataGrid" BasedOn="{StaticResource SmartLabDataGrid}"/>
+        <Style x:Key="DenseGrid" TargetType="DataGrid" BasedOn="{StaticResource SmartLabDataGrid}"/>
+        <Style x:Key="DarkGrid" TargetType="DataGrid" BasedOn="{StaticResource SmartLabDataGrid}"/>
+        <Style x:Key="DarkDataGrid" TargetType="DataGrid" BasedOn="{StaticResource SmartLabDataGrid}"/>
+        <Style x:Key="SectionBorder" TargetType="Border" BasedOn="{StaticResource SmartLabSectionBorder}"/>
+
+        <Style TargetType="Button" BasedOn="{StaticResource SmartLabButtonBase}"/>
+        <Style TargetType="TextBox" BasedOn="{StaticResource SmartLabFieldText}"/>
         <Style TargetType="PasswordBox">
             <Setter Property="FontFamily" Value="Segoe UI"/>
             <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="{StaticResource SmartLabText}"/>
             <Setter Property="Background" Value="{StaticResource SmartLabSurface}"/>
             <Setter Property="BorderBrush" Value="{StaticResource SmartLabBorder}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="8,6"/>
             <Setter Property="MinHeight" Value="34"/>
         </Style>
-
-        <Style TargetType="ComboBox">
+        <Style TargetType="ComboBox" BasedOn="{StaticResource SmartLabFieldBox}"/>
+        <Style TargetType="DatePicker">
             <Setter Property="FontFamily" Value="Segoe UI"/>
             <Setter Property="FontSize" Value="13"/>
-            <Setter Property="Foreground" Value="{StaticResource SmartLabText}"/>
             <Setter Property="Background" Value="{StaticResource SmartLabSurface}"/>
+            <Setter Property="Foreground" Value="{StaticResource SmartLabText}"/>
             <Setter Property="BorderBrush" Value="{StaticResource SmartLabBorder}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="8,4"/>
-            <Setter Property="MinHeight" Value="34"/>
+            <Setter Property="Height" Value="34"/>
         </Style>
-
         <Style TargetType="ListBox">
             <Setter Property="FontFamily" Value="Segoe UI"/>
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
         </Style>
-
+        <Style TargetType="ListBoxItem">
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="Margin" Value="0,1"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        </Style>
         <Style TargetType="CheckBox">
             <Setter Property="FontFamily" Value="Segoe UI"/>
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="Foreground" Value="{StaticResource SmartLabText}"/>
             <Setter Property="Margin" Value="0,3"/>
         </Style>
-
-        <Style TargetType="DataGrid">
-            <Setter Property="FontFamily" Value="Segoe UI"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="Background" Value="{StaticResource SmartLabSurface}"/>
-            <Setter Property="Foreground" Value="{StaticResource SmartLabText}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource SmartLabBorder}"/>
-            <Setter Property="GridLinesVisibility" Value="Horizontal"/>
-            <Setter Property="RowHeight" Value="34"/>
-            <Setter Property="ColumnHeaderHeight" Value="32"/>
-            <Setter Property="CanUserAddRows" Value="False"/>
-        </Style>
-
+        <Style TargetType="DataGrid" BasedOn="{StaticResource SmartLabDataGrid}"/>
         <Style TargetType="DataGridColumnHeader">
             <Setter Property="Background" Value="{StaticResource SmartLabSurfaceAlt}"/>
             <Setter Property="Foreground" Value="{StaticResource SmartLabMuted}"/>
@@ -129,10 +273,6 @@
             <Setter Property="BorderBrush" Value="{StaticResource SmartLabBorder}"/>
             <Setter Property="BorderThickness" Value="0,0,0,1"/>
         </Style>
-
-        <Style TargetType="TabItem">
-            <Setter Property="Foreground" Value="{StaticResource SmartLabText}"/>
-            <Setter Property="Padding" Value="12,7"/>
-        </Style>
+        <Style TargetType="TabItem" BasedOn="{StaticResource SmartLabTabItem}"/>
     </Application.Resources>
 </Application>
