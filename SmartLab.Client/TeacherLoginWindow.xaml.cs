@@ -1,6 +1,8 @@
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Diagnostics;
+using System.Net;
 using System.Windows;
 
 namespace SmartLab.Client;
@@ -46,7 +48,8 @@ public partial class TeacherLoginWindow : Window
             string responseText = await response.Content.ReadAsStringAsync();
             if (!response.IsSuccessStatusCode)
             {
-                StatusText.Text = ExtractMessage(responseText, "Invalid username or password.");
+                StatusText.Text = GetLoginErrorMessage(response.StatusCode, responseText);
+                Debug.WriteLine($"Teacher login rejected with HTTP {(int)response.StatusCode}.");
                 AuthSession.Clear();
                 AuthSession.Apply(_httpClient);
                 return;
@@ -91,11 +94,33 @@ public partial class TeacherLoginWindow : Window
             dashboard.Show();
             Close();
         }
-        catch (Exception ex)
+        catch (HttpRequestException ex)
         {
+            Debug.WriteLine($"Teacher login HTTP error: {ex}");
             AuthSession.Clear();
             AuthSession.Apply(_httpClient);
-            StatusText.Text = $"Connection error: {ex.Message}";
+            StatusText.Text = "Unable to connect to SmartLab Server.";
+        }
+        catch (TaskCanceledException ex)
+        {
+            Debug.WriteLine($"Teacher login request timed out: {ex}");
+            AuthSession.Clear();
+            AuthSession.Apply(_httpClient);
+            StatusText.Text = "SmartLab Server did not respond in time.";
+        }
+        catch (JsonException ex)
+        {
+            Debug.WriteLine($"Teacher login response parsing error: {ex}");
+            AuthSession.Clear();
+            AuthSession.Apply(_httpClient);
+            StatusText.Text = "SmartLab Server returned an invalid login response.";
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Unexpected Teacher login error: {ex}");
+            AuthSession.Clear();
+            AuthSession.Apply(_httpClient);
+            StatusText.Text = "SmartLab Server is unavailable. Contact MIS.";
         }
         finally
         {
@@ -106,19 +131,51 @@ public partial class TeacherLoginWindow : Window
 
     private void BackButton_Click(object sender, RoutedEventArgs e) => Close();
 
-    private static string ExtractMessage(string text, string fallback)
+    private static string GetLoginErrorMessage(HttpStatusCode statusCode, string responseText)
     {
+        string? serverMessage = TryExtractServerMessage(responseText);
+
+        if (statusCode == HttpStatusCode.Unauthorized)
+        {
+            if (serverMessage?.Contains("inactive", StringComparison.OrdinalIgnoreCase) == true)
+                return "This account is inactive. Contact MIS.";
+
+            return "Invalid username or password.";
+        }
+
+        if (statusCode == HttpStatusCode.Forbidden)
+            return "This Teacher account is not authorized for this operation.";
+
+        if (statusCode == HttpStatusCode.BadRequest)
+            return serverMessage ?? "Username and password are required.";
+
+        if ((int)statusCode >= 500)
+            return "SmartLab Server is unavailable. Contact MIS.";
+
+        return serverMessage ?? "Teacher login could not be completed.";
+    }
+
+    private static string? TryExtractServerMessage(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return null;
+
         try
         {
             using JsonDocument json = JsonDocument.Parse(text);
-            return json.RootElement.TryGetProperty("message", out JsonElement message)
-                ? message.GetString() ?? fallback
-                : fallback;
+
+            if (json.RootElement.TryGetProperty("message", out JsonElement message) &&
+                message.ValueKind == JsonValueKind.String)
+            {
+                string value = message.GetString()?.Trim() ?? string.Empty;
+                return string.IsNullOrWhiteSpace(value) ? null : value;
+            }
         }
-        catch
+        catch (JsonException)
         {
-            return string.IsNullOrWhiteSpace(text) ? fallback : text;
         }
+
+        return null;
     }
 
     protected override void OnClosed(EventArgs e)
