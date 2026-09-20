@@ -1,237 +1,138 @@
-<Window x:Class="SmartLab.Client.AdminDashboard"
+﻿<Window x:Class="SmartLab.Client.AdminDashboard"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="SmartLab — Administration"
-        Width="1580" Height="900" MinWidth="1220" MinHeight="740"
+        Width="1550"
+        Height="900"
+        MinWidth="1250"
+        MinHeight="760"
         WindowStartupLocation="CenterScreen"
-        Background="{StaticResource SmartLabPageBackground}"
-        Foreground="{StaticResource SmartLabText}"
-        FontFamily="Segoe UI" Loaded="Window_Loaded">
-    <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="224"/>
-            <ColumnDefinition Width="*"/>
-            <ColumnDefinition x:Name="RightSidebarColumn" Width="0"/>
-        </Grid.ColumnDefinitions>
-
-        <Border Grid.Column="0" Background="{StaticResource SmartLabSurface}" BorderBrush="{StaticResource SmartLabBorder}" BorderThickness="0,0,1,0">
-            <Grid>
-                <Grid.RowDefinitions><RowDefinition Height="76"/><RowDefinition Height="*"/><RowDefinition Height="66"/></Grid.RowDefinitions>
-
-                <StackPanel Grid.Row="0" Margin="18,16,14,0">
-                    <TextBlock Text="SMARTLABSYSTEM" FontSize="18" FontWeight="SemiBold"/>
-                    <TextBlock Text="ADMIN / MIS" Style="{StaticResource SmartLabCaption}" Margin="0,3,0,0"/>
-                </StackPanel>
-
-                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                    <StackPanel Margin="12,8,12,12">
-                        <TextBlock Text="OPERATIONS" Style="{StaticResource SmartLabCaption}" Margin="8,8,0,6"/>
-                        <Button Style="{StaticResource SmartLabNavButton}" Background="{StaticResource SmartLabAccentSoft}" Foreground="{StaticResource SmartLabAccent}" Click="DashboardNavButton_Click">
-                            <TextBlock Text="Dashboard"/>
-                        </Button>
-                        <Button Style="{StaticResource SmartLabNavButton}" Click="UserManagementNavButton_Click">
-                            <TextBlock Text="Users"/>
-                        </Button>
-                        <Button Style="{StaticResource SmartLabNavButton}" Click="LaboratoriesNavButton_Click">
-                            <TextBlock Text="Laboratories"/>
-                        </Button>
-                        <Button Style="{StaticResource SmartLabNavButton}" Click="PcManagementNavButton_Click">
-                            <TextBlock Text="Computers &amp; Maintenance"/>
-                        </Button>
-                        <Button Style="{StaticResource SmartLabNavButton}" Click="SchedulesNavButton_Click">
-                            <TextBlock Text="Schedules"/>
-                        </Button>
-                        <Button Style="{StaticResource SmartLabNavButton}" Click="ServiceDeskNavButton_Click">
-                            <TextBlock Text="Service Desk"/>
-                        </Button>
-                        <Button Style="{StaticResource SmartLabNavButton}" Click="ReportsNavButton_Click">
-                            <TextBlock Text="Reports"/>
-                        </Button>
-                        <Button Style="{StaticResource SmartLabNavButton}" Click="AnnouncementsNavButton_Click">
-                            <TextBlock Text="Announcements"/>
-                        </Button>
-                        <Button Style="{StaticResource SmartLabNavButton}" Click="SettingsNavButton_Click">
-                            <TextBlock Text="Settings"/>
-                        </Button>
-
-                        <Border Height="1" Background="{StaticResource SmartLabBorder}" Margin="8,13"/>
-                        <TextBlock Text="LABORATORIES" Style="{StaticResource SmartLabCaption}" Margin="8,2,0,6"/>
-                        <Button Style="{StaticResource SmartLabNavButton}" Click="ComLab101NavButton_Click"><TextBlock Text="ComLab 101"/></Button>
-                        <Button Style="{StaticResource SmartLabNavButton}" Click="ComLab601NavButton_Click"><TextBlock Text="ComLab 601"/></Button>
-                        <Button Style="{StaticResource SmartLabNavButton}" Click="ComLab602NavButton_Click"><TextBlock Text="ComLab 602"/></Button>
-                        <Button Style="{StaticResource SmartLabNavButton}" Click="ComLab603NavButton_Click"><TextBlock Text="ComLab 603"/></Button>
-                        <Button Style="{StaticResource SmartLabNavButton}" Click="ComLab604NavButton_Click"><TextBlock Text="ComLab 604"/></Button>
-                        <Button Style="{StaticResource SmartLabNavButton}" Click="ComLab605NavButton_Click"><TextBlock Text="ComLab 605"/></Button>
-                        <Button Style="{StaticResource SmartLabNavButton}" Click="ComLab607NavButton_Click"><TextBlock Text="ComLab 607"/></Button>
-                        <Button Style="{StaticResource SmartLabNavButton}" Click="ComLab609NavButton_Click"><TextBlock Text="ComLab 609"/></Button>
-                    </StackPanel>
-                </ScrollViewer>
-
-                <Button Grid.Row="2" Content="SEND ANNOUNCEMENT" Margin="14,10"
-                        Style="{StaticResource SmartLabPrimaryButton}" Height="38"
-                        Click="AnnouncementsNavButton_Click"/>
-            </Grid>
-        </Border>
-
-        <Grid Grid.Column="1">
-            <Grid.RowDefinitions><RowDefinition Height="62"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-
-            <Border Grid.Row="0" Style="{StaticResource SmartLabToolbarBorder}" Padding="12,8">
-                <Grid>
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="250"/><ColumnDefinition Width="*"/><ColumnDefinition Width="300"/></Grid.ColumnDefinitions>
-                    <ComboBox x:Name="LaboratorySelectorCombo" Grid.Column="0" Width="225" VerticalAlignment="Center"/>
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <TextBlock Text="LIVE OPERATIONS" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource SmartLabAccent}" VerticalAlignment="Center"/>
-                        <Button Content="REFRESH" Width="84" Margin="12,0,0,0" Style="{StaticResource SmartLabPrimaryButton}" Click="RefreshButton_Click"/>
-                    </StackPanel>
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                        <Button x:Name="ThemeToggleButton" Content="THEME" Width="70" Height="32" Margin="0,0,7,0" Click="HeaderThemeButton_Click"/>
-                        <Grid Width="66" Height="32" Margin="0,0,7,0">
-                            <Button x:Name="NotificationButton" Content="ALERTS" Width="66" Height="32" Click="HeaderBellButton_Click"/>
-                            <Border x:Name="NotificationBadge" Width="17" Height="17" CornerRadius="8"
-                                    Background="{StaticResource SmartLabDanger}" HorizontalAlignment="Right" VerticalAlignment="Top"
-                                    Visibility="Collapsed">
-                                <TextBlock x:Name="NotificationCountText" Text="0" FontSize="9" FontWeight="Bold"
-                                           Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </Border>
-                        </Grid>
-                        <Button Content="ADMIN" Width="92" Height="32" Click="ProfileButton_Click"/>
-                        <Button Content="LOGOUT" Width="78" Height="32" Margin="7,0,0,0"
-                                Style="{StaticResource SmartLabDangerButton}" Click="LogoutButton_Click"/>
-                    </StackPanel>
-                </Grid>
-            </Border>
-
-            <ScrollViewer x:Name="MainScrollViewer" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                <Grid Margin="16">
-                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-
-                    <Grid Grid.Row="0" Margin="2,0,2,10">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                        <StackPanel>
-                            <TextBlock Text="LABORATORY MONITORING" Style="{StaticResource SmartLabPageTitle}" FontSize="19"/>
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Network view" Style="{StaticResource SmartLabCaption}" Margin="0,3,8,0"/>
-                                <TextBlock Text="•" Style="{StaticResource SmartLabCaption}" Margin="0,3,8,0"/>
-                                <TextBlock x:Name="ApiStatusText" Text="Connecting..." Style="{StaticResource SmartLabCaption}" Margin="0,3,0,0"/>
-                            </StackPanel>
-                        </StackPanel>
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Bottom">
-                            <TextBlock Text="VIEW" Style="{StaticResource SmartLabCaption}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                            <Button Content="GRID" Width="58" Height="28" Margin="0,0,5,0" Click="GridViewButton_Click"/>
-                            <Button Content="LIST" Width="58" Height="28" Click="ListViewButton_Click"/>
-                        </StackPanel>
-                    </Grid>
-
-                    <Border Grid.Row="1" Style="{StaticResource SmartLabSectionBorder}" Padding="12">
-                        <Grid>
-                            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-                            <Grid Grid.Row="0" Margin="0,0,0,10">
-                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="PC STATUS" Style="{StaticResource SmartLabSectionTitle}"/>
-                                    <TextBlock Text="  •  Select a computer for details" Style="{StaticResource SmartLabCaption}" Margin="7,0,0,0"/>
-                                </StackPanel>
-                                <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                    <TextBlock Text="AVAILABLE" Foreground="{StaticResource SmartLabSuccess}" Style="{StaticResource SmartLabCaption}" Margin="0,0,12,0"/>
-                                    <TextBlock Text="OCCUPIED" Foreground="{StaticResource SmartLabAccent}" Style="{StaticResource SmartLabCaption}" Margin="0,0,12,0"/>
-                                    <TextBlock Text="MAINTENANCE" Foreground="{StaticResource SmartLabWarning}" Style="{StaticResource SmartLabCaption}" Margin="0,0,12,0"/>
-                                    <TextBlock Text="OFFLINE" Foreground="{StaticResource SmartLabMuted}" Style="{StaticResource SmartLabCaption}"/>
-                                </StackPanel>
-                            </Grid>
-
-                            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                <UniformGrid x:Name="PcGrid" Columns="4" Margin="0,0,0,6"/>
-                            </ScrollViewer>
-                        </Grid>
-                    </Border>
-
-                    <Grid Grid.Row="2" Margin="0,10,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <Border Grid.Column="0" Style="{StaticResource SmartLabToolbarBorder}" Margin="0,0,4,0"><StackPanel><TextBlock Text="LABS" Style="{StaticResource SmartLabCaption}"/><TextBlock x:Name="LabCountText" Text="—" FontSize="18" FontWeight="SemiBold"/></StackPanel></Border>
-                        <Border Grid.Column="1" Style="{StaticResource SmartLabToolbarBorder}" Margin="4,0"><StackPanel><TextBlock Text="COMPUTERS" Style="{StaticResource SmartLabCaption}"/><TextBlock x:Name="TotalPcText" Text="0" FontSize="18" FontWeight="SemiBold"/></StackPanel></Border>
-                        <Border Grid.Column="2" Style="{StaticResource SmartLabToolbarBorder}" Margin="4,0"><StackPanel><TextBlock Text="AVAILABLE" Style="{StaticResource SmartLabCaption}"/><TextBlock x:Name="AvailablePcText" Text="0" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource SmartLabSuccess}"/></StackPanel></Border>
-                        <Border Grid.Column="3" Style="{StaticResource SmartLabToolbarBorder}" Margin="4,0"><StackPanel><TextBlock Text="OCCUPIED" Style="{StaticResource SmartLabCaption}"/><TextBlock x:Name="OccupiedPcText" Text="0" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource SmartLabAccent}"/></StackPanel></Border>
-                        <Border Grid.Column="4" Style="{StaticResource SmartLabToolbarBorder}" Margin="4,0"><StackPanel><TextBlock Text="MAINTENANCE" Style="{StaticResource SmartLabCaption}"/><TextBlock x:Name="MaintenancePcText" Text="0" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource SmartLabWarning}"/></StackPanel></Border>
-                        <Border Grid.Column="5" Style="{StaticResource SmartLabToolbarBorder}" Margin="4,0,0,0"><StackPanel><TextBlock Text="OFFLINE" Style="{StaticResource SmartLabCaption}"/><TextBlock x:Name="OfflinePcText" Text="0" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource SmartLabMuted}"/></StackPanel></Border>
-                    </Grid>
-                </Grid>
-            </ScrollViewer>
+        Background="{DynamicResource Bg}"
+        Foreground="{DynamicResource Text}"
+        FontFamily="Segoe UI"
+        Loaded="Window_Loaded">
+    <Window.Resources>
+        <SolidColorBrush x:Key="Bg" Color="#F3F5F8"/>
+        <SolidColorBrush x:Key="Panel" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="Panel2" Color="#F7F9FB"/>
+        <SolidColorBrush x:Key="Border" Color="#D7DEE6"/>
+        <SolidColorBrush x:Key="Text" Color="#1F2933"/>
+        <SolidColorBrush x:Key="Muted" Color="#667583"/>
+        <SolidColorBrush x:Key="Blue" Color="#2467A9"/>
+        <SolidColorBrush x:Key="Green" Color="#2C7A52"/>
+        <SolidColorBrush x:Key="Orange" Color="#9A6A13"/>
+        <SolidColorBrush x:Key="Red" Color="#B43D3D"/>
+        <SolidColorBrush x:Key="Purple" Color="#5E4A9A"/>
+        <SolidColorBrush x:Key="Header" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="GridArea" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="ControlBg" Color="#FFFFFF"/>
+        <Style x:Key="NavButton" TargetType="Button" BasedOn="{StaticResource SmartLabButtonBase}">
+            <Setter Property="Foreground" Value="{StaticResource Text}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="12,9"/>
+            <Setter Property="Margin" Value="0,1"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
+        <Style x:Key="ActionButton" TargetType="Button" BasedOn="{StaticResource SmartLabButtonBase}">
+            <Setter Property="Background" Value="{StaticResource SmartLabSurface}"/>
+            <Setter Property="Foreground" Value="{StaticResource SmartLabText}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource SmartLabBorder}"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Padding" Value="11,5"/>
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
+        <Style x:Key="BlueButton" TargetType="Button" BasedOn="{StaticResource SmartLabPrimaryButton}">
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Padding" Value="11,5"/>
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
+        <Style x:Key="PurpleButton" TargetType="Button" BasedOn="{StaticResource SmartLabPrimaryButton}">
+            <Setter Property="Background" Value="{StaticResource SmartLabAccent}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource SmartLabAccent}"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Padding" Value="11,5"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style x:Key="RedButton" TargetType="Button" BasedOn="{StaticResource SmartLabDangerButton}">
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Padding" Value="11,5"/>
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
+        <Style x:Key="DarkCombo" TargetType="ComboBox">
+            <Setter Property="Background" Value="{StaticResource ControlBg}"/>
+            <Setter Property="Foreground" Value="{StaticResource Text}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="Height" Value="36"/>
+        </Style>
+        <Style x:Key="DarkTextBox" TargetType="TextBox">
+            <Setter Property="Background" Value="{StaticResource ControlBg}"/>
+            <Setter Property="Foreground" Value="{StaticResource Text}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8,6"/>
+        </Style>
+        <Style x:Key="AdminTabItem" TargetType="TabItem">
+            <Setter Property="Foreground" Value="{StaticResource Text}"/>
+            <Setter Property="Padding" Value="14,8"/>
+            <Setter Property="Margin" Value="0,0,4,0"/>
+            <Setter Property="FontSize" Value="10"/>
+        </Style>
+        <Style x:Key="DarkDataGrid" TargetType="DataGrid">
+            <Setter Property="Background" Value="{StaticResource GridArea}"/>
+            <Setter Property="Foreground" Value="{StaticResource Text}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
+            <Setter Property="RowBackground" Value="#FFFFFF"/>
+            <Setter Property="AlternatingRowBackground" Value="#F7F9FB"/>
+            <Setter Property="GridLinesVisibility" Value="Horizontal"/>
+            <Setter Property="HorizontalGridLinesBrush" Value="#E2E7EC"/>
+            <Setter Property="VerticalGridLinesBrush" Value="#E2E7EC"/>
+            <Setter Property="RowHeight" Value="34"/>
+            <Setter Property="CanUserAddRows" Value="False"/>
+            <Setter Property="AutoGenerateColumns" Value="True"/>
+        </Style>
+    </Window.Resources>
+    <Grid Background="{DynamicResource Bg}">
+        <Grid.ColumnDefinitions><ColumnDefinition Width="210"/><ColumnDefinition Width="*"/><ColumnDefinition x:Name="RightSidebarColumn" Width="0"/></Grid.ColumnDefinitions>
+        <Border Grid.Column="0" Background="{StaticResource Panel2}" BorderBrush="{StaticResource Border}" BorderThickness="0,0,1,0"><Grid>
+            <Grid.RowDefinitions><RowDefinition Height="68"/><RowDefinition Height="*"/><RowDefinition Height="70"/></Grid.RowDefinitions>
+            <StackPanel Grid.Row="0" Margin="18,16,8,0"><TextBlock Text="SmartLab System" FontSize="17" FontWeight="SemiBold" Foreground="{StaticResource Text}"/><TextBlock Text="Admin / MIS" Margin="0,3,0,0" FontSize="10" Foreground="{StaticResource Muted}"/></StackPanel>
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"><StackPanel Margin="12,8,12,12">
+                <TextBlock Text="MAIN" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource Muted}" Margin="8,8,0,6"/>
+                <Button Style="{StaticResource NavButton}" Background="{StaticResource SmartLabAccentSoft}" Foreground="{StaticResource Blue}" Click="DashboardNavButton_Click"><StackPanel Orientation="Horizontal"><TextBlock Text="Dashboard"/></StackPanel></Button>
+                <Button Style="{StaticResource NavButton}" Click="UserManagementNavButton_Click"><StackPanel Orientation="Horizontal"><TextBlock Text="Users"/></StackPanel></Button>
+                <Button Style="{StaticResource NavButton}" Click="LaboratoriesNavButton_Click"><StackPanel Orientation="Horizontal"><TextBlock Text="Laboratories"/></StackPanel></Button>
+                <Button Style="{StaticResource NavButton}" Click="PcManagementNavButton_Click"><StackPanel Orientation="Horizontal"><TextBlock Text="Computers"/></StackPanel></Button>
+                <Button Style="{StaticResource NavButton}" Click="SchedulesNavButton_Click"><StackPanel Orientation="Horizontal"><TextBlock Text="Schedules"/></StackPanel></Button>
+                <Button Style="{StaticResource NavButton}" Click="ServiceDeskNavButton_Click"><StackPanel Orientation="Horizontal"><TextBlock Text="Incidents"/></StackPanel></Button>
+                <Button Style="{StaticResource NavButton}" Click="PcManagementNavButton_Click"><StackPanel Orientation="Horizontal"><TextBlock Text="Maintenance"/></StackPanel></Button>
+                <Button Style="{StaticResource NavButton}" Click="ReportsNavButton_Click"><StackPanel Orientation="Horizontal"><TextBlock Text="Reports"/></StackPanel></Button>
+                <Button Style="{StaticResource NavButton}" Click="AnnouncementsNavButton_Click"><StackPanel Orientation="Horizontal"><TextBlock Text="Announcements"/></StackPanel></Button>
+                <Button Style="{StaticResource NavButton}" Click="SettingsNavButton_Click"><StackPanel Orientation="Horizontal"><TextBlock Text="Settings"/></StackPanel></Button>
+                <Border Height="1" Background="{StaticResource Border}" Margin="7,12"/>
+                <TextBlock Text="LABORATORIES" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource Muted}" Margin="8,3,0,6"/>
+                <Button Style="{StaticResource NavButton}" Click="ComLab101NavButton_Click"><StackPanel Orientation="Horizontal"><TextBlock Text="ComLab 101"/></StackPanel></Button>
+                <Button Style="{StaticResource NavButton}" Click="ComLab601NavButton_Click"><StackPanel Orientation="Horizontal"><TextBlock Text="ComLab 601"/></StackPanel></Button>
+                <Button Style="{StaticResource NavButton}" Click="ComLab602NavButton_Click"><StackPanel Orientation="Horizontal"><TextBlock Text="ComLab 602"/></StackPanel></Button>
+                <Button Style="{StaticResource NavButton}" Click="ComLab603NavButton_Click"><StackPanel Orientation="Horizontal"><TextBlock Text="ComLab 603"/></StackPanel></Button>
+                <Button Style="{StaticResource NavButton}" Click="ComLab604NavButton_Click"><StackPanel Orientation="Horizontal"><TextBlock Text="ComLab 604"/></StackPanel></Button>
+                <Button Style="{StaticResource NavButton}" Click="ComLab605NavButton_Click"><StackPanel Orientation="Horizontal"><TextBlock Text="ComLab 605"/></StackPanel></Button>
+                <Button Style="{StaticResource NavButton}" Click="ComLab607NavButton_Click"><StackPanel Orientation="Horizontal"><TextBlock Text="ComLab 607"/></StackPanel></Button>
+                <Button Style="{StaticResource NavButton}" Click="ComLab609NavButton_Click"><StackPanel Orientation="Horizontal"><TextBlock Text="ComLab 609"/></StackPanel></Button>
+            </StackPanel></ScrollViewer>
+            <Button Grid.Row="2" Style="{StaticResource PurpleButton}" Margin="14,10" Height="40" Content="SEND ANNOUNCEMENT" Click="AnnouncementsNavButton_Click"/>
+        </Grid></Border>
+        <Grid Grid.Column="1"><Grid.RowDefinitions><RowDefinition Height="62"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+            <Border Grid.Row="0" Background="{StaticResource Header}" BorderBrush="{StaticResource Border}" BorderThickness="0,0,0,1"><Grid Margin="14,0"><Grid.ColumnDefinitions><ColumnDefinition Width="240"/><ColumnDefinition Width="*"/><ColumnDefinition Width="320"/></Grid.ColumnDefinitions><ComboBox x:Name="LaboratorySelectorCombo" Grid.Column="0" Width="220" Style="{StaticResource DarkCombo}" VerticalAlignment="Center"/><StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center"><Border Background="{StaticResource SmartLabAccentSoft}" BorderBrush="{StaticResource SmartLabBorder}" BorderThickness="1" Padding="13,7" Margin="0,0,8,0"><TextBlock Text="LIVE MONITORING" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource Blue}"/></Border><Button Content="REFRESH" Style="{StaticResource BlueButton}" Width="86" Height="32" Click="RefreshButton_Click"/></StackPanel><StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center"><Button x:Name="ThemeToggleButton" Width="70" Height="34" Margin="0,0,7,0" Style="{StaticResource ActionButton}" Content="THEME" FontSize="9" Click="HeaderThemeButton_Click"/><Grid Width="66" Height="34" Margin="0,0,7,0"><Button x:Name="NotificationButton" Width="66" Height="34" Style="{StaticResource ActionButton}" Content="ALERTS" FontSize="9" Click="HeaderBellButton_Click"/><Border x:Name="NotificationBadge" Width="17" Height="17" CornerRadius="8" Background="{StaticResource Red}" HorizontalAlignment="Right" VerticalAlignment="Top" Visibility="Collapsed"><TextBlock x:Name="NotificationCountText" Text="0" FontSize="9" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border></Grid><Button Width="104" Height="34" Style="{StaticResource ActionButton}" Content="ADMIN" Click="ProfileButton_Click"/><Button Width="80" Height="34" Margin="7,0,0,0" Style="{StaticResource RedButton}" Content="LOGOUT" Click="LogoutButton_Click"/></StackPanel></Grid></Border>
+            <ScrollViewer x:Name="MainScrollViewer" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><Grid Margin="12,12,12,18"><Grid.RowDefinitions><RowDefinition Height="44"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions><Grid Grid.Row="0" Margin="2,0,2,8"><StackPanel Orientation="Horizontal"><TextBlock Text="COMLAB 601" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource Text}"/><TextBlock Text="  •  " Foreground="{StaticResource Muted}" FontSize="14" VerticalAlignment="Center"/><TextBlock x:Name="ApiStatusText" Text="Connecting..." Foreground="{StaticResource Muted}" FontSize="10" VerticalAlignment="Center"/></StackPanel><StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center"><TextBlock Text="VIEW:" Foreground="{StaticResource Muted}" FontSize="9" Margin="0,0,7,0" VerticalAlignment="Center"/><Button Content="GRID" Style="{StaticResource ActionButton}" Width="58" Height="26" FontSize="9" Margin="0,0,4,0" Click="GridViewButton_Click"/><Button Content="LIST" Style="{StaticResource ActionButton}" Width="58" Height="26" FontSize="9" Click="ListViewButton_Click"/></StackPanel></Grid><Border Grid.Row="1" Background="{StaticResource GridArea}" BorderBrush="{StaticResource Border}" BorderThickness="1" Padding="12"><Grid><Grid.RowDefinitions><RowDefinition Height="36"/><RowDefinition Height="*"/><RowDefinition Height="25"/></Grid.RowDefinitions><Grid Grid.Row="0"><StackPanel Orientation="Horizontal" VerticalAlignment="Center"><TextBlock Text="PC MONITORING" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource Text}"/><TextBlock Text="  |  Select a PC for details" FontSize="9" Foreground="{StaticResource Muted}" VerticalAlignment="Center"/></StackPanel><StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center"><TextBlock Text="AVAILABLE" Foreground="{StaticResource Green}" FontSize="9" Margin="0,0,12,0"/><TextBlock Text="OCCUPIED" Foreground="{StaticResource Blue}" FontSize="9" Margin="0,0,12,0"/><TextBlock Text="MAINTENANCE" Foreground="{StaticResource Orange}" FontSize="9" Margin="0,0,12,0"/><TextBlock Text="OFFLINE" Foreground="{StaticResource Muted}" FontSize="9"/></StackPanel></Grid><ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><UniformGrid x:Name="PcGrid" Columns="4" Margin="0,2,0,6"/></ScrollViewer><Border Grid.Row="2" Background="{StaticResource Panel2}" BorderBrush="{StaticResource Border}" BorderThickness="1,0,0,0" Padding="6,4"><TextBlock Text="Live monitoring updates automatically." Foreground="{StaticResource Muted}" FontSize="9"/></Border></Grid></Border><Grid Grid.Row="2" Margin="0,10,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border Grid.Column="0" Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}" BorderThickness="1" Padding="10" Margin="0,0,4,0"><StackPanel><TextBlock Text="LABS" FontSize="9" Foreground="{StaticResource Muted}"/><TextBlock x:Name="LabCountText" Text="—" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource Text}"/></StackPanel></Border><Border Grid.Column="1" Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}" BorderThickness="1" Padding="10" Margin="4,0"><StackPanel><TextBlock Text="COMPUTERS" FontSize="9" Foreground="{StaticResource Muted}"/><TextBlock x:Name="TotalPcText" Text="0" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource Text}"/></StackPanel></Border><Border Grid.Column="2" Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}" BorderThickness="1" Padding="10" Margin="4,0"><StackPanel><TextBlock Text="AVAILABLE" FontSize="9" Foreground="{StaticResource Muted}"/><TextBlock x:Name="AvailablePcText" Text="0" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource Green}"/></StackPanel></Border><Border Grid.Column="3" Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}" BorderThickness="1" Padding="10" Margin="4,0"><StackPanel><TextBlock Text="OCCUPIED" FontSize="9" Foreground="{StaticResource Muted}"/><TextBlock x:Name="OccupiedPcText" Text="0" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource Blue}"/></StackPanel></Border><Border Grid.Column="4" Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}" BorderThickness="1" Padding="10" Margin="4,0"><StackPanel><TextBlock Text="MAINTENANCE" FontSize="9" Foreground="{StaticResource Muted}"/><TextBlock x:Name="MaintenancePcText" Text="0" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource Orange}"/></StackPanel></Border><Border Grid.Column="5" Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}" BorderThickness="1" Padding="10" Margin="4,0,0,0"><StackPanel><TextBlock Text="OFFLINE" FontSize="9" Foreground="{StaticResource Muted}"/><TextBlock x:Name="OfflinePcText" Text="0" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource Muted}"/></StackPanel></Border></Grid></Grid></ScrollViewer>
         </Grid>
-
-        <Border x:Name="SelectedPcSidebar" Grid.Column="2" Background="{StaticResource SmartLabSurface}"
-                BorderBrush="{StaticResource SmartLabBorder}" BorderThickness="1,0,0,0">
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <StackPanel Margin="14">
-                    <Grid Margin="2,0,0,12">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                        <StackPanel>
-                            <TextBlock Text="SELECTED PC" Style="{StaticResource SmartLabCaption}"/>
-                            <TextBlock x:Name="AdminNameText" Text="Admin" FontSize="12" FontWeight="SemiBold" Margin="0,2,0,0"/>
-                        </StackPanel>
-                        <Button Grid.Column="1" Content="CLOSE" Width="58" Height="28" Click="ClearSelectedPcButton_Click"/>
-                    </Grid>
-
-                    <Border Style="{StaticResource SmartLabSectionBorder}" Padding="12">
-                        <StackPanel>
-                            <TextBlock x:Name="SelectedPcTitleText" Text="Select a PC" FontSize="17" FontWeight="SemiBold"/>
-                            <TextBlock x:Name="SelectedPcHintText" Text="No current user" Style="{StaticResource SmartLabCaption}" Margin="0,3,0,10"/>
-                            <Border Height="86" Background="{StaticResource SmartLabAccentSoft}" BorderBrush="{StaticResource SmartLabBorder}" BorderThickness="1">
-                                <TextBlock Text="PC" FontSize="26" FontWeight="SemiBold" Foreground="{StaticResource SmartLabAccent}"
-                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </Border>
-                            <Grid Margin="0,12,0,0">
-                                <Grid.ColumnDefinitions><ColumnDefinition Width="92"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                                <TextBlock Text="USER" Style="{StaticResource SmartLabCaption}"/>
-                                <TextBlock x:Name="SelectedPcCurrentUserText" Grid.Column="1" Text="—"/>
-                                <TextBlock Text="LOGIN" Grid.Row="1" Style="{StaticResource SmartLabCaption}"/>
-                                <TextBlock x:Name="SelectedPcLoginTimeText" Grid.Row="1" Grid.Column="1" Text="—"/>
-                                <TextBlock Text="IP" Grid.Row="2" Style="{StaticResource SmartLabCaption}" Margin="0,7,0,0"/>
-                                <TextBlock x:Name="SelectedPcIpText" Grid.Row="2" Grid.Column="1" Text="—" Margin="0,7,0,0"/>
-                                <TextBlock Text="LAB" Grid.Row="3" Style="{StaticResource SmartLabCaption}" Margin="0,7,0,0"/>
-                                <TextBlock x:Name="SelectedPcLabText" Grid.Row="3" Grid.Column="1" Text="—" Margin="0,7,0,0"/>
-                                <TextBlock Text="STATUS" Grid.Row="4" Style="{StaticResource SmartLabCaption}" Margin="0,7,0,0"/>
-                                <TextBlock x:Name="SelectedPcStatusText" Grid.Row="4" Grid.Column="1" Text="OFFLINE" Margin="0,7,0,0"/>
-                                <TextBlock Text="LAST SEEN" Grid.Row="5" Style="{StaticResource SmartLabCaption}" Margin="0,7,0,0"/>
-                                <TextBlock x:Name="SelectedPcLastSeenText" Grid.Row="5" Grid.Column="1" Text="—" Margin="0,7,0,0"/>
-                            </Grid>
-
-                            <TextBlock Text="QUICK ACTIONS" Style="{StaticResource SmartLabSectionTitle}" Margin="0,16,0,8"/>
-                            <Button x:Name="ViewFullScreenButton" Content="VIEW FULL SCREEN" Style="{StaticResource SmartLabPrimaryButton}" Height="32" Click="ViewFullScreenButton_Click" Margin="0,0,0,5"/>
-                            <Button x:Name="RemoteControlButton" Content="REMOTE CONTROL" Height="32" Click="RemoteControlButton_Click" Margin="0,0,0,5"/>
-                            <Button x:Name="SendMessageButton" Content="SEND MESSAGE" Height="32" Click="SendMessageButton_Click" Margin="0,0,0,5"/>
-                            <Button x:Name="BlankScreenButton" Content="BLANK SCREEN" Height="32" Click="BlankScreenButton_Click" Margin="0,0,0,5"/>
-                            <Button x:Name="LockComputerButton" Content="LOCK COMPUTER" Height="32" Click="LockComputerButton_Click" Margin="0,0,0,5"/>
-                            <Button x:Name="BlockThisUserButton" Content="BLOCK THIS USER" Style="{StaticResource SmartLabDangerButton}" Height="32" Click="BlockThisUserButton_Click" Margin="0,0,0,5"/>
-                            <Button x:Name="LogoffUserButton" Content="LOG OFF USER" Height="32" Click="LogoffUserButton_Click" Margin="0,0,0,5"/>
-                            <Button x:Name="RestartComputerButton" Content="RESTART COMPUTER" Height="32" Click="RestartComputerButton_Click" Margin="0,0,0,5"/>
-                            <Button x:Name="ShutdownComputerButton" Content="SHUTDOWN COMPUTER" Style="{StaticResource SmartLabDangerButton}" Height="32" Click="ShutdownComputerButton_Click"/>
-                        </StackPanel>
-                    </Border>
-
-                    <Border Style="{StaticResource SmartLabToolbarBorder}" Margin="0,10,0,0">
-                        <StackPanel>
-                            <TextBlock Text="MORE" Style="{StaticResource SmartLabSectionTitle}"/>
-                            <Button Content="PC DETAILS" Height="30" Margin="0,8,0,4" Click="PcDetailsButton_Click"/>
-                            <Button Content="SESSION HISTORY" Height="30" Margin="0,0,0,4" Click="SessionHistoryButton_Click"/>
-                            <Button Content="ACTIVITY LOGS" Height="30" Click="ActivityLogsButton_Click"/>
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
-            </ScrollViewer>
-        </Border>
-
-        <Grid Grid.Column="1" Visibility="Collapsed">
-            <TabControl x:Name="AdminModulesTab">
-                <TabItem Header="PC MANAGEMENT"><Border x:Name="PcManagementSection"><StackPanel><Button Content="ADD PC" Click="AddPCButton_Click"/></StackPanel></Border></TabItem>
-                <TabItem Header="USERS"><Border x:Name="UserManagementSection"><DataGrid x:Name="UserGrid" Height="300"/></Border></TabItem>
-                <TabItem Header="ANNOUNCEMENTS"><Border x:Name="AnnouncementSection"><StackPanel><TextBox x:Name="AnnouncementTitleBox"/><TextBox x:Name="AnnouncementMessageBox"/><TextBox x:Name="AnnouncementExpirationBox"/><Button x:Name="PostAnnouncementButton" Content="POST ANNOUNCEMENT" Click="PostAnnouncementButton_Click"/><DataGrid x:Name="AnnouncementGrid" Height="250"/></StackPanel></Border></TabItem>
-                <TabItem Header="SERVICE DESK"><Border x:Name="ServiceDeskSection"><DataGrid x:Name="ServiceDeskGrid" Height="300"/></Border></TabItem>
-                <TabItem Header="ACTIVITY LOGS"><Border x:Name="ActivityLogsSection"><DataGrid x:Name="ActivityLogGrid" Height="300"/></Border></TabItem>
-            </TabControl>
-        </Grid>
+        <Border x:Name="SelectedPcSidebar" Grid.Column="2" Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}" BorderThickness="1,0,0,0"><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="10"><Grid Margin="0,2,0,10"><StackPanel><TextBlock Text="SELECTED PC" FontSize="9" Foreground="{StaticResource Muted}"/><TextBlock x:Name="AdminNameText" Text="Admin" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource Text}"/></StackPanel><Button Content="CLOSE" Width="56" Height="28" HorizontalAlignment="Right" Style="{StaticResource ActionButton}" FontSize="9" Click="ClearSelectedPcButton_Click"/></Grid><Border Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}" BorderThickness="1" Padding="10"><StackPanel><TextBlock x:Name="SelectedPcTitleText" Text="Select a PC" FontSize="17" FontWeight="SemiBold" Foreground="{StaticResource Text}"/><TextBlock x:Name="SelectedPcHintText" Text="No current user" FontSize="9" Foreground="{StaticResource Muted}" Margin="0,3,0,8"/><Border Height="110" Background="{StaticResource Panel2}" BorderBrush="{StaticResource Border}" BorderThickness="1"><TextBlock Text="PC" FontSize="26" FontWeight="Bold" Foreground="{StaticResource Blue}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border><TextBlock Text="Current User" FontSize="9" Foreground="{StaticResource Muted}" Margin="0,10,0,0"/><TextBlock x:Name="SelectedPcCurrentUserText" Text="—" FontSize="11" Foreground="{StaticResource Text}"/><TextBlock Text="Login Time" FontSize="9" Foreground="{StaticResource Muted}" Margin="0,8,0,0"/><TextBlock x:Name="SelectedPcLoginTimeText" Text="—" FontSize="11" Foreground="{StaticResource Text}"/><TextBlock Text="IP Address" FontSize="9" Foreground="{StaticResource Muted}" Margin="0,8,0,0"/><TextBlock x:Name="SelectedPcIpText" Text="—" FontSize="11" Foreground="{StaticResource Text}"/><TextBlock Text="Laboratory" FontSize="9" Foreground="{StaticResource Muted}" Margin="0,8,0,0"/><TextBlock x:Name="SelectedPcLabText" Text="—" FontSize="11" Foreground="{StaticResource Text}"/><TextBlock Text="Status" FontSize="9" Foreground="{StaticResource Muted}" Margin="0,8,0,0"/><TextBlock x:Name="SelectedPcStatusText" Text="OFFLINE" FontSize="11" Foreground="{StaticResource Muted}"/><TextBlock Text="Last Seen" FontSize="9" Foreground="{StaticResource Muted}" Margin="0,8,0,0"/><TextBlock x:Name="SelectedPcLastSeenText" Text="—" FontSize="11" Foreground="{StaticResource Text}"/><TextBlock Text="QUICK ACTIONS" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource Text}" Margin="0,14,0,8"/><Button x:Name="ViewFullScreenButton" Content="VIEW FULL SCREEN" Style="{StaticResource BlueButton}" Height="30" Click="ViewFullScreenButton_Click" Margin="0,0,0,5"/><Button x:Name="RemoteControlButton" Content="REMOTE CONTROL" Style="{StaticResource ActionButton}" Height="30" Click="RemoteControlButton_Click" Margin="0,0,0,5"/><Button x:Name="SendMessageButton" Content="SEND MESSAGE" Style="{StaticResource ActionButton}" Height="30" Click="SendMessageButton_Click" Margin="0,0,0,5"/><Button x:Name="BlankScreenButton" Content="BLANK SCREEN" Style="{StaticResource ActionButton}" Height="30" Click="BlankScreenButton_Click" Margin="0,0,0,5"/><Button x:Name="LockComputerButton" Content="LOCK COMPUTER" Style="{StaticResource ActionButton}" Height="30" Click="LockComputerButton_Click" Margin="0,0,0,5"/><Button x:Name="BlockThisUserButton" Content="BLOCK THIS USER" Style="{StaticResource RedButton}" Height="30" Click="BlockThisUserButton_Click" Margin="0,0,0,5"/><Button x:Name="LogoffUserButton" Content="LOG OFF USER" Style="{StaticResource ActionButton}" Height="30" Click="LogoffUserButton_Click" Margin="0,0,0,5"/><Button x:Name="RestartComputerButton" Content="RESTART COMPUTER" Style="{StaticResource ActionButton}" Height="30" Click="RestartComputerButton_Click" Margin="0,0,0,5"/><Button x:Name="ShutdownComputerButton" Content="SHUTDOWN COMPUTER" Style="{StaticResource RedButton}" Height="30" Click="ShutdownComputerButton_Click"/></StackPanel></Border><Border Background="{StaticResource Panel2}" BorderBrush="{StaticResource Border}" BorderThickness="1" Padding="10" Margin="0,10,0,0"><StackPanel><TextBlock Text="MORE" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource Text}"/><Button Content="PC DETAILS" Style="{StaticResource ActionButton}" Height="29" Margin="0,8,0,5" Click="PcDetailsButton_Click"/><Button Content="SESSION HISTORY" Style="{StaticResource ActionButton}" Height="29" Margin="0,0,0,5" Click="SessionHistoryButton_Click"/><Button Content="ACTIVITY LOGS" Style="{StaticResource ActionButton}" Height="29" Click="ActivityLogsButton_Click"/></StackPanel></Border></StackPanel></ScrollViewer></Border>
+        <Grid Grid.Column="1" Visibility="Collapsed"><TabControl x:Name="AdminModulesTab" Background="Transparent" BorderThickness="0"><TabItem Header="PC MANAGEMENT" Style="{StaticResource AdminTabItem}"><Border x:Name="PcManagementSection"><StackPanel><Button Content="ADD PC" Click="AddPCButton_Click"/></StackPanel></Border></TabItem><TabItem Header="USERS" Style="{StaticResource AdminTabItem}"><Border x:Name="UserManagementSection"><DataGrid x:Name="UserGrid" AutoGenerateColumns="True" Height="300" Style="{StaticResource DarkDataGrid}"/></Border></TabItem><TabItem Header="ANNOUNCEMENTS" Style="{StaticResource AdminTabItem}"><Border x:Name="AnnouncementSection"><StackPanel><TextBox x:Name="AnnouncementTitleBox" Style="{StaticResource DarkTextBox}"/><TextBox x:Name="AnnouncementMessageBox" Style="{StaticResource DarkTextBox}"/><TextBox x:Name="AnnouncementExpirationBox" Style="{StaticResource DarkTextBox}"/><Button x:Name="PostAnnouncementButton" Content="POST ANNOUNCEMENT" Style="{StaticResource BlueButton}" Click="PostAnnouncementButton_Click"/><DataGrid x:Name="AnnouncementGrid" Height="250" Style="{StaticResource DarkDataGrid}"/></StackPanel></Border></TabItem><TabItem Header="SERVICE DESK" Style="{StaticResource AdminTabItem}"><Border x:Name="ServiceDeskSection"><DataGrid x:Name="ServiceDeskGrid" Height="300" Style="{StaticResource DarkDataGrid}"/></Border></TabItem><TabItem Header="ACTIVITY LOGS" Style="{StaticResource AdminTabItem}"><Border x:Name="ActivityLogsSection"><DataGrid x:Name="ActivityLogGrid" Height="300" Style="{StaticResource DarkDataGrid}"/></Border></TabItem></TabControl></Grid>
     </Grid>
 </Window>
