@@ -1,4 +1,6 @@
 using System;
+using System.Diagnostics;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -62,7 +64,8 @@ public partial class ChangePasswordWindow : Window
 
             if (!response.IsSuccessStatusCode)
             {
-                StatusText.Text = await ReadMessageAsync(response);
+                StatusText.Text = GetPasswordChangeErrorMessage(response.StatusCode, await response.Content.ReadAsStringAsync());
+                Debug.WriteLine($"Password change rejected with HTTP {(int)response.StatusCode}.");
                 SaveButton.IsEnabled = true;
                 return;
             }
@@ -70,9 +73,28 @@ public partial class ChangePasswordWindow : Window
             DialogResult = true;
             Close();
         }
+        catch (HttpRequestException ex)
+        {
+            Debug.WriteLine($"Password change HTTP error: {ex}");
+            StatusText.Text = "Unable to connect to SmartLab Server.";
+            SaveButton.IsEnabled = true;
+        }
+        catch (TaskCanceledException ex)
+        {
+            Debug.WriteLine($"Password change request timed out: {ex}");
+            StatusText.Text = "SmartLab Server did not respond in time.";
+            SaveButton.IsEnabled = true;
+        }
+        catch (JsonException ex)
+        {
+            Debug.WriteLine($"Password change response parsing error: {ex}");
+            StatusText.Text = "SmartLab Server returned an invalid response.";
+            SaveButton.IsEnabled = true;
+        }
         catch (Exception ex)
         {
-            StatusText.Text = $"Unable to change password: {ex.Message}";
+            Debug.WriteLine($"Unexpected password change error: {ex}");
+            StatusText.Text = "SmartLab Server is unavailable. Contact MIS.";
             SaveButton.IsEnabled = true;
         }
     }
@@ -83,24 +105,47 @@ public partial class ChangePasswordWindow : Window
         Close();
     }
 
-    private static async Task<string> ReadMessageAsync(HttpResponseMessage response)
+    private static string GetPasswordChangeErrorMessage(HttpStatusCode statusCode, string responseText)
     {
-        string text = await response.Content.ReadAsStringAsync();
+        string? serverMessage = TryExtractServerMessage(responseText);
+
+        if (statusCode == HttpStatusCode.BadRequest)
+            return serverMessage ?? "The password change request is invalid.";
+
+        if (statusCode == HttpStatusCode.Unauthorized)
+            return serverMessage?.Contains("inactive", StringComparison.OrdinalIgnoreCase) == true
+                ? "This account is inactive. Contact MIS."
+                : "Your session is no longer valid. Please sign in again.";
+
+        if (statusCode == HttpStatusCode.Forbidden)
+            return serverMessage ?? "You must change your password before continuing.";
+
+        if ((int)statusCode >= 500)
+            return "SmartLab Server is unavailable. Contact MIS.";
+
+        return serverMessage ?? "Password change could not be completed.";
+    }
+
+    private static string? TryExtractServerMessage(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return null;
 
         try
         {
             using JsonDocument json = JsonDocument.Parse(text);
-            if (json.RootElement.TryGetProperty("message", out JsonElement message))
+            if (json.RootElement.TryGetProperty("message", out JsonElement message) &&
+                message.ValueKind == JsonValueKind.String)
             {
-                return message.GetString() ?? text;
+                string value = message.GetString()?.Trim() ?? string.Empty;
+                return string.IsNullOrWhiteSpace(value) ? null : value;
             }
         }
-        catch
+        catch (JsonException)
         {
         }
 
-        return string.IsNullOrWhiteSpace(text)
-            ? $"Password change failed ({(int)response.StatusCode})."
-            : $"Password change failed ({(int)response.StatusCode}).\n\n{text}";
+        return null;
     }
+
 }
