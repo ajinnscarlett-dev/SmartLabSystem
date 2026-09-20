@@ -10,6 +10,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.FileProviders;
 using SmartLab.Server;
 using SmartLab.Server.Controllers;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 using Xunit;
 
 namespace SmartLab.Tests;
@@ -70,6 +72,23 @@ public sealed class TeacherAuthenticationTests
         string token = root.GetProperty("token").GetString()!;
         JwtSecurityToken jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
 
+        TokenValidationParameters validation = new()
+        {
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("SmartLab-Tests-Only-Key-2026-At-Least-32-Chars!")),
+            ValidateIssuer = true,
+            ValidIssuer = "SmartLab",
+            ValidateAudience = true,
+            ValidAudience = "SmartLab.Client",
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromMinutes(1)
+        };
+
+        ClaimsPrincipal validated = new JwtSecurityTokenHandler().ValidateToken(token, validation, out _);
+        Assert.Equal("10", validated.FindFirstValue(ClaimTypes.NameIdentifier));
+        Assert.Equal("teacher01", validated.FindFirstValue(ClaimTypes.Name));
+        Assert.Equal("Teacher", validated.FindFirstValue(ClaimTypes.Role));
+
         Assert.Equal("SmartLab", jwt.Issuer);
         Assert.Contains("SmartLab.Client", jwt.Audiences);
         Assert.Equal("10", jwt.Claims.Single(c => c.Type == ClaimTypes.NameIdentifier).Value);
@@ -82,9 +101,12 @@ public sealed class TeacherAuthenticationTests
     {
         await using AppDbContext context = CreateContext();
         User teacher = CreateTeacher(11, "teacher-disabled", "TeacherPass123", mustChangePassword: false);
-        teacher.Role = "Disabled:Teacher";
         context.Users.Add(teacher);
         await context.SaveChangesAsync();
+
+        UserManagementController management = CreateManagementController(context, 999);
+        IActionResult deactivate = await management.Deactivate(teacher.UserId);
+        Assert.IsType<OkObjectResult>(deactivate);
 
         IConfiguration configuration = CreateJwtConfiguration();
         var controller = CreateAuthController(context, configuration);
@@ -95,7 +117,9 @@ public sealed class TeacherAuthenticationTests
             Password = "TeacherPass123"
         });
 
-        Assert.IsType<UnauthorizedObjectResult>(result);
+        UnauthorizedObjectResult unauthorized = Assert.IsType<UnauthorizedObjectResult>(result);
+        string json = System.Text.Json.JsonSerializer.Serialize(unauthorized.Value);
+        Assert.Contains("inactive", json, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -266,6 +290,26 @@ public sealed class TeacherAuthenticationTests
         Assert.IsType<ForbidResult>(filterContext.Result);
     }
 
+    [Fact]
+    public void TeacherLoginClientRoutesTeacherToTeacherDashboard()
+    {
+        string sourcePath = FindRepositoryFile("SmartLab.Client", "TeacherLoginWindow.xaml.cs");
+        string source = File.ReadAllText(sourcePath);
+
+        Assert.Contains(
+            "role.Equals(\"Teacher\", StringComparison.OrdinalIgnoreCase)",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "new TeacherDashboard(returnedUsername, userId)",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "dashboard.Show();",
+            source,
+            StringComparison.Ordinal);
+    }
+
     private static User CreateTeacher(
         int userId,
         string username,
@@ -337,6 +381,23 @@ public sealed class TeacherAuthenticationTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
         return new AppDbContext(options);
+    }
+
+    private static string FindRepositoryFile(params string[] relativeParts)
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+
+        while (directory != null)
+        {
+            string candidate = Path.Combine(new[] { directory.FullName }.Concat(relativeParts).ToArray());
+            if (File.Exists(candidate))
+                return candidate;
+
+            directory = directory.Parent;
+        }
+
+        throw new FileNotFoundException(
+            $"Could not locate repository file: {Path.Combine(relativeParts)}");
     }
 
     private sealed class TestHostEnvironment : IWebHostEnvironment
