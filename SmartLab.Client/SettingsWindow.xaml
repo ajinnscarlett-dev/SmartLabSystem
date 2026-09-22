@@ -1,0 +1,54 @@
+<Window x:Class="SmartLab.Client.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="SmartLabSystem — Settings"
+        Width="800" Height="560" MinWidth="680" MinHeight="500"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource SmartLabPageBackground}">
+    <Grid Margin="24">
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" Margin="0,0,0,16">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="Settings" Style="{StaticResource SmartLabPageTitle}"/>
+                <TextBlock Text="Connection, workstation identity, and runtime information." Style="{StaticResource SmartLabCaption}" Margin="0,3,0,0"/>
+            </StackPanel>
+            <Button Grid.Column="1" Content="BACK" Style="{StaticResource SmartLabBackButton}" Click="CloseButton_Click"/>
+        </Grid>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="1*"/><ColumnDefinition Width="1*"/></Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Style="{StaticResource SmartLabSectionBorder}" Margin="0,0,8,0">
+                <StackPanel>
+                    <TextBlock Text="CONNECTION" Style="{StaticResource SmartLabSectionTitle}"/>
+                    <TextBlock Text="Current SmartLab server endpoint and connectivity." Style="{StaticResource SmartLabCaption}" Margin="0,3,0,16"/>
+                    <TextBlock Text="SERVER URL" FontSize="9" FontWeight="SemiBold" Foreground="{StaticResource SmartLabMuted}"/>
+                    <TextBlock x:Name="ServerUrlText" Text="—" FontSize="13" TextWrapping="Wrap" Margin="0,5,0,16"/>
+                    <TextBlock Text="CONNECTION" FontSize="9" FontWeight="SemiBold" Foreground="{StaticResource SmartLabMuted}"/>
+                    <TextBlock x:Name="ConnectionStatusText" Text="—" FontSize="13" FontWeight="SemiBold" Margin="0,5,0,16"/>
+                    <Button Content="REFRESH CONNECTION" Width="156" Height="34" Style="{StaticResource SmartLabPrimaryButton}" Click="RefreshConnectionButton_Click"/>
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Column="1" Style="{StaticResource SmartLabSectionBorder}" Margin="8,0,0,0">
+                <StackPanel>
+                    <TextBlock Text="SYSTEM INFORMATION" Style="{StaticResource SmartLabSectionTitle}"/>
+                    <TextBlock Text="Current authenticated context and workstation runtime." Style="{StaticResource SmartLabCaption}" Margin="0,3,0,16"/>
+                    <TextBlock Text="SIGNED-IN USER" FontSize="9" FontWeight="SemiBold" Foreground="{StaticResource SmartLabMuted}"/>
+                    <TextBlock x:Name="UserText" Text="—" FontSize="13" Margin="0,5,0,14"/>
+                    <TextBlock Text="PC" FontSize="9" FontWeight="SemiBold" Foreground="{StaticResource SmartLabMuted}"/>
+                    <TextBlock x:Name="PcText" Text="—" FontSize="13" Margin="0,5,0,14"/>
+                    <TextBlock Text="RUNTIME" FontSize="9" FontWeight="SemiBold" Foreground="{StaticResource SmartLabMuted}"/>
+                    <TextBlock x:Name="RuntimeText" Text="—" FontSize="13" Margin="0,5,0,14"/>
+                    <Border Height="1" Background="{StaticResource SmartLabBorder}" Margin="0,2,0,12"/>
+                    <TextBlock Text="STATUS" FontSize="9" FontWeight="SemiBold" Foreground="{StaticResource SmartLabMuted}"/>
+                    <TextBlock x:Name="StatusText" Text="Ready" Style="{StaticResource SmartLabCaption}" Margin="0,5,0,0" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <TextBlock Grid.Row="2" Text="SmartLabSystem desktop client" Style="{StaticResource SmartLabCaption}" HorizontalAlignment="Center" Margin="0,14,0,0"/>
+    </Grid>
+</Window>

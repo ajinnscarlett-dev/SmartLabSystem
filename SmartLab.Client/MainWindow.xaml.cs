@@ -14,32 +14,27 @@ namespace SmartLab.Client
         public MainWindow()
         {
             InitializeComponent();
-
             _httpClient = new HttpClient();
             AuthSession.Apply(_httpClient);
             _pcNumber = PCConfig.PCNumber;
         }
 
-        private async void LoginButton_Click(
-            object sender,
-            RoutedEventArgs e)
+        private async void LoginButton_Click(object sender, RoutedEventArgs e)
         {
             StatusText.Text = "Finding SmartLab Server...";
             LoginButton.IsEnabled = false;
+            LoginButton.Content = "SIGNING IN...";
 
-            bool serverFound =
-                await SmartLabServerConfig.ResolveServerAsync();
-
+            bool serverFound = await SmartLabServerConfig.ResolveServerAsync();
             if (!serverFound)
             {
-                StatusText.Text =
-                    "SmartLab Server could not be found on the local network.";
+                StatusText.Text = "SmartLab Server could not be found on the local network.";
                 LoginButton.IsEnabled = true;
+                LoginButton.Content = "SIGN IN";
                 return;
             }
 
-            StatusText.Text =
-                $"Connecting to {_pcNumber}...";
+            StatusText.Text = $"Connecting to {_pcNumber}...";
 
             var loginData = new
             {
@@ -49,170 +44,89 @@ namespace SmartLab.Client
 
             try
             {
-                Uri loginUri =
-                    new Uri(
-                        new Uri(SmartLabServerConfig.BaseUrl),
-                        "api/Auth/login");
-
-                var response =
-                    await _httpClient.PostAsJsonAsync(
-                        loginUri,
-                        loginData);
-
-                string responseText =
-                    await response.Content.ReadAsStringAsync();
+                Uri loginUri = new Uri(new Uri(SmartLabServerConfig.BaseUrl), "api/Auth/login");
+                var response = await _httpClient.PostAsJsonAsync(loginUri, loginData);
+                string responseText = await response.Content.ReadAsStringAsync();
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    string message =
-                        "Invalid username or password.";
-
-                    try
-                    {
-                        using JsonDocument errorJson =
-                            JsonDocument.Parse(responseText);
-
-                        message =
-                            errorJson.RootElement
-                                .GetProperty("message")
-                                .GetString()
-                            ?? message;
-                    }
-                    catch
-                    {
-                    }
-
-                    StatusText.Text = message;
+                    StatusText.Text = ExtractMessage(responseText, "Invalid username or password.");
                     LoginButton.IsEnabled = true;
+                    LoginButton.Content = "SIGN IN";
                     AuthSession.Clear();
                     return;
                 }
 
-                using JsonDocument json =
-                    JsonDocument.Parse(responseText);
+                using JsonDocument json = JsonDocument.Parse(responseText);
+                int userId = json.RootElement.GetProperty("userId").GetInt32();
+                string username = json.RootElement.GetProperty("username").GetString() ?? string.Empty;
+                string role = json.RootElement.GetProperty("role").GetString() ?? string.Empty;
+                string token = json.RootElement.GetProperty("token").GetString() ?? string.Empty;
+                bool mustChangePassword = json.RootElement.TryGetProperty("mustChangePassword", out JsonElement mustChange)
+                    && mustChange.GetBoolean();
 
-                int userId =
-                    json.RootElement
-                        .GetProperty("userId")
-                        .GetInt32();
-
-                string username =
-                    json.RootElement
-                        .GetProperty("username")
-                        .GetString()
-                    ?? string.Empty;
-
-                string role =
-                    json.RootElement
-                        .GetProperty("role")
-                        .GetString()
-                    ?? string.Empty;
-
-                string token =
-                    json.RootElement
-                        .GetProperty("token")
-                        .GetString()
-                    ?? string.Empty;
-
-                AuthSession.SetSession(
-                    token,
-                    userId,
-                    username,
-                    role);
-
-                // Refresh this HttpClient's Authorization header immediately
-                // after receiving the JWT. The same client is then used for the
-                // protected PC login request below.
+                AuthSession.SetSession(token, userId, username, role);
                 AuthSession.Apply(_httpClient);
 
-                if (role.Equals(
-                    "Student",
-                    StringComparison.OrdinalIgnoreCase))
+                if (mustChangePassword)
                 {
-                    StatusText.Text =
-                        $"Connecting to {_pcNumber}...";
-
-                    var pcUri =
-                        new Uri(
-                            new Uri(SmartLabServerConfig.BaseUrl),
-                            $"api/PC/login/{Uri.EscapeDataString(_pcNumber)}/{userId}");
-
-                    var pcResponse =
-                        await _httpClient.PostAsync(pcUri, null);
-
-                    string pcResponseText =
-                        await pcResponse.Content.ReadAsStringAsync();
-
-                    if (!pcResponse.IsSuccessStatusCode)
+                    var changePasswordWindow = new ChangePasswordWindow(_httpClient, username);
+                    bool? changed = changePasswordWindow.ShowDialog();
+                    if (changed != true)
                     {
-                        string message =
-                            $"Unable to login to {_pcNumber}.";
+                        AuthSession.Clear();
+                        AuthSession.Apply(_httpClient);
+                        StatusText.Text = "Password change is required before continuing.";
+                        LoginButton.IsEnabled = true;
+                        LoginButton.Content = "SIGN IN";
+                        return;
+                    }
+                }
 
-                        try
-                        {
-                            using JsonDocument pcError =
-                                JsonDocument.Parse(pcResponseText);
-
-                            message =
-                                pcError.RootElement
-                                    .GetProperty("message")
-                                    .GetString()
-                                ?? message;
-                        }
-                        catch
-                        {
-                        }
-
-                        StatusText.Text = message;
+                if (role.Equals("Student", StringComparison.OrdinalIgnoreCase))
+                {
+                    string? macAddress = MachinePresenceService.GetMacAddress();
+                    if (string.IsNullOrWhiteSpace(macAddress))
+                    {
+                        StatusText.Text = "Unable to identify this workstation's MAC address.";
                         AuthSession.Clear();
                         AuthSession.Apply(_httpClient);
                         LoginButton.IsEnabled = true;
+                        LoginButton.Content = "SIGN IN";
                         return;
                     }
 
-                    using JsonDocument pcJson =
-                        JsonDocument.Parse(pcResponseText);
+                    StatusText.Text = $"Connecting to {_pcNumber}...";
+                    Uri pcUri = new Uri(new Uri(SmartLabServerConfig.BaseUrl), $"api/PC/login/{Uri.EscapeDataString(_pcNumber)}/{userId}");
+                    var pcResponse = await _httpClient.PostAsJsonAsync(pcUri, new { macAddress });
+                    string pcResponseText = await pcResponse.Content.ReadAsStringAsync();
 
-                    int pcId =
-                        pcJson.RootElement
-                            .GetProperty("pcId")
-                            .GetInt32();
+                    if (!pcResponse.IsSuccessStatusCode)
+                    {
+                        StatusText.Text = ExtractMessage(pcResponseText, $"Unable to login to {_pcNumber}.");
+                        AuthSession.Clear();
+                        AuthSession.Apply(_httpClient);
+                        LoginButton.IsEnabled = true;
+                        LoginButton.Content = "SIGN IN";
+                        return;
+                    }
 
-                    string pcNumber =
-                        pcJson.RootElement
-                            .GetProperty("pcNumber")
-                            .GetString()
-                    ?? _pcNumber;
-
-                    SmartLabWidget widget =
-                        new SmartLabWidget(
-                            username,
-                            pcNumber,
-                            userId,
-                            pcId);
-
+                    using JsonDocument pcJson = JsonDocument.Parse(pcResponseText);
+                    int pcId = pcJson.RootElement.GetProperty("pcId").GetInt32();
+                    string pcNumber = pcJson.RootElement.GetProperty("pcNumber").GetString() ?? _pcNumber;
+                    SmartLabWidget widget = new SmartLabWidget(username, pcNumber, userId, pcId);
                     widget.Show();
                     Close();
                 }
-                else if (role.Equals(
-                    "Teacher",
-                    StringComparison.OrdinalIgnoreCase))
+                else if (role.Equals("Teacher", StringComparison.OrdinalIgnoreCase))
                 {
-                    TeacherDashboard dashboard =
-                        new TeacherDashboard(
-                            username,
-                            userId);
-
+                    TeacherDashboard dashboard = new TeacherDashboard(username, userId);
                     dashboard.Show();
                     Close();
                 }
-                else if (role.Equals(
-                    "Admin",
-                    StringComparison.OrdinalIgnoreCase))
+                else if (role.Equals("Admin", StringComparison.OrdinalIgnoreCase))
                 {
-                    AdminDashboard dashboard =
-                        new AdminDashboard(username);
-
+                    AdminDashboard dashboard = new AdminDashboard(username);
                     dashboard.Show();
                     Close();
                 }
@@ -220,37 +134,43 @@ namespace SmartLab.Client
                 {
                     AuthSession.Clear();
                     AuthSession.Apply(_httpClient);
-                    StatusText.Text =
-                        $"Login successful, but role '{role}' is not supported by this client.";
+                    StatusText.Text = $"Login successful, but role '{role}' is not supported by this client.";
                     LoginButton.IsEnabled = true;
+                    LoginButton.Content = "SIGN IN";
                 }
             }
             catch (Exception ex)
             {
-                StatusText.Text =
-                    $"Connection error: {ex.Message}";
+                StatusText.Text = $"Connection error: {ex.Message}";
                 LoginButton.IsEnabled = true;
+                LoginButton.Content = "SIGN IN";
                 AuthSession.Clear();
                 AuthSession.Apply(_httpClient);
             }
         }
 
-        private void AdminLoginButton_Click(
-            object sender,
-            RoutedEventArgs e)
+        private static string ExtractMessage(string responseText, string fallback)
         {
             try
             {
-                AdminLoginWindow adminLogin =
-                    new AdminLoginWindow();
+                using JsonDocument json = JsonDocument.Parse(responseText);
+                return json.RootElement.TryGetProperty("message", out JsonElement message)
+                    ? message.GetString() ?? fallback
+                    : fallback;
+            }
+            catch { return fallback; }
+        }
 
-                adminLogin.Show();
+        private void AdminLoginButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                new AdminLoginWindow().Show();
                 Close();
             }
             catch (Exception ex)
             {
-                StatusText.Text =
-                    $"Unable to open Admin Login: {ex.Message}";
+                StatusText.Text = $"Unable to open Admin Login: {ex.Message}";
             }
         }
 

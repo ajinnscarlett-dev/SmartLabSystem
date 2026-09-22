@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Concurrent;
 using System.Security.Claims;
-using System.Threading;
 
 namespace SmartLab.Server.Controllers
 {
@@ -15,6 +14,7 @@ namespace SmartLab.Server.Controllers
         private static readonly TimeSpan FrameMaxAge = TimeSpan.FromSeconds(30);
 
         private readonly AppDbContext _context;
+        private readonly TeacherScheduleService _scheduleService;
 
         private sealed class ScreenFrame
         {
@@ -28,7 +28,11 @@ namespace SmartLab.Server.Controllers
         private static readonly ConcurrentDictionary<int, bool> MonitoringStates = new();
         private static long _globalFrameVersion;
 
-        public ScreenMonitorController(AppDbContext context) => _context = context;
+        public ScreenMonitorController(AppDbContext context, TeacherScheduleService scheduleService)
+        {
+            _context = context;
+            _scheduleService = scheduleService;
+        }
 
         [Authorize(Roles = "Admin,Teacher,Student")]
         [HttpGet("{pcId}/status")]
@@ -91,6 +95,7 @@ namespace SmartLab.Server.Controllers
             CleanupStaleFrames();
             if (!await CanStaffAccessPcAsync(pcId)) return Forbid();
             if (!LatestFrames.TryGetValue(pcId, out ScreenFrame? frame)) return NotFound(new { message = "No current screen image is available for this PC." });
+            TouchRemoteViewerLease(pcId);
             return Ok(new { pcId, version = frame.Version, updatedAt = frame.UpdatedAt });
         }
 
@@ -101,6 +106,9 @@ namespace SmartLab.Server.Controllers
             CleanupStaleFrames();
             if (!await CanStaffAccessPcAsync(pcId)) return Forbid();
             if (!LatestFrames.TryGetValue(pcId, out ScreenFrame? frame)) return NotFound(new { message = "No current screen image is available for this PC." });
+
+            // Refresh the remote-control lease even when there is no newer frame.
+            TouchRemoteViewerLease(pcId);
             if (version.HasValue && version.Value >= frame.Version) return NoContent();
 
             Response.Headers["X-SmartLab-Frame-Version"] = frame.Version.ToString();
@@ -115,8 +123,20 @@ namespace SmartLab.Server.Controllers
             CleanupStaleFrames();
             if (!await CanAccessPcAsync(pcId)) return Forbid();
             LatestFrames.TryRemove(pcId, out _);
-            if (User.IsInRole("Admin") || User.IsInRole("Teacher")) MonitoringStates[pcId] = false;
+            if (User.IsInRole("Admin") || User.IsInRole("Teacher"))
+            {
+                MonitoringStates[pcId] = false;
+                RemoteControlSessionTracker.Remove(pcId);
+            }
             return Ok(new { message = "Screen monitoring data removed.", pcId });
+        }
+
+        private void TouchRemoteViewerLease(int pcId)
+        {
+            if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out int userId))
+                return;
+
+            RemoteControlSessionTracker.Touch(pcId, userId);
         }
 
         private static void CleanupStaleFrames()
@@ -146,9 +166,14 @@ namespace SmartLab.Server.Controllers
         private async Task<bool> CanTeacherAccessPcAsync(int pcId)
         {
             if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out int teacherId)) return false;
-            return await _context.PCs.AsNoTracking().AnyAsync(pc =>
-                pc.PCId == pcId && pc.LaboratoryId.HasValue &&
-                _context.TeacherLaboratoryAuthorizations.Any(a => a.TeacherUserId == teacherId && a.LaboratoryId == pc.LaboratoryId.Value));
+
+            PC? pc = await _context.PCs.AsNoTracking().FirstOrDefaultAsync(p => p.PCId == pcId);
+            if (pc == null || !pc.LaboratoryId.HasValue)
+                return false;
+
+            return await _scheduleService.IsTeacherScheduledAsync(
+                teacherId,
+                pc.LaboratoryId.Value);
         }
 
         private async Task<bool> CanStudentAccessPcAsync(int pcId)

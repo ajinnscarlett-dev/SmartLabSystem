@@ -1222,7 +1222,16 @@ namespace SmartLab.Client
             object sender,
             RoutedEventArgs e)
         {
-            SelectAdminModule(1);
+            foreach (Window window in Application.Current.Windows)
+            {
+                if (window is UserManagementWindow existing && existing.IsVisible)
+                {
+                    existing.Activate();
+                    return;
+                }
+            }
+
+            new UserManagementWindow(this).ShowDialog();
         }
 
 
@@ -1230,18 +1239,15 @@ namespace SmartLab.Client
             object sender,
             RoutedEventArgs e)
         {
-            MessageBox.Show(
-                "Laboratory selection is available from the laboratory selector.",
-                "SmartLab",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
+            MainScrollViewer.ScrollToHome();
+            LaboratorySelectorCombo?.Focus();
         }
 
         private void PcManagementNavButton_Click(
             object sender,
             RoutedEventArgs e)
         {
-            SelectAdminModule(0);
+            PcGrid?.BringIntoView();
         }
 
 
@@ -1249,7 +1255,7 @@ namespace SmartLab.Client
             object sender,
             RoutedEventArgs e)
         {
-            SelectAdminModule(4);
+            OpenOperationsCenter(8);
         }
 
 
@@ -1257,7 +1263,7 @@ namespace SmartLab.Client
             object sender,
             RoutedEventArgs e)
         {
-            SelectAdminModule(3);
+            OpenServiceDeskCenter();
         }
 
 
@@ -1265,7 +1271,7 @@ namespace SmartLab.Client
             object sender,
             RoutedEventArgs e)
         {
-            SelectAdminModule(2);
+            OpenOperationsCenter(5);
         }
 
 
@@ -1273,11 +1279,11 @@ namespace SmartLab.Client
             object sender,
             RoutedEventArgs e)
         {
-            MessageBox.Show(
-                "Settings is reserved for the next admin module.",
-                "SmartLab",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
+            var settingsWindow = new SettingsWindow(
+                this,
+                AdminNameText.Text);
+
+            settingsWindow.ShowDialog();
         }
 
         private void HeaderThemeButton_Click(
@@ -1325,7 +1331,7 @@ namespace SmartLab.Client
             if (ThemeToggleButton != null)
             {
                 ThemeToggleButton.Content =
-                    _isDarkTheme ? "☾" : "☀";
+                    _isDarkTheme ? "LIGHT" : "DARK";
 
                 ThemeToggleButton.ToolTip =
                     _isDarkTheme

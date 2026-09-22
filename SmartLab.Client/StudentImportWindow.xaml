@@ -1,0 +1,56 @@
+<Window x:Class="SmartLab.Client.StudentImportWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="SmartLabSystem — Import Students"
+        Width="1120" Height="720" MinWidth="900" MinHeight="560"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource SmartLabPageBackground}">
+    <Grid Margin="22">
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" Margin="0,0,0,14">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="Student Import" Style="{StaticResource SmartLabPageTitle}"/>
+                <TextBlock x:Name="FileText" Text="Load an Excel file, review validation, then import only valid rows." Style="{StaticResource SmartLabCaption}" Margin="0,3,0,0"/>
+            </StackPanel>
+            <Button Grid.Column="1" Content="BACK" Style="{StaticResource SmartLabBackButton}" Click="CancelButton_Click"/>
+        </Grid>
+
+        <Grid Grid.Row="1" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <Border Style="{StaticResource SmartLabToolbarBorder}" Padding="12" Margin="0,0,8,0">
+                <StackPanel>
+                    <TextBlock Text="VALIDATION" FontSize="9" FontWeight="SemiBold" Foreground="{StaticResource SmartLabMuted}"/>
+                    <TextBlock x:Name="SummaryText" Text="No rows loaded." FontSize="13" FontWeight="SemiBold" Margin="0,3,0,0"/>
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="1" Style="{StaticResource SmartLabToolbarBorder}" Padding="12" MinWidth="190">
+                <StackPanel>
+                    <TextBlock Text="IMPORT STATUS" FontSize="9" FontWeight="SemiBold" Foreground="{StaticResource SmartLabMuted}"/>
+                    <TextBlock x:Name="StatusText" Text="Ready" FontSize="13" FontWeight="SemiBold" Margin="0,3,0,0"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <Border Grid.Row="2" Style="{StaticResource SmartLabSectionBorder}" Padding="0">
+            <DataGrid x:Name="RowsGrid" Style="{StaticResource SmartLabDataGrid}">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="EXCEL ROW" Binding="{Binding ExcelRow}" Width="90"/>
+                    <DataGridTextColumn Header="STUDENT NUMBER" Binding="{Binding StudentNumber}" Width="190"/>
+                    <DataGridTextColumn Header="STUDENT NAME" Binding="{Binding StudentName}" Width="*"/>
+                    <DataGridTextColumn Header="VALIDATION" Binding="{Binding Validation}" Width="320"/>
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
+
+        <Grid Grid.Row="3" Margin="2,10,0,0">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <TextBlock Text="Initial password = Student Number. Imported accounts require a password change on first login."
+                       Style="{StaticResource SmartLabCaption}" VerticalAlignment="Center" TextWrapping="Wrap"/>
+            <Button x:Name="CancelButton" Grid.Column="1" Content="CANCEL" Width="88" Height="34" Margin="10,0,0,0" Click="CancelButton_Click"/>
+            <Button x:Name="ImportButton" Grid.Column="2" Content="IMPORT VALID ROWS" Width="160" Height="34" Margin="8,0,0,0"
+                    Style="{StaticResource SmartLabPrimaryButton}" Click="ImportButton_Click"/>
+        </Grid>
+    </Grid>
+</Window>

@@ -1,0 +1,39 @@
+<Window x:Class="SmartLab.Client.TeacherLoginWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="SmartLabSystem — Teacher Login"
+        Width="620" Height="480" MinWidth="560" MinHeight="440"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource SmartLabPageBackground}">
+    <Grid Margin="26">
+        <Grid.ColumnDefinitions><ColumnDefinition Width="0.9*"/><ColumnDefinition Width="1.1*"/></Grid.ColumnDefinitions>
+        <Border Grid.Column="0" Background="{StaticResource SmartLabText}" Padding="24">
+            <StackPanel VerticalAlignment="Center">
+                <TextBlock Text="TEACHER ACCESS" Foreground="#B8D0E2" FontSize="11" FontWeight="SemiBold"/>
+                <TextBlock Text="SmartLabSystem" Foreground="White" FontSize="24" FontWeight="SemiBold" Margin="0,7,0,3"/>
+                <TextBlock Text="Laboratory classroom operations" Foreground="#D4DDE5" FontSize="12"/>
+                <Border BorderBrush="#4A5B68" BorderThickness="0,1,0,0" Margin="0,22,0,16"/>
+                <TextBlock Text="Monitor student workstations, schedules, assistance requests, and announcements."
+                           Foreground="#C1CCD5" FontSize="12" TextWrapping="Wrap"/>
+            </StackPanel>
+        </Border>
+
+        <Grid Grid.Column="1" Margin="28,0,0,0">
+            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+            <Button Grid.Row="0" Content="BACK" Style="{StaticResource SmartLabBackButton}" HorizontalAlignment="Left" Click="BackButton_Click"/>
+            <Border Grid.Row="1" Style="{StaticResource SmartLabSectionBorder}" Padding="24" VerticalAlignment="Center">
+                <StackPanel>
+                    <TextBlock Text="Teacher Login" Style="{StaticResource SmartLabPageTitle}"/>
+                    <TextBlock Text="Use your assigned SmartLab Teacher account." Style="{StaticResource SmartLabCaption}" Margin="0,4,0,20"/>
+                    <TextBlock Text="USERNAME" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource SmartLabMuted}"/>
+                    <TextBox x:Name="UsernameTextBox" Margin="0,6,0,14"/>
+                    <TextBlock Text="PASSWORD" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource SmartLabMuted}"/>
+                    <PasswordBox x:Name="PasswordBox" Margin="0,6,0,18"/>
+                    <Button x:Name="LoginButton" Content="SIGN IN" Height="40" Style="{StaticResource SmartLabPrimaryButton}" Click="LoginButton_Click"/>
+                    <TextBlock x:Name="StatusText" Margin="0,12,0,0" TextWrapping="Wrap" Foreground="{StaticResource SmartLabMuted}"/>
+                </StackPanel>
+            </Border>
+            <TextBlock Grid.Row="2" Text="Teacher access is validated by the SmartLab Server." Style="{StaticResource SmartLabCaption}" HorizontalAlignment="Center" Margin="0,14,0,0"/>
+        </Grid>
+    </Grid>
+</Window>

@@ -9,15 +9,15 @@ namespace SmartLab.Server
     public sealed class SmartLabRequestIntegrityFilter : IAsyncActionFilter
     {
         private readonly AppDbContext _context;
+        private readonly TeacherScheduleService _scheduleService;
 
-        public SmartLabRequestIntegrityFilter(AppDbContext context)
+        public SmartLabRequestIntegrityFilter(AppDbContext context, TeacherScheduleService scheduleService)
         {
             _context = context;
+            _scheduleService = scheduleService;
         }
 
-        public async Task OnActionExecutionAsync(
-            ActionExecutingContext context,
-            ActionExecutionDelegate next)
+        public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
         {
             if (!(context.HttpContext.User?.Identity?.IsAuthenticated ?? false))
             {
@@ -30,17 +30,53 @@ namespace SmartLab.Server
                 ? actionName ?? string.Empty
                 : string.Empty;
 
+            if (!TryGetUserId(context, out int currentUserId))
+            {
+                context.Result = new UnauthorizedResult();
+                return;
+            }
+
+            User? currentUser = await _context.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.UserId == currentUserId);
+
+            if (currentUser == null || currentUser.Role.StartsWith("Disabled:", StringComparison.OrdinalIgnoreCase))
+            {
+                context.Result = new UnauthorizedObjectResult(new
+                {
+                    message = "This SmartLab account is no longer active."
+                });
+                return;
+            }
+
+            string tokenRole = context.HttpContext.User.FindFirstValue(ClaimTypes.Role) ?? string.Empty;
+            if (!string.Equals(currentUser.Role, tokenRole, StringComparison.OrdinalIgnoreCase))
+            {
+                context.Result = new UnauthorizedObjectResult(new
+                {
+                    message = "Your SmartLab access has changed. Please sign in again."
+                });
+                return;
+            }
+
+            if (!string.Equals(controller, "AuthController", StringComparison.OrdinalIgnoreCase) && currentUser.MustChangePassword)
+            {
+                context.Result = new ObjectResult(new
+                {
+                    code = "PASSWORD_CHANGE_REQUIRED",
+                    message = "You must change your password before continuing."
+                })
+                {
+                    StatusCode = StatusCodes.Status403Forbidden
+                };
+                return;
+            }
+
             if (controller == "PCController" && context.HttpContext.User.IsInRole("Teacher"))
             {
-                if (!TryGetUserId(context, out int teacherUserId))
-                {
-                    context.Result = new UnauthorizedResult();
-                    return;
-                }
-
                 if (action.Equals("GetAllPCs", StringComparison.OrdinalIgnoreCase))
                 {
-                    context.Result = new OkObjectResult(await GetAuthorizedTeacherPcsAsync(teacherUserId));
+                    context.Result = new OkObjectResult(await GetAuthorizedTeacherPcsAsync(currentUserId));
                     return;
                 }
 
@@ -52,15 +88,13 @@ namespace SmartLab.Server
                         return;
                     }
 
-                    bool authorized = await _context.TeacherLaboratoryAuthorizations.AsNoTracking()
-                        .AnyAsync(a => a.TeacherUserId == teacherUserId && a.LaboratoryId == laboratoryId);
-                    if (!authorized)
+                    if (!await _scheduleService.IsTeacherScheduledAsync(currentUserId, laboratoryId))
                     {
                         context.Result = new ForbidResult();
                         return;
                     }
 
-                    context.Result = new OkObjectResult(await GetAuthorizedTeacherPcsAsync(teacherUserId, laboratoryId));
+                    context.Result = new OkObjectResult(await GetAuthorizedTeacherPcsAsync(currentUserId, laboratoryId));
                     return;
                 }
 
@@ -72,11 +106,9 @@ namespace SmartLab.Server
                         return;
                     }
 
-                    bool authorized = await _context.PCs.AsNoTracking().AnyAsync(pc =>
-                        pc.PCId == pcId && pc.LaboratoryId.HasValue &&
-                        _context.TeacherLaboratoryAuthorizations.Any(a =>
-                            a.TeacherUserId == teacherUserId && a.LaboratoryId == pc.LaboratoryId.Value));
-                    if (!authorized)
+                    PC? pc = await _context.PCs.AsNoTracking().FirstOrDefaultAsync(p => p.PCId == pcId);
+                    if (pc == null || !pc.LaboratoryId.HasValue ||
+                        !await _scheduleService.IsTeacherScheduledAsync(currentUserId, pc.LaboratoryId.Value))
                     {
                         context.Result = new ForbidResult();
                         return;
@@ -86,15 +118,9 @@ namespace SmartLab.Server
 
             if (controller == "PCController" && context.HttpContext.User.IsInRole("Student"))
             {
-                if (!TryGetUserId(context, out int userId))
-                {
-                    context.Result = new UnauthorizedResult();
-                    return;
-                }
-
                 if (action.Equals("LoginToPC", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (!TryGetRouteInt(context, "userId", out int routeUserId) || routeUserId != userId)
+                    if (!TryGetRouteInt(context, "userId", out int routeUserId) || routeUserId != currentUserId)
                     {
                         context.Result = new ForbidResult();
                         return;
@@ -102,7 +128,7 @@ namespace SmartLab.Server
                 }
                 else if (action.Equals("ReleasePC", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (!TryGetRouteInt(context, "userId", out int routeUserId) || routeUserId != userId)
+                    if (!TryGetRouteInt(context, "userId", out int routeUserId) || routeUserId != currentUserId)
                     {
                         context.Result = new ForbidResult();
                         return;
@@ -116,18 +142,13 @@ namespace SmartLab.Server
                         return;
                     }
 
-                    PC? ownedPc = await _context.PCs
-                        .FirstOrDefaultAsync(p => p.PCId == pcId && p.CurrentUserId == userId);
-
+                    PC? ownedPc = await _context.PCs.FirstOrDefaultAsync(p => p.PCId == pcId && p.CurrentUserId == currentUserId);
                     if (ownedPc == null)
                     {
                         context.Result = new ForbidResult();
                         return;
                     }
 
-                    // A temporary network outage may have moved an owned PC to
-                    // Offline. Restore the operational state as soon as the same
-                    // authenticated student proves ownership again by heartbeat.
                     if (string.Equals(ownedPc.Status, "Offline", StringComparison.OrdinalIgnoreCase))
                     {
                         ownedPc.Status = "Occupied";
@@ -138,7 +159,7 @@ namespace SmartLab.Server
 
             if (controller == "ServiceDeskController" && action.Equals("CreateTicket", StringComparison.OrdinalIgnoreCase))
             {
-                if (!TryGetUserId(context, out int userId) || !context.HttpContext.User.IsInRole("Teacher"))
+                if (!context.HttpContext.User.IsInRole("Teacher"))
                 {
                     context.Result = new ForbidResult();
                     return;
@@ -150,7 +171,7 @@ namespace SmartLab.Server
                     return;
                 }
 
-                if (createRequest.TeacherUserId != userId)
+                if (createRequest.TeacherUserId != currentUserId)
                 {
                     context.Result = new ForbidResult();
                     return;
@@ -169,11 +190,22 @@ namespace SmartLab.Server
 
         private async Task<List<object>> GetAuthorizedTeacherPcsAsync(int teacherUserId, int? laboratoryId = null)
         {
+            DateTime now = DateTime.Now;
+            DateTime dayStart = now.Date;
+            DateTime dayEnd = dayStart.AddDays(1);
+            TimeSpan time = now.TimeOfDay;
+
             return await _context.PCs.AsNoTracking()
                 .Where(p => p.LaboratoryId.HasValue &&
                     (!laboratoryId.HasValue || p.LaboratoryId == laboratoryId.Value) &&
-                    _context.TeacherLaboratoryAuthorizations.Any(a =>
-                        a.TeacherUserId == teacherUserId && a.LaboratoryId == p.LaboratoryId.Value))
+                    _context.ClassSchedules.Any(s =>
+                        s.TeacherUserId == teacherUserId &&
+                        s.LaboratoryId == p.LaboratoryId.Value &&
+                        s.ScheduleDate >= dayStart &&
+                        s.ScheduleDate < dayEnd &&
+                        s.Status == "Scheduled" &&
+                        s.StartTime <= time &&
+                        s.EndTime > time))
                 .Include(p => p.CurrentUser)
                 .Include(p => p.Laboratory)
                 .OrderBy(p => p.PCId)
@@ -196,10 +228,8 @@ namespace SmartLab.Server
                 .ToListAsync();
         }
 
-        private static bool TryGetUserId(ActionContext context, out int userId)
-        {
-            return int.TryParse(context.HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier), out userId);
-        }
+        private static bool TryGetUserId(ActionContext context, out int userId) =>
+            int.TryParse(context.HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier), out userId);
 
         private static bool TryGetRouteInt(ActionContext context, string name, out int value)
         {

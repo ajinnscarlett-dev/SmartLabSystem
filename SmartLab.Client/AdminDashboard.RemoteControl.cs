@@ -12,8 +12,6 @@ using System.Windows.Threading;
 
 namespace SmartLab.Client
 {
-    // Authenticated, COMLAB-authorized remote-control layer built on
-    // the existing live-screen monitoring flow.
     public partial class AdminDashboard
     {
         private static readonly bool _remoteControlHandlerRegistered = RegisterRemoteControlHandler();
@@ -148,7 +146,7 @@ namespace SmartLab.Client
         {
             for (int attempt = 0; attempt < 30; attempt++)
             {
-                await Task.Delay(150);
+                await Task.Delay(100);
 
                 var response = await _httpClient.GetAsync($"api/PCCommand/{commandId}");
                 if (!response.IsSuccessStatusCode)
@@ -205,7 +203,7 @@ namespace SmartLab.Client
             });
             toolbarPanel.Children.Add(new TextBlock
             {
-                Text = "Click inside the live screen to send a mouse click. Press a key to send one key press.",
+                Text = "Live workstation view",
                 Foreground = new SolidColorBrush(Color.FromRgb(150, 165, 174)),
                 VerticalAlignment = VerticalAlignment.Center
             });
@@ -337,7 +335,7 @@ namespace SmartLab.Client
                 await StopRemoteControlSessionAsync(pc.PcId);
             };
 
-            timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+            timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
             timer.Tick += async (s, e) =>
             {
                 if (closing || refreshRunning)
@@ -346,13 +344,7 @@ namespace SmartLab.Client
                 refreshRunning = true;
                 try
                 {
-                    await RefreshOnePcFrameAsync(card, pc);
-                    if (_latestScreenImages.TryGetValue(pc.PcId, out byte[]? latest) && latest.Length > 0)
-                    {
-                        ImageSource? latestImage = DecodeFrozenImage(latest);
-                        if (latestImage != null)
-                            image.Source = latestImage;
-                    }
+                    await RefreshRemoteControlFrameAsync(pc, image);
                 }
                 catch
                 {
@@ -370,6 +362,65 @@ namespace SmartLab.Client
             timer.Stop();
         }
 
+        private async Task RefreshRemoteControlFrameAsync(PCInfo pc, Image image)
+        {
+            _screenVersions.TryGetValue(pc.PcId, out long knownVersion);
+
+            using HttpResponseMessage response = await _httpClient.GetAsync(
+                $"api/ScreenMonitor/{pc.PcId}?version={knownVersion}");
+
+            if (response.StatusCode == System.Net.HttpStatusCode.NoContent)
+                return;
+
+            if (!response.IsSuccessStatusCode)
+                return;
+
+            byte[] latest = await response.Content.ReadAsByteArrayAsync();
+            if (latest.Length == 0)
+                return;
+
+            ImageSource? decoded = await Task.Run(() => DecodeFrozenImage(latest));
+            if (decoded == null)
+                return;
+
+            if (response.Headers.TryGetValues("X-SmartLab-Frame-Version", out var values) &&
+                long.TryParse(values.FirstOrDefault(), out long version))
+            {
+                _screenVersions[pc.PcId] = version;
+            }
+
+            _latestScreenImages[pc.PcId] = latest;
+            image.Source = decoded;
+        }
+
+        private async Task SendRemoteKeyAsync(int pcId, int keyCode)
+        {
+            try
+            {
+                await _httpClient.PostAsJsonAsync(
+                    $"api/PCCommand/{pcId}/remote-control/key",
+                    new { KeyCode = keyCode });
+            }
+            catch
+            {
+                // Ignore individual remote input failures.
+            }
+        }
+
+        private async Task SendRemoteMouseClickAsync(int pcId, double x, double y, string button)
+        {
+            try
+            {
+                await _httpClient.PostAsJsonAsync(
+                    $"api/PCCommand/{pcId}/remote-control/mouse-click",
+                    new { X = x, Y = y, Button = button });
+            }
+            catch
+            {
+                // Ignore individual remote input failures.
+            }
+        }
+
         private static (double X, double Y)? CalculateNormalizedImagePoint(Image image, Point position)
         {
             if (image.Source is not BitmapSource bitmap ||
@@ -381,8 +432,6 @@ namespace SmartLab.Client
                 return null;
             }
 
-            // Mouse coordinates are WPF DIPs, so use the bitmap's DIPs as the
-            // source dimensions too. This avoids a DPI-dependent pixel/DIP mix.
             double sourceWidth = bitmap.Width;
             double sourceHeight = bitmap.Height;
             double actualWidth = image.ActualWidth;
@@ -415,63 +464,6 @@ namespace SmartLab.Client
             return (
                 Math.Clamp(sourceX / sourceWidth, 0.0, 1.0),
                 Math.Clamp(sourceY / sourceHeight, 0.0, 1.0));
-        }
-
-        private async Task SendRemoteKeyAsync(int pcId, int keyCode)
-        {
-            try
-            {
-                var response = await _httpClient.PostAsJsonAsync(
-                    $"api/PCCommand/{pcId}/remote-control/key",
-                    new { KeyCode = keyCode });
-
-                if (response.IsSuccessStatusCode)
-                    await WaitForRemoteInputCompletionAsync(await GetCommandIdFromResponseAsync(response));
-            }
-            catch
-            {
-                // Ignore individual remote input failures.
-            }
-        }
-
-        private async Task SendRemoteMouseClickAsync(int pcId, double x, double y, string button)
-        {
-            try
-            {
-                var response = await _httpClient.PostAsJsonAsync(
-                    $"api/PCCommand/{pcId}/remote-control/mouse-click",
-                    new { X = x, Y = y, Button = button });
-
-                if (!response.IsSuccessStatusCode)
-                    return;
-
-                await WaitForRemoteInputCompletionAsync(await GetCommandIdFromResponseAsync(response));
-            }
-            catch
-            {
-                // Ignore individual remote input failures.
-            }
-        }
-
-        private async Task WaitForRemoteInputCompletionAsync(long commandId)
-        {
-            try
-            {
-                await WaitForRemoteCommandCompletionAsync(commandId, "Remote input");
-            }
-            catch
-            {
-                // Ignore individual input completion failures.
-            }
-        }
-
-        private async Task<long> GetCommandIdFromResponseAsync(HttpResponseMessage response)
-        {
-            PCCommandSimpleResponse? result = await response.Content.ReadFromJsonAsync<PCCommandSimpleResponse>();
-            if (result == null)
-                throw new InvalidOperationException("Remote input command returned no command ID.");
-
-            return result.CommandId;
         }
 
         private sealed class PCCommandStatusResponse
