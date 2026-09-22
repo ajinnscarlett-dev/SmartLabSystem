@@ -136,6 +136,7 @@ namespace SmartLab.Client
                     AuthSession.Apply(_httpClient);
                     StatusText.Text = $"Login successful, but role '{role}' is not supported by this client.";
                     LoginButton.IsEnabled = true;
+                    LoginButton.Content = "SIGN IN";
                 }
             }
             catch (Exception ex)
