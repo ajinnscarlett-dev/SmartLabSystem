@@ -2,69 +2,216 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="SmartLabSystem — Student Login"
-        Width="760" Height="560" MinWidth="680" MinHeight="520"
+        Width="900"
+        Height="560"
+        MinWidth="820"
+        MinHeight="520"
         WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResizeWithGrip"
+        FocusManager.FocusedElement="{Binding ElementName=UsernameTextBox}"
         Background="{StaticResource SmartLabPageBackground}">
-    <Grid Margin="28">
+
+    <Grid Margin="24">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="1.05*"/>
-            <ColumnDefinition Width="0.95*"/>
+            <ColumnDefinition Width="320"/>
+            <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <Border Grid.Column="0" Background="{StaticResource SmartLabText}" Padding="28">
-            <StackPanel VerticalAlignment="Center">
-                <TextBlock Text="SMARTLABSYSTEM" Foreground="White" FontSize="25" FontWeight="SemiBold"/>
-                <TextBlock Text="School laboratory operations platform" Foreground="#C8D3DD" FontSize="12" Margin="0,5,0,26"/>
-                <Border BorderBrush="#495865" BorderThickness="0,1,0,0" Margin="0,0,0,20"/>
-                <TextBlock Text="STUDENT WORKSTATION" Foreground="#AFC2D0" FontSize="10" FontWeight="SemiBold"/>
-                <TextBlock Text="Sign in to continue to your assigned workstation." Foreground="White"
-                           FontSize="16" FontWeight="SemiBold" Margin="0,7,0,8" TextWrapping="Wrap"/>
-                <TextBlock Text="SmartLab verifies the local server and workstation identity during sign in."
-                           Foreground="#B9C7D2" FontSize="11" TextWrapping="Wrap" MaxWidth="330"/>
-            </StackPanel>
+        <!-- Application identity / operational context -->
+        <Border Grid.Column="0"
+                Background="{StaticResource SmartLabText}"
+                Padding="28">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <StackPanel>
+                    <Border Background="{StaticResource SmartLabAccent}"
+                            Width="34"
+                            Height="4"
+                            HorizontalAlignment="Left"
+                            Margin="0,0,0,18"/>
+                    <TextBlock Text="SMARTLABSYSTEM"
+                               Foreground="White"
+                               FontSize="24"
+                               FontWeight="SemiBold"
+                               TextWrapping="Wrap"/>
+                    <TextBlock Text="School Computer Laboratory Platform"
+                               Foreground="#C6D1DA"
+                               FontSize="12"
+                               Margin="0,6,0,0"
+                               TextWrapping="Wrap"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="1"
+                            VerticalAlignment="Center"
+                            MaxWidth="250">
+                    <TextBlock Text="STUDENT WORKSTATION"
+                               Foreground="#AFC0CD"
+                               FontSize="10"
+                               FontWeight="SemiBold"/>
+                    <TextBlock Text="Sign in to access your assigned workstation."
+                               Foreground="White"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Margin="0,8,0,10"
+                               TextWrapping="Wrap"/>
+                    <TextBlock Text="SmartLab verifies the local server and workstation identity during sign in."
+                               Foreground="#B7C4CE"
+                               FontSize="11"
+                               LineHeight="17"
+                               TextWrapping="Wrap"/>
+                </StackPanel>
+
+                <Border Grid.Row="2"
+                        BorderBrush="#43525F"
+                        BorderThickness="1"
+                        Background="#1E2933"
+                        Padding="12">
+                    <StackPanel>
+                        <TextBlock Text="SMARTLAB SERVER"
+                                   Foreground="#AFC0CD"
+                                   FontSize="9"
+                                   FontWeight="SemiBold"/>
+                        <TextBlock Text="Local network discovery enabled"
+                                   Foreground="White"
+                                   FontSize="11"
+                                   Margin="0,4,0,2"
+                                   TextWrapping="Wrap"/>
+                        <TextBlock Text="Workstation identity validation"
+                                   Foreground="#B7C4CE"
+                                   FontSize="10"
+                                   TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
         </Border>
 
-        <Grid Grid.Column="1" Margin="28,0,0,0">
+        <!-- Primary sign-in surface -->
+        <Grid Grid.Column="1"
+              Margin="34,0,18,0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <Grid Grid.Row="0" Margin="0,0,0,18">
-                <StackPanel>
-                    <TextBlock Text="Student Login" Style="{StaticResource SmartLabPageTitle}"/>
-                    <TextBlock Text="Use your SmartLab student credentials." Style="{StaticResource SmartLabCaption}" Margin="0,4,0,0"/>
-                </StackPanel>
-                <Border HorizontalAlignment="Right" VerticalAlignment="Center"
-                        Background="{StaticResource SmartLabAccentSoft}" BorderBrush="{StaticResource SmartLabBorder}" BorderThickness="1" Padding="9,5">
-                    <TextBlock Text="STUDENT" Foreground="{StaticResource SmartLabAccent}" FontSize="10" FontWeight="SemiBold"/>
-                </Border>
-            </Grid>
+            <StackPanel Grid.Row="0"
+                        Margin="0,18,0,18">
+                <TextBlock Text="Student Login"
+                           Style="{StaticResource SmartLabPageTitle}"/>
+                <TextBlock Text="Sign in with your student credentials."
+                           Style="{StaticResource SmartLabCaption}"
+                           FontSize="12"
+                           Margin="0,5,0,0"/>
+            </StackPanel>
 
-            <Border Grid.Row="1" Style="{StaticResource SmartLabSectionBorder}" Padding="22" VerticalAlignment="Center">
-                <StackPanel>
-                    <TextBlock Text="CREDENTIALS" Style="{StaticResource SmartLabSectionTitle}"/>
-                    <TextBlock Text="Student number or username" Style="{StaticResource SmartLabCaption}" Margin="0,4,0,18"/>
+            <ScrollViewer Grid.Row="1"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <Grid>
+                    <Border Style="{StaticResource SmartLabSectionBorder}"
+                            Padding="24"
+                            MaxWidth="470"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Top">
+                        <StackPanel>
+                            <TextBlock Text="CREDENTIALS"
+                                       Style="{StaticResource SmartLabSectionTitle}"/>
+                            <TextBlock Text="Enter the student number or username registered with SmartLab."
+                                       Style="{StaticResource SmartLabCaption}"
+                                       Margin="0,5,0,20"
+                                       TextWrapping="Wrap"/>
 
-                    <TextBlock Text="USERNAME" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource SmartLabMuted}"/>
-                    <TextBox x:Name="UsernameTextBox" Margin="0,6,0,14"/>
+                            <TextBlock Text="STUDENT NUMBER / USERNAME"
+                                       FontSize="10"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource SmartLabMuted}"/>
+                            <TextBox x:Name="UsernameTextBox"
+                                     Height="40"
+                                     Margin="0,7,0,16"
+                                     TabIndex="0"
+                                     AutomationProperties.Name="Student number or username"
+                                     ToolTip="Enter your student number or username"/>
 
-                    <TextBlock Text="PASSWORD" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource SmartLabMuted}"/>
-                    <PasswordBox x:Name="PasswordBox" Margin="0,6,0,18"/>
+                            <TextBlock Text="PASSWORD"
+                                       FontSize="10"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource SmartLabMuted}"/>
+                            <PasswordBox x:Name="PasswordBox"
+                                         Height="40"
+                                         Margin="0,7,0,18"
+                                         TabIndex="1"
+                                         AutomationProperties.Name="Password"
+                                         ToolTip="Enter your password"/>
 
-                    <Button x:Name="LoginButton" Content="SIGN IN" Height="40" Style="{StaticResource SmartLabPrimaryButton}" Click="LoginButton_Click"/>
-                    <TextBlock x:Name="StatusText" Margin="0,12,0,0" TextWrapping="Wrap" Foreground="{StaticResource SmartLabMuted}"/>
-                </StackPanel>
+                            <Button x:Name="LoginButton"
+                                    Content="SIGN IN"
+                                    Height="42"
+                                    TabIndex="2"
+                                    IsDefault="True"
+                                    Style="{StaticResource SmartLabPrimaryButton}"
+                                    Click="LoginButton_Click"
+                                    AutomationProperties.Name="Sign in"/>
+
+                            <Border Margin="0,14,0,0"
+                                    MinHeight="48"
+                                    Background="{StaticResource SmartLabSurfaceAlt}"
+                                    BorderBrush="{StaticResource SmartLabBorder}"
+                                    BorderThickness="1"
+                                    Padding="10,8">
+                                <TextBlock x:Name="StatusText"
+                                           Foreground="{StaticResource SmartLabMuted}"
+                                           FontSize="11"
+                                           LineHeight="16"
+                                           TextWrapping="Wrap"
+                                           VerticalAlignment="Center"
+                                           AutomationProperties.LiveSetting="Polite"/>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </ScrollViewer>
+
+            <Border Grid.Row="2"
+                    BorderBrush="{StaticResource SmartLabBorder}"
+                    BorderThickness="0,1,0,0"
+                    Padding="0,14,0,0"
+                    Margin="0,10,0,2">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Text="Other sign-in options"
+                               Style="{StaticResource SmartLabCaption}"
+                               FontWeight="SemiBold"/>
+
+                    <StackPanel Grid.Row="1"
+                                Orientation="Horizontal"
+                                Margin="0,7,0,0">
+                        <Button Content="Teacher Login"
+                                Width="108"
+                                Height="32"
+                                TabIndex="3"
+                                Style="{StaticResource SmartLabBackButton}"
+                                Click="TeacherLoginButton_Click"
+                                AutomationProperties.Name="Teacher login"/>
+                        <Button Content="Admin Login"
+                                Width="92"
+                                Height="32"
+                                Margin="12,0,0,0"
+                                TabIndex="4"
+                                Style="{StaticResource SmartLabBackButton}"
+                                Click="AdminLoginButton_Click"
+                                AutomationProperties.Name="Admin login"/>
+                    </StackPanel>
+                </Grid>
             </Border>
-
-            <Grid Grid.Row="2" Margin="0,18,0,0">
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                    <Button Content="TEACHER LOGIN" Style="{StaticResource SmartLabButtonBase}" Width="118" Height="32" Click="TeacherLoginButton_Click"/>
-                    <Button x:Name="AdminSettingsButton" Content="MANAGEMENT" Style="{StaticResource SmartLabButtonBase}" Width="110" Height="32" Margin="8,0,0,0" Click="AdminLoginButton_Click"/>
-                </StackPanel>
-                <TextBlock Text="SmartLab Server • Workstation verification" Style="{StaticResource SmartLabCaption}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
-            </Grid>
         </Grid>
     </Grid>
 </Window>
