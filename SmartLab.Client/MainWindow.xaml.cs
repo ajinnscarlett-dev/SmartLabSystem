@@ -161,19 +161,6 @@ namespace SmartLab.Client
             catch { return fallback; }
         }
 
-        private void TeacherLoginButton_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                var teacherLogin = new TeacherLoginWindow(this);
-                teacherLogin.ShowDialog();
-            }
-            catch (Exception ex)
-            {
-                StatusText.Text = $"Unable to open Teacher Login: {ex.Message}";
-            }
-        }
-
         private void AdminLoginButton_Click(object sender, RoutedEventArgs e)
         {
             try
