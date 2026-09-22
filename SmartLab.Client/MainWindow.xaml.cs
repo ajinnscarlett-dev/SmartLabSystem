@@ -23,12 +23,14 @@ namespace SmartLab.Client
         {
             StatusText.Text = "Finding SmartLab Server...";
             LoginButton.IsEnabled = false;
+            LoginButton.Content = "SIGNING IN...";
 
             bool serverFound = await SmartLabServerConfig.ResolveServerAsync();
             if (!serverFound)
             {
                 StatusText.Text = "SmartLab Server could not be found on the local network.";
                 LoginButton.IsEnabled = true;
+                LoginButton.Content = "SIGN IN";
                 return;
             }
 
@@ -50,6 +52,7 @@ namespace SmartLab.Client
                 {
                     StatusText.Text = ExtractMessage(responseText, "Invalid username or password.");
                     LoginButton.IsEnabled = true;
+                    LoginButton.Content = "SIGN IN";
                     AuthSession.Clear();
                     return;
                 }
@@ -75,6 +78,7 @@ namespace SmartLab.Client
                         AuthSession.Apply(_httpClient);
                         StatusText.Text = "Password change is required before continuing.";
                         LoginButton.IsEnabled = true;
+                        LoginButton.Content = "SIGN IN";
                         return;
                     }
                 }
@@ -88,6 +92,7 @@ namespace SmartLab.Client
                         AuthSession.Clear();
                         AuthSession.Apply(_httpClient);
                         LoginButton.IsEnabled = true;
+                        LoginButton.Content = "SIGN IN";
                         return;
                     }
 
@@ -102,6 +107,7 @@ namespace SmartLab.Client
                         AuthSession.Clear();
                         AuthSession.Apply(_httpClient);
                         LoginButton.IsEnabled = true;
+                        LoginButton.Content = "SIGN IN";
                         return;
                     }
 
@@ -136,6 +142,7 @@ namespace SmartLab.Client
             {
                 StatusText.Text = $"Connection error: {ex.Message}";
                 LoginButton.IsEnabled = true;
+                LoginButton.Content = "SIGN IN";
                 AuthSession.Clear();
                 AuthSession.Apply(_httpClient);
             }
@@ -151,6 +158,19 @@ namespace SmartLab.Client
                     : fallback;
             }
             catch { return fallback; }
+        }
+
+        private void TeacherLoginButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var teacherLogin = new TeacherLoginWindow(this);
+                teacherLogin.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                StatusText.Text = $"Unable to open Teacher Login: {ex.Message}";
+            }
         }
 
         private void AdminLoginButton_Click(object sender, RoutedEventArgs e)
