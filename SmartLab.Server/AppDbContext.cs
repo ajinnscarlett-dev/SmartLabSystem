@@ -24,6 +24,11 @@ namespace SmartLab.Server
         {
             base.OnModelCreating(modelBuilder);
 
+            modelBuilder.Entity<PC>().HasIndex(p => p.CurrentUserId).IsUnique().HasFilter("[CurrentUserId] IS NOT NULL");
+            modelBuilder.Entity<PC>().Property(p => p.CurrentUserId).IsConcurrencyToken();
+            modelBuilder.Entity<PC>().Property(p => p.LastSeen).IsConcurrencyToken();
+            modelBuilder.Entity<PC>().Property(p => p.IsEnabled).IsConcurrencyToken();
+            modelBuilder.Entity<PC>().Property(p => p.Status).IsConcurrencyToken();
             modelBuilder.Entity<PC>().HasIndex(p => p.PCNumber).IsUnique();
             modelBuilder.Entity<PC>().HasIndex(p => p.MACAddress).IsUnique().HasFilter("[MACAddress] IS NOT NULL");
             modelBuilder.Entity<PC>().HasIndex(p => new { p.LaboratoryId, p.Status });
@@ -83,8 +88,8 @@ namespace SmartLab.Server
                 int? previousUserId = entry.Property(p => p.CurrentUserId).OriginalValue;
                 int? currentUserId = entry.Entity.CurrentUserId;
 
-                bool enteredOccupied = !string.Equals(previousStatus, "Occupied", StringComparison.OrdinalIgnoreCase) && string.Equals(currentStatus, "Occupied", StringComparison.OrdinalIgnoreCase) && currentUserId.HasValue;
-                bool leftOccupied = string.Equals(previousStatus, "Occupied", StringComparison.OrdinalIgnoreCase) && !string.Equals(currentStatus, "Occupied", StringComparison.OrdinalIgnoreCase);
+                bool enteredOccupied = string.Equals(currentStatus, "Occupied", StringComparison.OrdinalIgnoreCase) && currentUserId.HasValue;
+                bool leftOccupied = previousUserId.HasValue && previousUserId != currentUserId;
 
                 if (enteredOccupied)
                 {

@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -264,7 +265,9 @@ public sealed class PCController : ControllerBase
     [Authorize(Roles = "Student")]
     public async Task<IActionResult> LoginToPC(string pcNumber, int userId, [FromBody] PCLoginRequest request)
     {
-        var user = await _context.Users.FirstOrDefaultAsync(u => u.UserId == userId && u.Role == "Student");
+        if (!User.IsInRole("Student") || User.FindFirstValue(ClaimTypes.NameIdentifier) != userId.ToString())
+            return Forbid();
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.UserId == userId && u.Role == "Student" && !u.MustChangePassword);
         if (user == null)
             return NotFound(new { message = "Student account not found." });
 
@@ -290,7 +293,10 @@ public sealed class PCController : ControllerBase
             return Conflict(new { message = $"PC {pc.PCNumber} is currently disabled." });
         if (pc.Status == "Maintenance")
             return Conflict(new { message = $"PC {pc.PCNumber} is currently under maintenance." });
-        if (pc.Status != "Available" || pc.CurrentUserId.HasValue)
+        if (await _context.PCs.AnyAsync(p => p.CurrentUserId == userId && p.PCId != pc.PCId))
+            return Conflict(new { message = "You already own another workstation. Sign out there or ask Admin/MIS to release it." });
+        bool recovering = pc.CurrentUserId == userId;
+        if (!recovering && (pc.Status != "Available" || pc.CurrentUserId.HasValue))
             return Conflict(new { message = $"PC {pc.PCNumber} is not available for a new student session." });
 
         pc.Status = "Occupied";
@@ -298,10 +304,11 @@ public sealed class PCController : ControllerBase
         pc.LastSeen = DateTime.Now;
         await _context.SaveChangesAsync();
         await LogActivity(userId, pc.PCId, "PC Login", $"User {user.Username} logged in to PC {pc.PCNumber}.");
-
+        var session = await _context.PcUsageHistory.SingleOrDefaultAsync(s => s.PCId == pc.PCId && s.UserId == userId && s.LogoutTime == null);
         return Ok(new
         {
             message = "PC login successful.",
+            sessionId = session!.SessionId,
             pcId = pc.PCId,
             pcNumber = pc.PCNumber,
             status = pc.Status,
@@ -315,17 +322,22 @@ public sealed class PCController : ControllerBase
 
     [HttpPost("release/{userId}")]
     [Authorize(Roles = "Student")]
-    public async Task<IActionResult> ReleasePC(int userId)
+    public async Task<IActionResult> ReleasePC(int userId, [FromQuery] int? pcId = null, [FromQuery] long? sessionId = null)
     {
-        var pc = await _context.PCs.FirstOrDefaultAsync(p => p.CurrentUserId == userId);
+        if (!User.IsInRole("Student") || User.FindFirstValue(ClaimTypes.NameIdentifier) != userId.ToString())
+            return Forbid();
+        var pc = await _context.PCs.SingleOrDefaultAsync(p => p.CurrentUserId == userId);
         if (pc == null)
             return NotFound(new { message = "No PC is currently assigned to this user." });
 
+        if (pcId != pc.PCId || !sessionId.HasValue ||
+            !await _context.PcUsageHistory.AnyAsync(s => s.SessionId == sessionId && s.PCId == pc.PCId && s.UserId == userId && s.LogoutTime == null))
+            return Conflict(new { message = "The workstation session has changed. Sign in again before releasing it." });
         var user = await _context.Users.FirstOrDefaultAsync(u => u.UserId == userId);
         string username = user?.Username ?? $"User {userId}";
         string pcNumber = pc.PCNumber;
 
-        pc.Status = "Available";
+        if (pc.Status != "Maintenance" && pc.IsEnabled) pc.Status = "Available";
         pc.CurrentUserId = null;
         pc.LastSeen = DateTime.Now;
         await _context.SaveChangesAsync();
@@ -336,18 +348,42 @@ public sealed class PCController : ControllerBase
 
     [HttpPost("{id}/heartbeat")]
     [Authorize(Roles = "Student")]
-    public async Task<IActionResult> Heartbeat(int id)
+    public async Task<IActionResult> Heartbeat(int id, [FromQuery] long? sessionId = null)
     {
         var pc = await _context.PCs.FirstOrDefaultAsync(p => p.PCId == id);
         if (pc == null)
             return NotFound(new { message = "PC not found." });
 
+        if (!User.IsInRole("Student") || !int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out int userId) || pc.CurrentUserId != userId)
+            return Forbid();
+        if (!sessionId.HasValue || !await _context.PcUsageHistory.AnyAsync(s => s.SessionId == sessionId && s.PCId == id && s.UserId == userId && s.LogoutTime == null))
+            return Conflict(new { message = "This workstation session has expired. Sign in again." });
         pc.LastSeen = DateTime.Now;
         if (pc.Status == "Offline" && pc.CurrentUserId.HasValue && pc.IsEnabled)
             pc.Status = "Occupied";
 
         await _context.SaveChangesAsync();
         return Ok(new { message = "Heartbeat received.", pcId = pc.PCId, pcNumber = pc.PCNumber, laboratoryId = pc.LaboratoryId, status = pc.Status, lastSeen = pc.LastSeen, isEnabled = pc.IsEnabled });
+    }
+
+    [HttpPost("{id}/release-session")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> ReleaseStaleSession(int id, [FromBody] PCSessionReleaseRequest request)
+    {
+        if (!User.IsInRole("Admin")) return Forbid();
+        if (string.IsNullOrWhiteSpace(request.Reason)) return BadRequest(new { message = "A recovery reason is required." });
+        var pc = await _context.PCs.SingleOrDefaultAsync(p => p.PCId == id);
+        if (pc == null) return NotFound();
+        if (!pc.CurrentUserId.HasValue) return Conflict(new { message = "This PC has no owner." });
+        var session = await _context.PcUsageHistory.SingleOrDefaultAsync(s => s.PCId == id && s.LogoutTime == null);
+        if (session == null || session.SessionId != request.SessionId)
+            return Conflict(new { message = "The session changed. Refresh before releasing it." });
+        pc.CurrentUserId = null;
+        if (pc.Status != "Maintenance" && pc.IsEnabled)
+            pc.Status = "Offline"; // Presence will establish availability after administrative recovery.
+        _context.ActivityLogs.Add(new ActivityLog { PCId = id, Action = "Admin Session Recovery", Details = $"Session {session.SessionId} released by {User.FindFirstValue(ClaimTypes.NameIdentifier)}: {request.Reason.Trim()}", CreatedAt = DateTime.Now });
+        await _context.SaveChangesAsync();
+        return Ok(new { message = "Workstation ownership released.", pcId = id });
     }
 
     [HttpPut("{id}/enabled")]
@@ -413,6 +449,7 @@ public sealed class PCController : ControllerBase
         if (pc == null)
             return NotFound(new { message = "PC not found." });
 
+        if (pc.CurrentUserId.HasValue) return Conflict(new { message = "Release the active session before clearing maintenance." });
         pc.Status = "Available";
         pc.IsEnabled = true;
         pc.CurrentUserId = null;
@@ -496,5 +533,11 @@ public sealed class PCEnabledRequest
 
 public sealed class PCMaintenanceRequest
 {
+    public string Reason { get; set; } = string.Empty;
+}
+
+public sealed class PCSessionReleaseRequest
+{
+    public long SessionId { get; set; }
     public string Reason { get; set; } = string.Empty;
 }

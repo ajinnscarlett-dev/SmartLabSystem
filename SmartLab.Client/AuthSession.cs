@@ -1,4 +1,4 @@
-﻿using System.Net.Http;
+using System.Net.Http;
 using System.Net.Http.Headers;
 
 namespace SmartLab.Client
@@ -9,6 +9,7 @@ namespace SmartLab.Client
             string.Empty;
 
         public static int UserId { get; private set; }
+        public static long WorkstationSessionId { get; set; }
 
         public static string Username { get; private set; } =
             string.Empty;
@@ -50,6 +51,7 @@ namespace SmartLab.Client
         {
             Token = string.Empty;
             UserId = 0;
+            WorkstationSessionId = 0;
             Username = string.Empty;
             Role = string.Empty;
         }

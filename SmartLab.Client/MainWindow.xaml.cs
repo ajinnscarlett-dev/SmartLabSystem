@@ -113,6 +113,7 @@ namespace SmartLab.Client
 
                     using JsonDocument pcJson = JsonDocument.Parse(pcResponseText);
                     int pcId = pcJson.RootElement.GetProperty("pcId").GetInt32();
+                    AuthSession.WorkstationSessionId = pcJson.RootElement.GetProperty("sessionId").GetInt64();
                     string pcNumber = pcJson.RootElement.GetProperty("pcNumber").GetString() ?? _pcNumber;
                     SmartLabWidget widget = new SmartLabWidget(username, pcNumber, userId, pcId);
                     widget.Show();

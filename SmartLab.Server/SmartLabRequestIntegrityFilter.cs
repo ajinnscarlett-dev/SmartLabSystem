@@ -149,11 +149,7 @@ namespace SmartLab.Server
                         return;
                     }
 
-                    if (string.Equals(ownedPc.Status, "Offline", StringComparison.OrdinalIgnoreCase))
-                    {
-                        ownedPc.Status = "Occupied";
-                        await _context.SaveChangesAsync();
-                    }
+
                 }
             }
 

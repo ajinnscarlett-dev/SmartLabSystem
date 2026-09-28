@@ -288,7 +288,7 @@ namespace SmartLab.Client
                 timeout.CancelAfter(TimeSpan.FromSeconds(8));
                 using var response =
                     await _httpClient.PostAsync(
-                        new Uri(new Uri(SmartLabServerConfig.BaseUrl), $"api/PC/{_pcId}/heartbeat"),
+                        new Uri(new Uri(SmartLabServerConfig.BaseUrl), $"api/PC/{_pcId}/heartbeat?sessionId={AuthSession.WorkstationSessionId}"),
                         null,
                         timeout.Token
                     );
@@ -619,7 +619,7 @@ namespace SmartLab.Client
 
                 var response =
                     await _httpClient.PostAsync(
-                        $"api/PC/release/{_userId}",
+                        new Uri(new Uri(SmartLabServerConfig.BaseUrl), $"api/PC/release/{_userId}?pcId={_pcId}&sessionId={AuthSession.WorkstationSessionId}"),
                         null
                     );
 

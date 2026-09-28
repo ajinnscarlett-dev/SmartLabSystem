@@ -120,6 +120,22 @@ if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 }
 
+app.Use(async (context, next) =>
+{
+    try { await next(context); }
+    catch (DbUpdateConcurrencyException ex)
+    {
+        app.Logger.LogWarning(ex, "Workstation update raced with another request");
+        context.Response.StatusCode = StatusCodes.Status409Conflict;
+        await context.Response.WriteAsJsonAsync(new { message = "Workstation state changed. Refresh and retry." });
+    }
+    catch (DbUpdateException ex) when (ex.InnerException is Microsoft.Data.SqlClient.SqlException sql && (sql.Number == 2601 || sql.Number == 2627))
+    {
+        app.Logger.LogWarning(ex, "A unique workstation or ownership constraint rejected an update");
+        context.Response.StatusCode = StatusCodes.Status409Conflict;
+        await context.Response.WriteAsJsonAsync(new { message = "This workstation or student already has an active assignment." });
+    }
+});
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
