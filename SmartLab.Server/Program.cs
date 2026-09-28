@@ -4,6 +4,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using SmartLab.Server;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -26,11 +27,27 @@ builder.Services.AddControllers(options =>
     options.Filters.AddService<SmartLabRequestIntegrityFilter>();
 });
 
-string jwtKey =
+string? configuredJwtKey =
     builder.Configuration["Jwt:Key"]
-    ?? Environment.GetEnvironmentVariable("SMARTLAB_JWT_KEY")
-    ?? throw new InvalidOperationException(
-        "JWT signing key is missing. Configure Jwt:Key through a local secret/environment variable.");
+    ?? Environment.GetEnvironmentVariable("SMARTLAB_JWT_KEY");
+
+string jwtKey;
+if (!string.IsNullOrWhiteSpace(configuredJwtKey))
+{
+    jwtKey = configuredJwtKey;
+}
+else if (builder.Environment.IsDevelopment() &&
+         builder.Configuration.GetValue("SmartLab:EnableDevelopmentBootstrap", false))
+{
+    // Local development fallback only. A new ephemeral key is generated per server
+    // process, so no signing secret is stored in source control.
+    jwtKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+}
+else
+{
+    throw new InvalidOperationException(
+        "JWT signing key is missing. Configure Jwt:Key through a local secret/environment variable."); 
+}
 
 if (jwtKey.Length < 32)
 {
