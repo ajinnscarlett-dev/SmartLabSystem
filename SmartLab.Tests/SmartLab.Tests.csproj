@@ -22,4 +22,13 @@
     <ProjectReference Include="..\SmartLab.Shared\SmartLab.Shared.csproj" />
   </ItemGroup>
 
+  <!-- Exercise the actual platform-neutral client networking code on every test host. -->
+  <ItemGroup>
+    <Compile Include="../SmartLab.Client/MachinePresenceService.cs" Link="Client/MachinePresenceService.cs" />
+    <Compile Include="../SmartLab.Client/SmartLabServerConfig.cs" Link="Client/SmartLabServerConfig.cs" />
+    <Compile Include="../SmartLab.Client/PCConfig.cs" Link="Client/PCConfig.cs" />
+    <Compile Include="../SmartLab.Client/AuthSession.cs" Link="Client/AuthSession.cs" />
+    <Compile Include="../SmartLab.Client/ClientLog.cs" Link="Client/ClientLog.cs" />
+  </ItemGroup>
+
 </Project>

@@ -1,9 +1,10 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Threading.Tasks;
+using System.Threading;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Controls;
@@ -26,6 +27,8 @@ namespace SmartLab.Client
         // ==========================================
 
         private readonly DispatcherTimer _heartbeatTimer;
+        private readonly CancellationTokenSource _lifetime = new();
+        private bool _heartbeatRunning;
 
 
         // ==========================================
@@ -267,31 +270,53 @@ namespace SmartLab.Client
 
         private async Task SendHeartbeat()
         {
-            if (_isLoggingOut)
+            if (_isLoggingOut || _heartbeatRunning)
             {
                 return;
             }
 
+            _heartbeatRunning = true;
             try
             {
-                var response =
+                if (!await SmartLabServerConfig.ResolveServerAsync())
+                {
+                    ConnectionStatusText.Text = "SERVER OFFLINE — reconnecting";
+                    ClientLog.Write("Warning", "SessionServerUnreachable", new { pcId = _pcId });
+                    return;
+                }
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+                timeout.CancelAfter(TimeSpan.FromSeconds(8));
+                using var response =
                     await _httpClient.PostAsync(
-                        $"api/PC/{_pcId}/heartbeat",
-                        null
+                        new Uri(new Uri(SmartLabServerConfig.BaseUrl), $"api/PC/{_pcId}/heartbeat"),
+                        null,
+                        timeout.Token
                     );
 
                 if (!response.IsSuccessStatusCode)
                 {
+                    ConnectionStatusText.Text = response.StatusCode == System.Net.HttpStatusCode.Unauthorized
+                        ? "SESSION EXPIRED — sign in again"
+                        : response.StatusCode == System.Net.HttpStatusCode.Forbidden ? "ACCESS DENIED" : "RECONNECTING";
+                    ClientLog.Write("Warning", "SessionHeartbeatRejected", new { pcId = _pcId, statusCode = (int)response.StatusCode });
                     return;
                 }
 
-                // Server updates LastSeen.
+                ConnectionStatusText.Text = "CONNECTED";
+                ClientLog.Write("Debug", "SessionHeartbeatSucceeded", new { pcId = _pcId });
             }
-            catch
+            catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+            catch (OperationCanceledException)
             {
-                // Do not close SmartLab.
-                // Server-side monitor handles stale PCs.
+                ConnectionStatusText.Text = "RECONNECTING";
+                ClientLog.Write("Warning", "SessionHeartbeatTimeout", new { pcId = _pcId });
             }
+            catch (Exception ex)
+            {
+                ConnectionStatusText.Text = "SERVER OFFLINE — reconnecting";
+                ClientLog.Write(ex is HttpRequestException ? "Warning" : "Error", "SessionHeartbeatFailure", new { pcId = _pcId }, ex);
+            }
+            finally { _heartbeatRunning = false; }
         }
 
 
@@ -1134,7 +1159,7 @@ namespace SmartLab.Client
             EventArgs e)
         {
             _isLoggingOut = true;
-
+            _lifetime.Cancel();
 
             // Stop heartbeat.
 
