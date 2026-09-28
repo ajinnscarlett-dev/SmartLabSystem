@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SmartLab.Server;
 
 #nullable disable
@@ -15,179 +16,736 @@ namespace SmartLab.Server.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "8.0.29")
+            modelBuilder
+                .HasAnnotation("ProductVersion", "8.0.29")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
+
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity<ActivityLog>(b =>
-            {
-                b.Property<int>("ActivityLogId").ValueGeneratedOnAdd().HasColumnType("int");
-                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ActivityLogId"));
-                b.Property<string>("Action").IsRequired().HasColumnType("nvarchar(max)");
-                b.Property<DateTime>("CreatedAt").HasColumnType("datetime2");
-                b.Property<string>("Details").IsRequired().HasColumnType("nvarchar(max)");
-                b.Property<int?>("PCId").HasColumnType("int");
-                b.Property<int?>("UserId").HasColumnType("int");
-                b.HasKey("ActivityLogId"); b.HasIndex("PCId"); b.HasIndex("UserId"); b.ToTable("ActivityLogs");
-                b.HasOne(x => x.PC).WithMany().HasForeignKey("PCId");
-                b.HasOne(x => x.User).WithMany().HasForeignKey("UserId");
-            });
+            modelBuilder.Entity("SmartLab.Server.ActivityLog", b =>
+                {
+                    b.Property<int>("ActivityLogId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
 
-            modelBuilder.Entity<Announcement>(b =>
-            {
-                b.Property<int>("AnnouncementId").ValueGeneratedOnAdd().HasColumnType("int");
-                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AnnouncementId"));
-                b.Property<string>("Title").IsRequired().HasColumnType("nvarchar(max)");
-                b.Property<string>("Message").IsRequired().HasColumnType("nvarchar(max)");
-                b.Property<int?>("PostedByUserId").HasColumnType("int");
-                b.Property<DateTime>("CreatedAt").HasColumnType("datetime2");
-                b.Property<bool>("IsActive").HasColumnType("bit");
-                b.Property<DateTime?>("ExpiresAt").HasColumnType("datetime2");
-                b.Property<string>("TargetRole").IsRequired().HasColumnType("nvarchar(max)");
-                b.HasKey("AnnouncementId"); b.ToTable("Announcements");
-            });
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ActivityLogId"));
 
-            modelBuilder.Entity<Laboratory>(b =>
-            {
-                b.Property<int>("LaboratoryId").ValueGeneratedOnAdd().HasColumnType("int");
-                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("LaboratoryId"));
-                b.Property<string>("LabName").IsRequired().HasColumnType("nvarchar(max)");
-                b.Property<string>("Description").HasColumnType("nvarchar(max)");
-                b.HasKey("LaboratoryId"); b.ToTable("Laboratories");
-            });
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
-            modelBuilder.Entity<PC>(b =>
-            {
-                b.Property<int>("PCId").ValueGeneratedOnAdd().HasColumnType("int");
-                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("PCId"));
-                b.Property<string>("PCNumber").IsRequired().HasColumnType("nvarchar(450)");
-                b.Property<string>("Status").IsRequired().HasColumnType("nvarchar(450)");
-                b.Property<int?>("CurrentUserId").HasColumnType("int");
-                b.Property<int?>("LaboratoryId").HasColumnType("int");
-                b.Property<string>("MACAddress").HasColumnType("nvarchar(450)");
-                b.Property<string>("IPAddress").HasColumnType("nvarchar(max)");
-                b.Property<DateTime?>("LastSeen").HasColumnType("datetime2");
-                b.Property<bool>("IsEnabled").HasColumnType("bit");
-                b.Property<string>("MaintenanceReason").HasColumnType("nvarchar(max)");
-                b.Property<DateTime?>("MaintenanceStarted").HasColumnType("datetime2");
-                b.HasKey("PCId");
-                b.HasIndex("PCNumber").IsUnique();
-                b.HasIndex("MACAddress").IsUnique().HasFilter("[MACAddress] IS NOT NULL");
-                b.HasIndex("LaboratoryId", "Status"); b.HasIndex("LastSeen"); b.HasIndex("CurrentUserId");
-                b.ToTable("PCs");
-                b.HasOne(x => x.CurrentUser).WithMany().HasForeignKey("CurrentUserId");
-                b.HasOne(x => x.Laboratory).WithMany(x => x.PCs).HasForeignKey("LaboratoryId");
-            });
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
 
-            modelBuilder.Entity<ServiceDeskTicket>(b =>
-            {
-                b.Property<int>("ServiceDeskTicketId").ValueGeneratedOnAdd().HasColumnType("int");
-                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ServiceDeskTicketId"));
-                b.Property<int>("TeacherUserId").HasColumnType("int");
-                b.Property<string>("TeacherUsername").IsRequired().HasColumnType("nvarchar(max)");
-                b.Property<string>("PCNumber").HasColumnType("nvarchar(max)");
-                b.Property<string>("Location").HasColumnType("nvarchar(max)");
-                b.Property<string>("Category").IsRequired().HasColumnType("nvarchar(max)");
-                b.Property<string>("Subject").IsRequired().HasColumnType("nvarchar(max)");
-                b.Property<string>("Description").IsRequired().HasColumnType("nvarchar(max)");
-                b.Property<string>("Status").IsRequired().HasColumnType("nvarchar(max)");
-                b.Property<int?>("AssignedToUserId").HasColumnType("int");
-                b.Property<string>("AssignedToUsername").HasColumnType("nvarchar(max)");
-                b.Property<DateTime>("CreatedAt").HasColumnType("datetime2");
-                b.Property<DateTime?>("StartedAt").HasColumnType("datetime2");
-                b.Property<DateTime?>("ResolvedAt").HasColumnType("datetime2");
-                b.Property<string>("ResolutionNotes").HasColumnType("nvarchar(max)");
-                b.HasKey("ServiceDeskTicketId"); b.ToTable("ServiceDeskTickets");
-            });
+                    b.Property<string>("Details")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
-            modelBuilder.Entity<User>(b =>
-            {
-                b.Property<int>("UserId").ValueGeneratedOnAdd().HasColumnType("int");
-                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("UserId"));
-                b.Property<string>("Username").IsRequired().HasColumnType("nvarchar(max)");
-                b.Property<string>("PasswordHash").IsRequired().HasColumnType("nvarchar(max)");
-                b.Property<string>("Role").IsRequired().HasColumnType("nvarchar(max)");
-                b.Property<DateTime>("CreatedAt").HasColumnType("datetime2");
-                b.HasKey("UserId"); b.ToTable("Users");
-            });
+                    b.Property<int?>("PCId")
+                        .HasColumnType("int");
 
-            modelBuilder.Entity<TeacherLaboratoryAuthorization>(b =>
-            {
-                b.Property<int>("TeacherLaboratoryAuthorizationId").ValueGeneratedOnAdd().HasColumnType("int");
-                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("TeacherLaboratoryAuthorizationId"));
-                b.Property<int>("TeacherUserId").HasColumnType("int");
-                b.Property<int>("LaboratoryId").HasColumnType("int");
-                b.Property<DateTime>("CreatedAt").HasColumnType("datetime2");
-                b.HasKey("TeacherLaboratoryAuthorizationId");
-                b.HasIndex("LaboratoryId");
-                b.HasIndex("TeacherUserId");
-                b.ToTable("TeacherLaboratoryAuthorizations");
-                b.HasOne(x => x.TeacherUser).WithMany().HasForeignKey("TeacherUserId").OnDelete(DeleteBehavior.Cascade);
-                b.HasOne(x => x.Laboratory).WithMany().HasForeignKey("LaboratoryId").OnDelete(DeleteBehavior.Cascade);
-            });
+                    b.Property<int?>("UserId")
+                        .HasColumnType("int");
 
-            modelBuilder.Entity<PcUsageHistory>(b =>
-            {
-                b.Property<long>("SessionId").ValueGeneratedOnAdd().HasColumnType("bigint");
-                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("SessionId"));
-                b.Property<int>("PCId").HasColumnType("int"); b.Property<int>("UserId").HasColumnType("int"); b.Property<int?>("LaboratoryId").HasColumnType("int");
-                b.Property<DateTime>("LoginTime").HasColumnType("datetime2"); b.Property<DateTime?>("LogoutTime").HasColumnType("datetime2");
-                b.Property<int?>("DurationSeconds").HasColumnType("int"); b.Property<string>("EndReason").IsRequired().HasColumnType("nvarchar(max)");
-                b.HasKey("SessionId"); b.HasIndex("UserId"); b.HasIndex("LaboratoryId", "LoginTime"); b.HasIndex("PCId", "LoginTime"); b.ToTable("PcUsageHistory");
-                b.HasOne(x => x.PC).WithMany().HasForeignKey("PCId").OnDelete(DeleteBehavior.Restrict);
-                b.HasOne(x => x.User).WithMany().HasForeignKey("UserId").OnDelete(DeleteBehavior.Restrict);
-                b.HasOne(x => x.Laboratory).WithMany().HasForeignKey("LaboratoryId").OnDelete(DeleteBehavior.Restrict);
-            });
+                    b.HasKey("ActivityLogId");
 
-            modelBuilder.Entity<MaintenanceRecord>(b =>
-            {
-                b.Property<long>("MaintenanceRecordId").ValueGeneratedOnAdd().HasColumnType("bigint");
-                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("MaintenanceRecordId"));
-                b.Property<int>("PCId").HasColumnType("int"); b.Property<string>("Reason").IsRequired().HasColumnType("nvarchar(max)");
-                b.Property<DateTime>("StartedAt").HasColumnType("datetime2"); b.Property<DateTime?>("EndedAt").HasColumnType("datetime2");
-                b.Property<int?>("TechnicianUserId").HasColumnType("int"); b.Property<string>("Notes").HasColumnType("nvarchar(max)");
-                b.HasKey("MaintenanceRecordId"); b.HasIndex("TechnicianUserId"); b.HasIndex("PCId", "StartedAt"); b.ToTable("MaintenanceRecords");
-                b.HasOne(x => x.PC).WithMany().HasForeignKey("PCId").OnDelete(DeleteBehavior.Restrict);
-                b.HasOne(x => x.TechnicianUser).WithMany().HasForeignKey("TechnicianUserId").OnDelete(DeleteBehavior.Restrict);
-            });
+                    b.HasIndex("PCId");
 
-            modelBuilder.Entity<HardwareInventory>(b =>
-            {
-                b.Property<int>("HardwareInventoryId").ValueGeneratedOnAdd().HasColumnType("int");
-                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("HardwareInventoryId"));
-                b.Property<int>("PCId").HasColumnType("int"); b.Property<string>("Cpu").HasColumnType("nvarchar(max)"); b.Property<string>("Ram").HasColumnType("nvarchar(max)");
-                b.Property<string>("Storage").HasColumnType("nvarchar(max)"); b.Property<string>("Gpu").HasColumnType("nvarchar(max)"); b.Property<string>("OperatingSystem").HasColumnType("nvarchar(max)");
-                b.Property<string>("MACAddress").HasColumnType("nvarchar(max)"); b.Property<string>("IPAddress").HasColumnType("nvarchar(max)"); b.Property<DateTime>("LastAuditedAt").HasColumnType("datetime2");
-                b.HasKey("HardwareInventoryId"); b.HasIndex("PCId").IsUnique(); b.ToTable("HardwareInventories");
-                b.HasOne(x => x.PC).WithMany().HasForeignKey("PCId").OnDelete(DeleteBehavior.Restrict);
-            });
+                    b.HasIndex("UserId");
 
-            modelBuilder.Entity<Notification>(b =>
-            {
-                b.Property<long>("NotificationId").ValueGeneratedOnAdd().HasColumnType("bigint");
-                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("NotificationId"));
-                b.Property<int>("UserId").HasColumnType("int"); b.Property<string>("Type").IsRequired().HasColumnType("nvarchar(max)");
-                b.Property<string>("Title").IsRequired().HasColumnType("nvarchar(max)"); b.Property<string>("Message").IsRequired().HasColumnType("nvarchar(max)");
-                b.Property<DateTime>("CreatedAt").HasColumnType("datetime2"); b.Property<DateTime?>("ReadAt").HasColumnType("datetime2"); b.Property<bool>("IsRead").HasColumnType("bit");
-                b.HasKey("NotificationId"); b.HasIndex("UserId", "IsRead", "CreatedAt"); b.ToTable("Notifications");
-                b.HasOne(x => x.User).WithMany().HasForeignKey("UserId").OnDelete(DeleteBehavior.Restrict);
-            });
+                    b.ToTable("ActivityLogs");
+                });
 
-            modelBuilder.Entity<AssistanceRequest>(b =>
-            {
-                b.Property<long>("AssistanceRequestId").ValueGeneratedOnAdd().HasColumnType("bigint");
-                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("AssistanceRequestId"));
-                b.Property<int>("StudentUserId").HasColumnType("int"); b.Property<int>("PCId").HasColumnType("int"); b.Property<int?>("LaboratoryId").HasColumnType("int");
-                b.Property<string>("Category").IsRequired().HasColumnType("nvarchar(max)"); b.Property<string>("Description").IsRequired().HasColumnType("nvarchar(max)");
-                b.Property<string>("Status").IsRequired().HasColumnType("nvarchar(max)"); b.Property<DateTime>("CreatedAt").HasColumnType("datetime2");
-                b.Property<DateTime?>("AcknowledgedAt").HasColumnType("datetime2"); b.Property<DateTime?>("StartedAt").HasColumnType("datetime2"); b.Property<DateTime?>("ResolvedAt").HasColumnType("datetime2");
-                b.Property<DateTime?>("ClosedAt").HasColumnType("datetime2"); b.Property<int?>("ResolvedByUserId").HasColumnType("int"); b.Property<string>("ResolutionNotes").HasColumnType("nvarchar(max)");
-                b.HasKey("AssistanceRequestId"); b.HasIndex("ResolvedByUserId"); b.HasIndex("LaboratoryId", "CreatedAt"); b.HasIndex("StudentUserId", "CreatedAt"); b.HasIndex("PCId"); b.ToTable("AssistanceRequests");
-                b.HasOne(x => x.StudentUser).WithMany().HasForeignKey("StudentUserId").OnDelete(DeleteBehavior.Restrict);
-                b.HasOne(x => x.PC).WithMany().HasForeignKey("PCId").OnDelete(DeleteBehavior.Restrict);
-                b.HasOne(x => x.Laboratory).WithMany().HasForeignKey("LaboratoryId").OnDelete(DeleteBehavior.Restrict);
-                b.HasOne(x => x.ResolvedByUser).WithMany().HasForeignKey("ResolvedByUserId").OnDelete(DeleteBehavior.Restrict);
-            });
+            modelBuilder.Entity("SmartLab.Server.Announcement", b =>
+                {
+                    b.Property<int>("AnnouncementId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AnnouncementId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("PostedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TargetRole")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("AnnouncementId");
+
+                    b.ToTable("Announcements");
+                });
+
+            modelBuilder.Entity("SmartLab.Server.AssistanceRequest", b =>
+                {
+                    b.Property<long>("AssistanceRequestId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("AssistanceRequestId"));
+
+                    b.Property<DateTime?>("AcknowledgedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ClosedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("LaboratoryId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PCId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ResolutionNotes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ResolvedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("ResolvedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("StartedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("StudentUserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("AssistanceRequestId");
+
+                    b.HasIndex("PCId");
+
+                    b.HasIndex("ResolvedByUserId");
+
+                    b.HasIndex("LaboratoryId", "CreatedAt");
+
+                    b.HasIndex("StudentUserId", "CreatedAt");
+
+                    b.ToTable("AssistanceRequests");
+                });
+
+            modelBuilder.Entity("SmartLab.Server.ClassSchedule", b =>
+                {
+                    b.Property<int>("ClassScheduleId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ClassScheduleId"));
+
+                    b.Property<string>("ClassName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<TimeSpan>("EndTime")
+                        .HasColumnType("time");
+
+                    b.Property<int>("LaboratoryId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("ScheduleDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<TimeSpan>("StartTime")
+                        .HasColumnType("time");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SubjectName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("TeacherUserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("ClassScheduleId");
+
+                    b.HasIndex("ScheduleDate");
+
+                    b.HasIndex("LaboratoryId", "ScheduleDate");
+
+                    b.HasIndex("TeacherUserId", "ScheduleDate");
+
+                    b.ToTable("ClassSchedules");
+                });
+
+            modelBuilder.Entity("SmartLab.Server.HardwareInventory", b =>
+                {
+                    b.Property<int>("HardwareInventoryId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("HardwareInventoryId"));
+
+                    b.Property<string>("Cpu")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Gpu")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("IPAddress")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("LastAuditedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("MACAddress")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("OperatingSystem")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("PCId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Ram")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Storage")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("HardwareInventoryId");
+
+                    b.HasIndex("PCId")
+                        .IsUnique();
+
+                    b.ToTable("HardwareInventories");
+                });
+
+            modelBuilder.Entity("SmartLab.Server.Laboratory", b =>
+                {
+                    b.Property<int>("LaboratoryId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("LaboratoryId"));
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("LabName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("LaboratoryId");
+
+                    b.ToTable("Laboratories");
+                });
+
+            modelBuilder.Entity("SmartLab.Server.MaintenanceRecord", b =>
+                {
+                    b.Property<long>("MaintenanceRecordId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("MaintenanceRecordId"));
+
+                    b.Property<DateTime?>("EndedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("PCId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("TechnicianUserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("MaintenanceRecordId");
+
+                    b.HasIndex("TechnicianUserId");
+
+                    b.HasIndex("PCId", "StartedAt");
+
+                    b.ToTable("MaintenanceRecords");
+                });
+
+            modelBuilder.Entity("SmartLab.Server.Notification", b =>
+                {
+                    b.Property<long>("NotificationId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("NotificationId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("NotificationId");
+
+                    b.HasIndex("UserId", "IsRead", "CreatedAt");
+
+                    b.ToTable("Notifications");
+                });
+
+            modelBuilder.Entity("SmartLab.Server.PC", b =>
+                {
+                    b.Property<int>("PCId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("PCId"));
+
+                    b.Property<int?>("CurrentUserId")
+                        .IsConcurrencyToken()
+                        .HasColumnType("int");
+
+                    b.Property<string>("IPAddress")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsEnabled")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bit");
+
+                    b.Property<int?>("LaboratoryId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("LastSeen")
+                        .IsConcurrencyToken()
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("MACAddress")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("MaintenanceReason")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("MaintenanceStarted")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PCNumber")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Status")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("PCId");
+
+                    b.HasIndex("CurrentUserId")
+                        .IsUnique()
+                        .HasFilter("[CurrentUserId] IS NOT NULL");
+
+                    b.HasIndex("LastSeen");
+
+                    b.HasIndex("MACAddress")
+                        .IsUnique()
+                        .HasFilter("[MACAddress] IS NOT NULL");
+
+                    b.HasIndex("PCNumber")
+                        .IsUnique();
+
+                    b.HasIndex("LaboratoryId", "Status");
+
+                    b.ToTable("PCs");
+                });
+
+            modelBuilder.Entity("SmartLab.Server.PcUsageHistory", b =>
+                {
+                    b.Property<long>("SessionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("SessionId"));
+
+                    b.Property<int?>("DurationSeconds")
+                        .HasColumnType("int");
+
+                    b.Property<string>("EndReason")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("LaboratoryId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("LoginTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("LogoutTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("PCId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("SessionId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("LaboratoryId", "LoginTime");
+
+                    b.HasIndex("PCId", "LoginTime");
+
+                    b.ToTable("PcUsageHistory");
+                });
+
+            modelBuilder.Entity("SmartLab.Server.ServiceDeskTicket", b =>
+                {
+                    b.Property<int>("ServiceDeskTicketId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ServiceDeskTicketId"));
+
+                    b.Property<int?>("AssignedToUserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("AssignedToUsername")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Location")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PCNumber")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ResolutionNotes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ResolvedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("StartedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("TeacherUserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TeacherUsername")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("ServiceDeskTicketId");
+
+                    b.ToTable("ServiceDeskTickets");
+                });
+
+            modelBuilder.Entity("SmartLab.Server.TeacherLaboratoryAuthorization", b =>
+                {
+                    b.Property<int>("TeacherLaboratoryAuthorizationId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("TeacherLaboratoryAuthorizationId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("LaboratoryId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TeacherUserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("TeacherLaboratoryAuthorizationId");
+
+                    b.HasIndex("LaboratoryId");
+
+                    b.HasIndex("TeacherUserId");
+
+                    b.ToTable("TeacherLaboratoryAuthorizations");
+                });
+
+            modelBuilder.Entity("SmartLab.Server.User", b =>
+                {
+                    b.Property<int>("UserId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("UserId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("FullName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("MustChangePassword")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("StudentNumber")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("UserId");
+
+                    b.HasIndex("StudentNumber")
+                        .IsUnique()
+                        .HasFilter("[StudentNumber] IS NOT NULL");
+
+                    b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("SmartLab.Server.ActivityLog", b =>
+                {
+                    b.HasOne("SmartLab.Server.PC", "PC")
+                        .WithMany()
+                        .HasForeignKey("PCId");
+
+                    b.HasOne("SmartLab.Server.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId");
+
+                    b.Navigation("PC");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("SmartLab.Server.AssistanceRequest", b =>
+                {
+                    b.HasOne("SmartLab.Server.Laboratory", "Laboratory")
+                        .WithMany()
+                        .HasForeignKey("LaboratoryId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SmartLab.Server.PC", "PC")
+                        .WithMany()
+                        .HasForeignKey("PCId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SmartLab.Server.User", "ResolvedByUser")
+                        .WithMany()
+                        .HasForeignKey("ResolvedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SmartLab.Server.User", "StudentUser")
+                        .WithMany()
+                        .HasForeignKey("StudentUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Laboratory");
+
+                    b.Navigation("PC");
+
+                    b.Navigation("ResolvedByUser");
+
+                    b.Navigation("StudentUser");
+                });
+
+            modelBuilder.Entity("SmartLab.Server.ClassSchedule", b =>
+                {
+                    b.HasOne("SmartLab.Server.Laboratory", "Laboratory")
+                        .WithMany()
+                        .HasForeignKey("LaboratoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SmartLab.Server.User", "TeacherUser")
+                        .WithMany()
+                        .HasForeignKey("TeacherUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Laboratory");
+
+                    b.Navigation("TeacherUser");
+                });
+
+            modelBuilder.Entity("SmartLab.Server.HardwareInventory", b =>
+                {
+                    b.HasOne("SmartLab.Server.PC", "PC")
+                        .WithMany()
+                        .HasForeignKey("PCId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("PC");
+                });
+
+            modelBuilder.Entity("SmartLab.Server.MaintenanceRecord", b =>
+                {
+                    b.HasOne("SmartLab.Server.PC", "PC")
+                        .WithMany()
+                        .HasForeignKey("PCId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SmartLab.Server.User", "TechnicianUser")
+                        .WithMany()
+                        .HasForeignKey("TechnicianUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("PC");
+
+                    b.Navigation("TechnicianUser");
+                });
+
+            modelBuilder.Entity("SmartLab.Server.Notification", b =>
+                {
+                    b.HasOne("SmartLab.Server.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("SmartLab.Server.PC", b =>
+                {
+                    b.HasOne("SmartLab.Server.User", "CurrentUser")
+                        .WithMany()
+                        .HasForeignKey("CurrentUserId");
+
+                    b.HasOne("SmartLab.Server.Laboratory", "Laboratory")
+                        .WithMany("PCs")
+                        .HasForeignKey("LaboratoryId");
+
+                    b.Navigation("CurrentUser");
+
+                    b.Navigation("Laboratory");
+                });
+
+            modelBuilder.Entity("SmartLab.Server.PcUsageHistory", b =>
+                {
+                    b.HasOne("SmartLab.Server.Laboratory", "Laboratory")
+                        .WithMany()
+                        .HasForeignKey("LaboratoryId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SmartLab.Server.PC", "PC")
+                        .WithMany()
+                        .HasForeignKey("PCId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SmartLab.Server.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Laboratory");
+
+                    b.Navigation("PC");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("SmartLab.Server.TeacherLaboratoryAuthorization", b =>
+                {
+                    b.HasOne("SmartLab.Server.Laboratory", "Laboratory")
+                        .WithMany()
+                        .HasForeignKey("LaboratoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SmartLab.Server.User", "TeacherUser")
+                        .WithMany()
+                        .HasForeignKey("TeacherUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Laboratory");
+
+                    b.Navigation("TeacherUser");
+                });
+
+            modelBuilder.Entity("SmartLab.Server.Laboratory", b =>
+                {
+                    b.Navigation("PCs");
+                });
 #pragma warning restore 612, 618
         }
     }

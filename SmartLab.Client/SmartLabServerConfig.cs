@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Net;
 using System.Net.NetworkInformation;
@@ -38,6 +38,11 @@ namespace SmartLab.Client
             {
                 return true;
             }
+
+            // A trusted HTTPS hostname must never downgrade to an unauthenticated UDP responder.
+            if (new Uri(BaseUrl).Scheme == Uri.UriSchemeHttps ||
+                !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("SMARTLAB_DEVICE_TOKEN")))
+                return false;
 
             string? discovered =
                 await DiscoverServerOnLocalNetworkAsync();
@@ -93,8 +98,15 @@ namespace SmartLab.Client
                 // Keep localhost fallback.
             }
 
-            return EnsureTrailingSlash(
-                serverUrl);
+            serverUrl = Environment.GetEnvironmentVariable("SMARTLAB_SERVER_URL") ?? serverUrl;
+            if (!Uri.TryCreate(serverUrl, UriKind.Absolute, out var endpoint) ||
+                (endpoint.Scheme != Uri.UriSchemeHttp && endpoint.Scheme != Uri.UriSchemeHttps) ||
+                !string.IsNullOrEmpty(endpoint.UserInfo))
+                throw new InvalidOperationException("SmartLab ServerUrl must be a valid HTTP or HTTPS address.");
+            if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("SMARTLAB_DEVICE_TOKEN")) &&
+                endpoint.Scheme != Uri.UriSchemeHttps)
+                throw new InvalidOperationException("Provisioned workstations require a trusted HTTPS ServerUrl.");
+            return EnsureTrailingSlash(serverUrl);
         }
 
         private static bool IsServerReachable(

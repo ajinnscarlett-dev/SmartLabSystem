@@ -1,111 +1,81 @@
-﻿<Window x:Class="SmartLab.Client.SmartLabWidget"
+<Window x:Class="SmartLab.Client.SmartLabWidget"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="SmartLab"
-        Width="320"
-        Height="175"
-        WindowStyle="None"
-        ResizeMode="NoResize"
-        AllowsTransparency="True"
-        Background="Transparent"
-        ShowInTaskbar="False"
-        Topmost="True"
-        WindowStartupLocation="Manual"
-        MouseLeftButtonDown="Window_MouseLeftButtonDown">
+        Title="SmartLabSystem — Student Workstation"
+        Width="780" Height="500" MinWidth="680" MinHeight="440"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource SmartLabPageBackground}">
+    <Grid Margin="18">
+        <Grid.RowDefinitions><RowDefinition Height="58"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
 
-    <Border Background="#E8F0F8"
-            CornerRadius="12"
-            BorderBrush="#B8C7D9"
-            BorderThickness="1"
-            Padding="12">
-
-        <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
-
-            <Grid Grid.Row="0">
-                <TextBlock Text="SmartLab"
-                           FontSize="16"
-                           FontWeight="Bold"
-                           Foreground="#182536"
-                           HorizontalAlignment="Left"/>
-
-                <TextBlock x:Name="PcNumberText"
-                           Text="PC-01"
-                           FontSize="11"
-                           Foreground="#5A6B7D"
-                           HorizontalAlignment="Right"
-                           VerticalAlignment="Center"/>
+        <Border Grid.Row="0" Style="{StaticResource SmartLabToolbarBorder}" Padding="12">
+            <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="SmartLabSystem" FontSize="16" FontWeight="SemiBold"/>
+                    <TextBlock Text="Student workstation" Style="{StaticResource SmartLabCaption}" Margin="0,2,0,0"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Grid Width="62" Height="32">
+                        <Button x:Name="NotificationButton" Content="ALERTS" Width="62" Height="32" Style="{StaticResource SmartLabButtonBase}" Click="NotificationButton_Click"/>
+                        <Border x:Name="NotificationCountBadge" Width="17" Height="17" CornerRadius="8" Background="{StaticResource SmartLabDanger}" HorizontalAlignment="Right" VerticalAlignment="Top" Visibility="Collapsed">
+                            <TextBlock x:Name="NotificationCountText" Text="0" FontSize="9" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </Grid>
+                    <Button x:Name="LogoutButton" Content="LOGOUT" Width="78" Height="32" Margin="8,0,0,0" Style="{StaticResource SmartLabDangerButton}" Click="LogoutButton_Click"/>
+                </StackPanel>
             </Grid>
+        </Border>
 
-            <TextBlock x:Name="UsernameText"
-                       Grid.Row="1"
-                       Text="student01"
-                       FontSize="12"
-                       Foreground="#4B5D70"
-                       Margin="0,5,0,7"/>
-
-            <Grid Grid.Row="2"
-                  Margin="0,0,0,8">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <Grid Grid.Column="0">
-                    <Button x:Name="NotificationButton"
-                            Content="NOTIFICATIONS"
-                            Width="125"
-                            Height="30"
-                            Click="NotificationButton_Click"/>
-
-                    <Border x:Name="NotificationCountBadge"
-                            Width="20"
-                            Height="20"
-                            CornerRadius="10"
-                            Background="#C62828"
-                            HorizontalAlignment="Left"
-                            VerticalAlignment="Top"
-                            Margin="112,-7,0,0"
-                            Visibility="Collapsed">
-                        <TextBlock x:Name="NotificationCountText"
-                                   Text="0"
-                                   FontSize="10"
-                                   FontWeight="Bold"
-                                   Foreground="White"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"
-                                   TextAlignment="Center"/>
-                    </Border>
-                </Grid>
-
-                <Button Grid.Column="1"
-                        x:Name="NeedAssistanceButton"
-                        Content="NEED HELP"
-                        Width="82"
-                        Height="30"
-                        Margin="8,0,0,0"
-                        Click="NeedAssistanceButton_Click"/>
-
-                <Button Grid.Column="2"
-                        x:Name="LogoutButton"
-                        Content="Logout"
-                        Width="65"
-                        Height="30"
-                        HorizontalAlignment="Right"
-                        Click="LogoutButton_Click"/>
-            </Grid>
-
-            <TextBlock x:Name="ConnectionStatusText"
-                       Grid.Row="3"
-                       Text="Connected • workstation presence active"
-                       FontSize="9"
-                       Foreground="#4E6A84"/>
+        <Grid Grid.Row="1" Margin="2,14,2,12">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="Current Workstation" Style="{StaticResource SmartLabPageTitle}"/>
+                <TextBlock Text="Your active SmartLab computer and session status." Style="{StaticResource SmartLabCaption}" Margin="0,3,0,0"/>
+            </StackPanel>
+            <StackPanel Grid.Column="1" HorizontalAlignment="Right">
+                <TextBlock Text="PC" Style="{StaticResource SmartLabCaption}" HorizontalAlignment="Right"/>
+                <TextBlock x:Name="PcNumberText" Text="—" FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Right"/>
+            </StackPanel>
         </Grid>
-    </Border>
+
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="1.15*"/><ColumnDefinition Width="0.85*"/></Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Style="{StaticResource SmartLabSectionBorder}" Padding="18" Margin="0,0,8,0">
+                <StackPanel>
+                    <TextBlock Text="SESSION" Style="{StaticResource SmartLabSectionTitle}"/>
+                    <TextBlock x:Name="UsernameText" Text="Student" FontSize="17" FontWeight="SemiBold" Margin="0,8,0,3"/>
+                    <TextBlock Text="Authenticated student account" Style="{StaticResource SmartLabCaption}"/>
+                    <Border Height="1" Background="{StaticResource SmartLabBorder}" Margin="0,18,0,14"/>
+                    <TextBlock Text="CONNECTION" FontSize="9" FontWeight="SemiBold" Foreground="{StaticResource SmartLabMuted}"/>
+                    <TextBlock x:Name="ConnectionStatusText" Text="Connecting..." FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource SmartLabAccent}" Margin="0,4,0,0"/>
+                    <Border Background="{StaticResource SmartLabAccentSoft}" BorderBrush="{StaticResource SmartLabBorder}" BorderThickness="1" Padding="12" Margin="0,18,0,0">
+                        <StackPanel>
+                            <TextBlock Text="WORKSTATION CONTROLS" FontSize="9" FontWeight="SemiBold" Foreground="{StaticResource SmartLabAccent}"/>
+                            <TextBlock Text="Active session controls are provided by the SmartLab workstation client." Style="{StaticResource SmartLabCaption}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                <Border Style="{StaticResource SmartLabSectionBorder}" Padding="16">
+                    <StackPanel>
+                        <TextBlock Text="ASSISTANCE" Style="{StaticResource SmartLabCaption}"/>
+                        <TextBlock Text="Need help?" FontSize="16" FontWeight="SemiBold" Margin="0,6,0,3"/>
+                        <TextBlock Text="Send an assistance request to your teacher or MIS staff." Style="{StaticResource SmartLabCaption}" TextWrapping="Wrap"/>
+                        <Button x:Name="NeedAssistanceButton" Content="NEED ASSISTANCE" Height="38" Margin="0,16,0,0" Style="{StaticResource SmartLabPrimaryButton}" Click="NeedAssistanceButton_Click"/>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource SmartLabSectionBorder}" Padding="16" Margin="0,10,0,0">
+                    <StackPanel>
+                        <TextBlock Text="SESSION" Style="{StaticResource SmartLabCaption}"/>
+                        <TextBlock Text="When finished, log out from this workstation." FontSize="14" FontWeight="SemiBold" Margin="0,6,0,3" TextWrapping="Wrap"/>
+                        <TextBlock Text="Your assigned PC will be released through the existing SmartLab workflow." Style="{StaticResource SmartLabCaption}" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Grid>
+    </Grid>
 </Window>

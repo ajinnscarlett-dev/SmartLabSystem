@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.29" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="8.0.29" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
     <PackageReference Include="xunit" Version="2.9.2" />
@@ -20,6 +21,16 @@
   <ItemGroup>
     <ProjectReference Include="..\SmartLab.Server\SmartLab.Server.csproj" />
     <ProjectReference Include="..\SmartLab.Shared\SmartLab.Shared.csproj" />
+  </ItemGroup>
+
+  <!-- Exercise the actual platform-neutral client networking code on every test host. -->
+  <ItemGroup>
+    <Compile Include="../SmartLab.Client/ThumbnailRefreshPolicy.cs" Link="Client/ThumbnailRefreshPolicy.cs" />
+    <Compile Include="../SmartLab.Client/MachinePresenceService.cs" Link="Client/MachinePresenceService.cs" />
+    <Compile Include="../SmartLab.Client/SmartLabServerConfig.cs" Link="Client/SmartLabServerConfig.cs" />
+    <Compile Include="../SmartLab.Client/PCConfig.cs" Link="Client/PCConfig.cs" />
+    <Compile Include="../SmartLab.Client/AuthSession.cs" Link="Client/AuthSession.cs" />
+    <Compile Include="../SmartLab.Client/ClientLog.cs" Link="Client/ClientLog.cs" />
   </ItemGroup>
 
 </Project>

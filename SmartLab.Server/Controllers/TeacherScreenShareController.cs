@@ -12,6 +12,7 @@ namespace SmartLab.Server.Controllers
     {
         private static readonly TimeSpan ShareMaxAge = TimeSpan.FromSeconds(30);
         private readonly AppDbContext _context;
+        private readonly TeacherScheduleService _scheduleService;
 
         private sealed class TeacherShareState
         {
@@ -25,7 +26,11 @@ namespace SmartLab.Server.Controllers
         private static readonly ConcurrentDictionary<int, TeacherShareState> ActiveShares = new();
         private static long _frameVersion;
 
-        public TeacherScreenShareController(AppDbContext context) => _context = context;
+        public TeacherScreenShareController(AppDbContext context, TeacherScheduleService scheduleService)
+        {
+            _context = context;
+            _scheduleService = scheduleService;
+        }
 
         [Authorize(Roles = "Admin,Teacher")]
         [HttpPost("{laboratoryId}/start")]
@@ -69,13 +74,10 @@ namespace SmartLab.Server.Controllers
 
             const int maxFrameBytes = 2 * 1024 * 1024;
             if (Request.ContentLength.HasValue && Request.ContentLength.Value > maxFrameBytes) return BadRequest(new { message = "Teacher screen frame is too large." });
-            using MemoryStream stream = new();
-            await Request.Body.CopyToAsync(stream, HttpContext.RequestAborted);
-            if (stream.Length == 0) return BadRequest(new { message = "Teacher screen frame is empty." });
-            if (stream.Length > maxFrameBytes) return BadRequest(new { message = "Teacher screen frame is too large." });
-
+            byte[]? image = await BoundedFrameReader.ReadAsync(Request.Body, maxFrameBytes, HttpContext.RequestAborted);
+            if (image == null || image.Length == 0) return BadRequest(new { message = "Teacher screen frame is empty or exceeds the size limit." });
             long version = Interlocked.Increment(ref _frameVersion);
-            share.LatestFrame = stream.ToArray();
+            share.LatestFrame = image;
             share.Version = version;
             share.UpdatedAt = DateTime.Now;
             return Ok(new { message = "Teacher screen frame uploaded.", laboratoryId, version, size = share.LatestFrame.Length });
@@ -120,7 +122,7 @@ namespace SmartLab.Server.Controllers
         {
             if (User.IsInRole("Admin")) return true;
             if (!User.IsInRole("Teacher")) return false;
-            return await _context.TeacherLaboratoryAuthorizations.AsNoTracking().AnyAsync(a => a.TeacherUserId == userId && a.LaboratoryId == laboratoryId);
+            return await _scheduleService.IsTeacherScheduledAsync(userId, laboratoryId);
         }
 
         private bool TryGetCurrentUserId(out int userId) => int.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out userId);

@@ -8,6 +8,7 @@ namespace SmartLab.Server
     {
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly TimeSpan _commandTtl;
+        private readonly TimeSpan _remoteSessionTtl;
         private readonly TimeSpan _cleanupInterval;
 
         public CommandLifecycleHostedService(
@@ -19,6 +20,12 @@ namespace SmartLab.Server
             _commandTtl = TimeSpan.FromSeconds(
                 Math.Clamp(
                     configuration.GetValue("SmartLab:CommandTtlSeconds", 20),
+                    5,
+                    300));
+
+            _remoteSessionTtl = TimeSpan.FromSeconds(
+                Math.Clamp(
+                    configuration.GetValue("SmartLab:RemoteControlSessionTtlSeconds", 20),
                     5,
                     300));
 
@@ -63,10 +70,6 @@ namespace SmartLab.Server
 
             FieldInfo? pendingField = controllerType.GetField(
                 "PendingCommandByPc",
-                BindingFlags.Static | BindingFlags.NonPublic);
-
-            FieldInfo? remoteSessionsField = controllerType.GetField(
-                "RemoteControlSessions",
                 BindingFlags.Static | BindingFlags.NonPublic);
 
             if (commandsField?.GetValue(null) is not IDictionary commands ||
@@ -123,27 +126,27 @@ namespace SmartLab.Server
                 });
             }
 
-            if (remoteSessionsField?.GetValue(null) is IDictionary remoteSessions)
-            {
-                var offlinePcIds = await context.PCs
-                    .AsNoTracking()
-                    .Where(p => p.Status == "Offline")
-                    .Select(p => p.PCId)
-                    .ToListAsync(cancellationToken);
+            var offlinePcIds = await context.PCs
+                .AsNoTracking()
+                .Where(p => p.Status == "Offline")
+                .Select(p => p.PCId)
+                .ToListAsync(cancellationToken);
 
+            int removedRemoteSessions =
+                RemoteControlSessionTracker.CleanupExpired(
+                    _remoteSessionTtl,
+                    offlinePcIds.ToHashSet());
+
+            if (removedRemoteSessions > 0)
+            {
                 foreach (int pcId in offlinePcIds)
                 {
-                    if (!remoteSessions.Contains(pcId))
-                        continue;
-
-                    remoteSessions.Remove(pcId);
-
                     context.ActivityLogs.Add(new ActivityLog
                     {
                         UserId = null,
                         PCId = pcId,
                         Action = "Remote Control Cleanup",
-                        Details = "Remote-control session removed because the PC is offline.",
+                        Details = "Remote-control session removed because the PC is offline or the viewer lease expired.",
                         CreatedAt = DateTime.Now
                     });
                 }

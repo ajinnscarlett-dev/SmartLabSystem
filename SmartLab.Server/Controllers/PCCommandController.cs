@@ -15,12 +15,14 @@ namespace SmartLab.Server.Controllers
         private readonly AppDbContext _context;
 
         private static long _nextCommandId;
+        private static readonly ConcurrentDictionary<int, long> RemoteUsageSessions = new();
 
         private sealed class PcCommand
         {
             public long CommandId { get; set; }
             public int PCId { get; set; }
             public int RequestedByUserId { get; set; }
+            public long UsageSessionId { get; set; }
             public string CommandType { get; set; } = string.Empty;
             public string? Message { get; set; }
             public DateTime CreatedAt { get; set; }
@@ -410,19 +412,8 @@ namespace SmartLab.Server.Controllers
                     return Forbid();
                 }
 
-                await EnsureAuthorizationTableAsync();
-
-                bool authorized =
-                    await _context
-                        .TeacherLaboratoryAuthorizations
-                        .AsNoTracking()
-                        .AnyAsync(a =>
-                            a.TeacherUserId ==
-                            requestedByUserId
-                            &&
-                            a.LaboratoryId ==
-                            pc.LaboratoryId.Value);
-
+                bool authorized = await new TeacherScheduleService(_context)
+                    .IsTeacherScheduledAsync(requestedByUserId, pc.LaboratoryId.Value);
                 if (!authorized)
                 {
                     return StatusCode(
@@ -439,12 +430,17 @@ namespace SmartLab.Server.Controllers
             // REMOTE CONTROL SESSION AUTHORIZATION
             // ======================================================
 
+            var usage = await _context.PcUsageHistory.AsNoTracking().SingleOrDefaultAsync(s => s.PCId == pcId && s.UserId == pc.CurrentUserId && s.LogoutTime == null);
+            if (usage == null) return Conflict(new { message = "The workstation session is no longer active." });
+
             if (requireRemoteControlSession)
             {
                 if (!RemoteControlSessions.TryGetValue(
                         pcId,
                         out int sessionUserId) ||
-                    sessionUserId != requestedByUserId)
+                    sessionUserId != requestedByUserId ||
+                    !RemoteUsageSessions.TryGetValue(pcId, out long remoteUsage) || remoteUsage != usage.SessionId ||
+                    !RemoteControlSessionTracker.IsActive(pcId, requestedByUserId))
                 {
                     return Conflict(new
                     {
@@ -475,6 +471,7 @@ namespace SmartLab.Server.Controllers
             PcCommand command =
                 new PcCommand
                 {
+                    UsageSessionId = usage.SessionId,
                     CommandId =
                         commandId,
 
@@ -598,6 +595,8 @@ namespace SmartLab.Server.Controllers
                 return NoContent();
             }
 
+            if (!await IsCommandSessionCurrentAsync(command)) return Conflict(new { message = "The command belongs to an expired workstation session." });
+
             if (!command.Status.Equals(
                     "Pending",
                     StringComparison.OrdinalIgnoreCase))
@@ -610,6 +609,8 @@ namespace SmartLab.Server.Controllers
             {
                 return NoContent();
             }
+
+
 
             return Ok(new
             {
@@ -680,6 +681,8 @@ namespace SmartLab.Server.Controllers
                 return Forbid();
             }
 
+            if (!await IsCommandSessionCurrentAsync(command)) return Conflict(new { message = "The command belongs to an expired workstation session." });
+
             if (!command.Status.Equals(
                     "Pending",
                     StringComparison.OrdinalIgnoreCase))
@@ -729,6 +732,8 @@ namespace SmartLab.Server.Controllers
                 {
                     RemoteControlSessions[command.PCId] =
                         command.RequestedByUserId;
+                    RemoteUsageSessions[command.PCId] = command.UsageSessionId;
+                    RemoteControlSessionTracker.Touch(command.PCId, command.RequestedByUserId);
                 }
                 else if (command.CommandType.Equals(
                              "REMOTE_CONTROL_STOP",
@@ -769,7 +774,7 @@ namespace SmartLab.Server.Controllers
 
         [Authorize(Roles = "Admin,Teacher")]
         [HttpGet("{commandId}")]
-        public IActionResult GetCommandStatus(
+        public async Task<IActionResult> GetCommandStatus(
             long commandId)
         {
             if (!Commands.TryGetValue(
@@ -782,6 +787,14 @@ namespace SmartLab.Server.Controllers
                         "Command not found."
                 });
             }
+
+            if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out int requester)) return Unauthorized();
+            var target = await _context.PCs.AsNoTracking().SingleOrDefaultAsync(p => p.PCId == command.PCId);
+            if (target == null) return NotFound();
+            if (!User.IsInRole("Admin") &&
+                (!User.IsInRole("Teacher") || !target.LaboratoryId.HasValue ||
+                 !await new TeacherScheduleService(_context).IsTeacherScheduledAsync(requester, target.LaboratoryId.Value)))
+                return Forbid();
 
             return Ok(new
             {
@@ -815,47 +828,11 @@ namespace SmartLab.Server.Controllers
         // CREATE AUTHORIZATION TABLE IF NEEDED
         // ==========================================================
 
-        private async Task
-            EnsureAuthorizationTableAsync()
-        {
-            await _context.Database
-                .ExecuteSqlRawAsync(
-                    """
-                    IF OBJECT_ID(
-                        N'dbo.TeacherLaboratoryAuthorizations',
-                        N'U'
-                    ) IS NULL
-                    BEGIN
-                        CREATE TABLE dbo.TeacherLaboratoryAuthorizations
-                        (
-                            TeacherLaboratoryAuthorizationId INT IDENTITY(1,1)
-                                NOT NULL
-                                CONSTRAINT PK_TeacherLaboratoryAuthorizations
-                                PRIMARY KEY,
-
-                            TeacherUserId INT NOT NULL,
-
-                            LaboratoryId INT NOT NULL,
-
-                            CreatedAt DATETIME2 NOT NULL
-                                CONSTRAINT DF_TeacherLaboratoryAuthorizations_CreatedAt
-                                DEFAULT(GETDATE()),
-
-                            CONSTRAINT FK_TeacherLaboratoryAuthorizations_User
-                                FOREIGN KEY (TeacherUserId)
-                                REFERENCES dbo.Users(UserId),
-
-                            CONSTRAINT FK_TeacherLaboratoryAuthorizations_Laboratory
-                                FOREIGN KEY (LaboratoryId)
-                                REFERENCES dbo.Laboratories(LaboratoryId),
-
-                            CONSTRAINT UQ_TeacherLaboratoryAuthorizations
-                                UNIQUE(TeacherUserId, LaboratoryId)
-                        );
-                    END
-                    """);
-        }
-
+        private Task<bool> IsCommandSessionCurrentAsync(PcCommand command) =>
+            _context.PcUsageHistory.AsNoTracking().AnyAsync(s =>
+                s.SessionId == command.UsageSessionId && s.PCId == command.PCId &&
+                s.LogoutTime == null && s.PC != null && s.PC.CurrentUserId == s.UserId &&
+                s.PC.IsEnabled && s.PC.Status == "Occupied");
         // ==========================================================
         // ACTIVITY LOG
         // ==========================================================

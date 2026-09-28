@@ -4,6 +4,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using SmartLab.Server;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -14,20 +15,39 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     ));
 
 builder.Services.AddHostedService<DatabaseMigrationHostedService>();
+builder.Services.AddScoped<TeacherScheduleService>();
 
+builder.Services.AddScoped<WorkstationCredentialFilter>();
 builder.Services.AddScoped<SmartLabAuthorizationFilter>();
 builder.Services.AddScoped<SmartLabRequestIntegrityFilter>();
 builder.Services.AddControllers(options =>
 {
+    options.Filters.AddService<WorkstationCredentialFilter>();
     options.Filters.AddService<SmartLabAuthorizationFilter>();
     options.Filters.AddService<SmartLabRequestIntegrityFilter>();
 });
 
-string jwtKey =
+string? configuredJwtKey =
     builder.Configuration["Jwt:Key"]
-    ?? Environment.GetEnvironmentVariable("SMARTLAB_JWT_KEY")
-    ?? throw new InvalidOperationException(
-        "JWT signing key is missing. Configure Jwt:Key through a local secret/environment variable.");
+    ?? Environment.GetEnvironmentVariable("SMARTLAB_JWT_KEY");
+
+string jwtKey;
+if (!string.IsNullOrWhiteSpace(configuredJwtKey))
+{
+    jwtKey = configuredJwtKey;
+}
+else if (builder.Environment.IsDevelopment() &&
+         builder.Configuration.GetValue("SmartLab:EnableDevelopmentBootstrap", false))
+{
+    // Local development fallback only. A new ephemeral key is generated per server
+    // process, so no signing secret is stored in source control.
+    jwtKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+}
+else
+{
+    throw new InvalidOperationException(
+        "JWT signing key is missing. Configure Jwt:Key through a local secret/environment variable."); 
+}
 
 if (jwtKey.Length < 32)
 {
@@ -65,6 +85,7 @@ builder.Services.AddSingleton<AuthTokenService>();
 builder.Services.AddHostedService<PCMonitorService>();
 builder.Services.AddHostedService<CommandLifecycleHostedService>();
 builder.Services.AddHostedService<ServerDiscoveryService>();
+builder.Services.AddHostedService<TeacherScheduleAuthorizationCacheService>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -118,7 +139,25 @@ if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 }
 
+app.Use(async (context, next) =>
+{
+    try { await next(context); }
+    catch (DbUpdateConcurrencyException ex)
+    {
+        app.Logger.LogWarning(ex, "Workstation update raced with another request");
+        context.Response.StatusCode = StatusCodes.Status409Conflict;
+        await context.Response.WriteAsJsonAsync(new { message = "Workstation state changed. Refresh and retry." });
+    }
+    catch (DbUpdateException ex) when (ex.InnerException is Microsoft.Data.SqlClient.SqlException sql && (sql.Number == 2601 || sql.Number == 2627))
+    {
+        app.Logger.LogWarning(ex, "A unique workstation or ownership constraint rejected an update");
+        context.Response.StatusCode = StatusCodes.Status409Conflict;
+        await context.Response.WriteAsJsonAsync(new { message = "This workstation or student already has an active assignment." });
+    }
+});
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.Run();
+
+public partial class Program { }

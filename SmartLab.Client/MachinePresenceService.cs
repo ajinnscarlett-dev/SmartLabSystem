@@ -1,10 +1,11 @@
 using System;
-using System.Linq;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -12,20 +13,55 @@ namespace SmartLab.Client
 {
     public sealed class MachinePresenceService : IDisposable
     {
-        private readonly HttpClient _httpClient = new HttpClient();
+        private readonly HttpClient _httpClient;
+        private readonly Func<CancellationToken, Task<Uri?>> _resolveServer;
+        private readonly Func<MachinePresenceRequest?> _getIdentity;
+        private readonly Func<bool> _isAuthenticated;
+        private readonly bool _ownsClient;
         private readonly CancellationTokenSource _cancellationTokenSource = new();
         private readonly TimeSpan _interval = TimeSpan.FromSeconds(5);
-
         private Task? _worker;
         private bool _disposed;
 
+        public string ConnectionState { get; private set; } = "CONNECTING";
+
+        public MachinePresenceService() : this(
+            new HttpClient { Timeout = TimeSpan.FromSeconds(8) },
+            async token =>
+            {
+                token.ThrowIfCancellationRequested();
+                return await SmartLabServerConfig.ResolveServerAsync()
+                    ? new Uri(SmartLabServerConfig.BaseUrl) : null;
+            },
+            () =>
+            {
+                var identity = GetMachineNetworkIdentity();
+                return identity == null ? null : new MachinePresenceRequest
+                {
+                    PCNumber = PCConfig.PCNumber,
+                    MACAddress = identity.MacAddress,
+                    IPAddress = identity.IPAddress
+                };
+            },
+            () => AuthSession.IsAuthenticated && AuthSession.Role == "Student",
+            true) { }
+
+        internal MachinePresenceService(HttpClient client,
+            Func<CancellationToken, Task<Uri?>> resolveServer,
+            Func<MachinePresenceRequest?> getIdentity,
+            Func<bool> isAuthenticated, bool ownsClient = false)
+        {
+            _httpClient = client;
+            _resolveServer = resolveServer;
+            _getIdentity = getIdentity;
+            _isAuthenticated = isAuthenticated;
+            _ownsClient = ownsClient;
+        }
+
         public void Start()
         {
-            if (_worker != null)
-            {
-                return;
-            }
-
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (_worker != null) return;
             _worker = RunAsync(_cancellationTokenSource.Token);
         }
 
@@ -35,146 +71,212 @@ namespace SmartLab.Client
             {
                 try
                 {
-                    // Once authenticated, the existing student session heartbeat
-                    // becomes the authoritative heartbeat. This avoids duplicate
-                    // heartbeat loops after login.
-                    if (!AuthSession.IsAuthenticated)
-                    {
+                    if (!_isAuthenticated())
                         await SendPresenceAsync(cancellationToken);
-                    }
                 }
-                catch
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { break; }
+                catch (Exception ex)
                 {
-                    // Presence must never prevent the WPF client from starting.
+                    ConnectionState = "RECONNECTING";
+                    ClientLog.Write("Error", "PresenceUnexpectedFailure", exception: ex);
                 }
 
-                try
-                {
-                    await Task.Delay(_interval, cancellationToken);
-                }
-                catch (OperationCanceledException)
-                {
-                    break;
-                }
+                try { await Task.Delay(_interval, cancellationToken); }
+                catch (OperationCanceledException) { break; }
             }
         }
 
-        private async Task SendPresenceAsync(CancellationToken cancellationToken)
-        {
-            bool serverFound = await SmartLabServerConfig.ResolveServerAsync();
-
-            if (!serverFound)
-            {
-                return;
-            }
-
-            _httpClient.BaseAddress = new Uri(SmartLabServerConfig.BaseUrl);
-
-            string macAddress = GetMacAddress() ?? string.Empty;
-            string? ipAddress = GetLocalIPv4Address();
-            string pcNumber = PCConfig.PCNumber;
-
-            if (string.IsNullOrWhiteSpace(pcNumber) ||
-                string.IsNullOrWhiteSpace(macAddress))
-            {
-                return;
-            }
-
-            var request = new MachinePresenceRequest
-            {
-                PCNumber = pcNumber,
-                MACAddress = macAddress,
-                IPAddress = ipAddress
-            };
-
-            using HttpResponseMessage response = await _httpClient.PostAsJsonAsync(
-                "api/PC/presence",
-                request,
-                cancellationToken);
-
-            // 403/409 intentionally remain non-fatal: they indicate that this
-            // physical machine is not the registered owner of the PC number.
-        }
-
-        private static string? GetMacAddress()
+        internal async Task SendPresenceAsync(CancellationToken cancellationToken)
         {
             try
             {
-                foreach (NetworkInterface networkInterface in
-                         NetworkInterface.GetAllNetworkInterfaces())
+                Uri? server = await _resolveServer(cancellationToken);
+                if (server == null)
                 {
-                    if (networkInterface.OperationalStatus != OperationalStatus.Up ||
-                        networkInterface.NetworkInterfaceType == NetworkInterfaceType.Loopback)
-                    {
-                        continue;
-                    }
+                    SetFailure("SERVER OFFLINE", "PresenceServerUnreachable");
+                    return;
+                }
+                MachinePresenceRequest? request = _getIdentity();
+                if (request == null || string.IsNullOrWhiteSpace(request.PCNumber))
+                {
+                    SetFailure("INVALID WORKSTATION IDENTITY", "PresenceIdentityUnavailable");
+                    return;
+                }
 
+                // Reuse the connection pool. Absolute URIs allow rediscovery without
+                // mutating BaseAddress after the first request.
+                using var message = new HttpRequestMessage(HttpMethod.Post, new Uri(server, "api/PC/presence"))
+                {
+                    Content = JsonContent.Create(request)
+                };
+                string? deviceToken = Environment.GetEnvironmentVariable("SMARTLAB_DEVICE_TOKEN");
+                if (!string.IsNullOrWhiteSpace(deviceToken)) message.Headers.Add("X-SmartLab-Device-Token", deviceToken);
+                using HttpResponseMessage response = await _httpClient.SendAsync(message, cancellationToken);
+                if (!response.IsSuccessStatusCode)
+                {
+                    string state = response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.NotFound or HttpStatusCode.Conflict
+                        ? "WORKSTATION REGISTRATION MISMATCH" : "SERVER ERROR";
+                    SetFailure(state, "PresenceHttpFailure", (int)response.StatusCode);
+                    return;
+                }
+                if (ConnectionState != "CONNECTED")
+                    ClientLog.Write("Information", "PresenceConnected", new { previousState = ConnectionState });
+                ConnectionState = "CONNECTED";
+                ClientLog.Write("Debug", "PresenceHeartbeatSucceeded");
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                SetFailure("RECONNECTING", "PresenceTimeout");
+            }
+            catch (HttpRequestException ex)
+            {
+                SetFailure("SERVER OFFLINE", "PresenceNetworkFailure");
+                ClientLog.Write("Warning", "PresenceTransportError", exception: ex);
+            }
+        }
+
+        private void SetFailure(string state, string eventName, int? statusCode = null)
+        {
+            ConnectionState = state;
+            ClientLog.Write("Warning", eventName, new { state, statusCode });
+        }
+
+        public static string? GetMacAddress()
+        {
+            return GetMachineNetworkIdentity()?.MacAddress;
+        }
+
+        private static MachineNetworkIdentity? GetMachineNetworkIdentity()
+        {
+            try
+            {
+                IEnumerable<NetworkInterface> candidates = NetworkInterface
+                    .GetAllNetworkInterfaces()
+                    .Where(IsUsableInterface)
+                    .OrderByDescending(IsPreferredLanInterface)
+                    .ThenByDescending(IsLikelyLanInterface);
+
+                foreach (NetworkInterface networkInterface in candidates)
+                {
                     byte[] bytes = networkInterface.GetPhysicalAddress().GetAddressBytes();
+                    if (bytes.Length != 6)
+                        continue;
 
-                    if (bytes.Length == 6)
-                    {
-                        return string.Join("-", bytes.Select(b => b.ToString("X2")));
-                    }
+                    string? ipAddress = GetUsableIPv4Address(networkInterface);
+                    if (ipAddress == null)
+                        continue;
+
+                    return new MachineNetworkIdentity(
+                        string.Join("-", bytes.Select(b => b.ToString("X2"))),
+                        ipAddress);
                 }
             }
-            catch
-            {
-            }
+            catch (Exception ex) { ClientLog.Write("Warning", "NetworkIdentityUnavailable", exception: ex); }
 
             return null;
         }
 
-        private static string? GetLocalIPv4Address()
+        private static bool IsUsableInterface(NetworkInterface networkInterface)
         {
+            if (networkInterface.OperationalStatus != OperationalStatus.Up)
+                return false;
+
+            if (networkInterface.NetworkInterfaceType == NetworkInterfaceType.Loopback)
+                return false;
+
             try
             {
-                foreach (NetworkInterface networkInterface in
-                         NetworkInterface.GetAllNetworkInterfaces())
-                {
-                    if (networkInterface.OperationalStatus != OperationalStatus.Up ||
-                        networkInterface.NetworkInterfaceType == NetworkInterfaceType.Loopback)
-                    {
-                        continue;
-                    }
-
-                    foreach (UnicastIPAddressInformation address in
-                             networkInterface.GetIPProperties().UnicastAddresses)
-                    {
-                        if (address.Address.AddressFamily != AddressFamily.InterNetwork)
-                        {
-                            continue;
-                        }
-
-                        string ip = address.Address.ToString();
-
-                        if (!ip.StartsWith("169.254.", StringComparison.Ordinal))
-                        {
-                            return ip;
-                        }
-                    }
-                }
+                return GetUsableIPv4Address(networkInterface) != null &&
+                       networkInterface.GetPhysicalAddress().GetAddressBytes().Length == 6;
             }
             catch
             {
+                return false;
             }
+        }
+
+        private static bool IsPreferredLanInterface(NetworkInterface networkInterface)
+        {
+            return networkInterface.NetworkInterfaceType == NetworkInterfaceType.Ethernet ||
+                   networkInterface.NetworkInterfaceType == NetworkInterfaceType.GigabitEthernet ||
+                   networkInterface.NetworkInterfaceType == NetworkInterfaceType.Wireless80211;
+        }
+
+        private static bool IsLikelyLanInterface(NetworkInterface networkInterface)
+        {
+            string description = (networkInterface.Description ?? string.Empty).ToLowerInvariant();
+            string name = (networkInterface.Name ?? string.Empty).ToLowerInvariant();
+
+            string[] virtualMarkers =
+            {
+                "virtual",
+                "vpn",
+                "tunnel",
+                "loopback",
+                "hyper-v",
+                "vmware",
+                "virtualbox",
+                "zerotier",
+                "tailscale",
+                "wireguard",
+                "hamachi"
+            };
+
+            return !virtualMarkers.Any(marker =>
+                description.Contains(marker, StringComparison.Ordinal) ||
+                name.Contains(marker, StringComparison.Ordinal));
+        }
+
+        private static string? GetUsableIPv4Address(NetworkInterface networkInterface)
+        {
+            try
+            {
+                foreach (UnicastIPAddressInformation address in networkInterface.GetIPProperties().UnicastAddresses)
+                {
+                    if (address.Address.AddressFamily != AddressFamily.InterNetwork)
+                        continue;
+
+                    IPAddress ipAddress = address.Address;
+                    if (IPAddress.IsLoopback(ipAddress) || ipAddress.Equals(IPAddress.Any))
+                        continue;
+
+                    string ip = ipAddress.ToString();
+                    if (ip.StartsWith("169.254.", StringComparison.Ordinal))
+                        continue;
+
+                    return ip;
+                }
+            }
+            catch { }
 
             return null;
         }
 
         public void Dispose()
         {
-            if (_disposed)
-            {
-                return;
-            }
-
+            if (_disposed) return;
             _disposed = true;
             _cancellationTokenSource.Cancel();
-            _httpClient.Dispose();
-            _cancellationTokenSource.Dispose();
+            _ = (_worker ?? Task.CompletedTask).ContinueWith(_ =>
+            {
+                if (_ownsClient) _httpClient.Dispose();
+                _cancellationTokenSource.Dispose();
+            }, TaskScheduler.Default);
         }
 
-        private sealed class MachinePresenceRequest
+        private sealed class MachineNetworkIdentity
+        {
+            public MachineNetworkIdentity(string macAddress, string ipAddress)
+            {
+                MacAddress = macAddress;
+                IPAddress = ipAddress;
+            }
+
+            public string MacAddress { get; }
+            public string IPAddress { get; }
+        }
+
+        internal sealed class MachinePresenceRequest
         {
             public string PCNumber { get; init; } = string.Empty;
             public string MACAddress { get; init; } = string.Empty;

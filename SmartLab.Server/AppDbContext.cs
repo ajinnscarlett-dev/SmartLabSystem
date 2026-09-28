@@ -18,15 +18,25 @@ namespace SmartLab.Server
         public DbSet<HardwareInventory> HardwareInventories { get; set; }
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<AssistanceRequest> AssistanceRequests { get; set; }
+        public DbSet<ClassSchedule> ClassSchedules { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
 
+            modelBuilder.Entity<PC>().HasIndex(p => p.CurrentUserId).IsUnique().HasFilter("[CurrentUserId] IS NOT NULL");
+            modelBuilder.Entity<PC>().Property(p => p.CurrentUserId).IsConcurrencyToken();
+            modelBuilder.Entity<PC>().Property(p => p.LastSeen).IsConcurrencyToken();
+            modelBuilder.Entity<PC>().Property(p => p.IsEnabled).IsConcurrencyToken();
+            modelBuilder.Entity<PC>().Property(p => p.Status).IsConcurrencyToken();
             modelBuilder.Entity<PC>().HasIndex(p => p.PCNumber).IsUnique();
             modelBuilder.Entity<PC>().HasIndex(p => p.MACAddress).IsUnique().HasFilter("[MACAddress] IS NOT NULL");
             modelBuilder.Entity<PC>().HasIndex(p => new { p.LaboratoryId, p.Status });
             modelBuilder.Entity<PC>().HasIndex(p => p.LastSeen);
+            modelBuilder.Entity<User>().HasIndex(u => u.StudentNumber).IsUnique().HasFilter("[StudentNumber] IS NOT NULL");
+            modelBuilder.Entity<ClassSchedule>().HasIndex(s => new { s.TeacherUserId, s.ScheduleDate });
+            modelBuilder.Entity<ClassSchedule>().HasIndex(s => new { s.LaboratoryId, s.ScheduleDate });
+            modelBuilder.Entity<ClassSchedule>().HasIndex(s => s.ScheduleDate);
             modelBuilder.Entity<PcUsageHistory>().HasKey(s => s.SessionId);
             modelBuilder.Entity<PcUsageHistory>().HasIndex(s => new { s.LaboratoryId, s.LoginTime });
             modelBuilder.Entity<PcUsageHistory>().HasIndex(s => new { s.PCId, s.LoginTime });
@@ -48,6 +58,8 @@ namespace SmartLab.Server
             modelBuilder.Entity<AssistanceRequest>().HasOne(a => a.PC).WithMany().HasForeignKey(a => a.PCId).OnDelete(DeleteBehavior.Restrict);
             modelBuilder.Entity<AssistanceRequest>().HasOne(a => a.Laboratory).WithMany().HasForeignKey(a => a.LaboratoryId).OnDelete(DeleteBehavior.Restrict);
             modelBuilder.Entity<AssistanceRequest>().HasOne(a => a.ResolvedByUser).WithMany().HasForeignKey(a => a.ResolvedByUserId).OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<ClassSchedule>().HasOne(s => s.TeacherUser).WithMany().HasForeignKey(s => s.TeacherUserId).OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<ClassSchedule>().HasOne(s => s.Laboratory).WithMany().HasForeignKey(s => s.LaboratoryId).OnDelete(DeleteBehavior.Restrict);
         }
 
         public override int SaveChanges()
@@ -76,8 +88,8 @@ namespace SmartLab.Server
                 int? previousUserId = entry.Property(p => p.CurrentUserId).OriginalValue;
                 int? currentUserId = entry.Entity.CurrentUserId;
 
-                bool enteredOccupied = !string.Equals(previousStatus, "Occupied", StringComparison.OrdinalIgnoreCase) && string.Equals(currentStatus, "Occupied", StringComparison.OrdinalIgnoreCase) && currentUserId.HasValue;
-                bool leftOccupied = string.Equals(previousStatus, "Occupied", StringComparison.OrdinalIgnoreCase) && !string.Equals(currentStatus, "Occupied", StringComparison.OrdinalIgnoreCase);
+                bool enteredOccupied = string.Equals(currentStatus, "Occupied", StringComparison.OrdinalIgnoreCase) && currentUserId.HasValue;
+                bool leftOccupied = previousUserId.HasValue && previousUserId != currentUserId;
 
                 if (enteredOccupied)
                 {

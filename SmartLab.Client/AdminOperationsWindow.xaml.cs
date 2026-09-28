@@ -210,6 +210,21 @@ namespace SmartLab.Client
             AnnouncementGrid.ItemsSource = rows;
         }
 
+        private async Task LoadActivityLogsAsync()
+        {
+            try
+            {
+                var rows = await GetJsonAsync<List<ActivityLogRow>>("api/ActivityLog") ?? new();
+                ActivityLogGrid.ItemsSource = rows;
+            }
+            catch (Exception ex)
+            {
+                ActivityLogGrid.ItemsSource = new List<ActivityLogRow>();
+                StatusText.Text = "Activity log load failed";
+                Console.WriteLine(ex);
+            }
+        }
+
         private async Task LoadArchiveAsync()
         {
             int ageDays = ParseArchiveAge();
@@ -384,6 +399,17 @@ namespace SmartLab.Client
                 MessageBox.Show(ex.Message, "Export", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
+        private sealed class ActivityLogRow
+        {
+            public DateTime CreatedAt { get; set; }
+            public string? Username { get; set; }
+            public string? Role { get; set; }
+            public string? Action { get; set; }
+            public string? PcNumber { get; set; }
+            public string? Details { get; set; }
+        }
+
 
         private async Task<T?> GetJsonAsync<T>(string endpoint)
         {

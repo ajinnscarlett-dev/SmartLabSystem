@@ -1,10 +1,6 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -32,16 +28,12 @@ public partial class UserManagementWindow : Window
             StatusText.Text = "Loading accounts...";
             _accounts = await _httpClient.GetFromJsonAsync<List<AccountRow>>("api/User/management") ?? new();
             ApplyFilter();
-            StatusText.Text = $"{_accounts.Count} account(s) loaded.";
+            StatusText.Text = $"{_accounts.Count:N0} account(s) loaded.";
         }
         catch (Exception ex)
         {
             StatusText.Text = "Unable to load accounts.";
-            MessageBox.Show(
-                $"Unable to load accounts.\n\n{ex.Message}",
-                "User Management",
-                MessageBoxButton.OK,
-                MessageBoxImage.Error);
+            MessageBox.Show($"Unable to load accounts.\n\n{ex.Message}", "User Management", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -52,6 +44,8 @@ public partial class UserManagementWindow : Window
             ? _accounts
             : _accounts.Where(a =>
                 a.Username.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                (a.StudentNumber?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (a.FullName?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false) ||
                 a.Role.Contains(query, StringComparison.OrdinalIgnoreCase) ||
                 a.Status.Contains(query, StringComparison.OrdinalIgnoreCase) ||
                 a.UserId.ToString().Contains(query, StringComparison.OrdinalIgnoreCase)).ToList();
@@ -73,8 +67,7 @@ public partial class UserManagementWindow : Window
         try
         {
             SetBusy(fields.Value, true);
-
-            var response = await _httpClient.PostAsJsonAsync(
+            using HttpResponseMessage response = await _httpClient.PostAsJsonAsync(
                 "api/User/management",
                 new
                 {
@@ -85,11 +78,7 @@ public partial class UserManagementWindow : Window
 
             if (!response.IsSuccessStatusCode)
             {
-                MessageBox.Show(
-                    await ReadMessageAsync(response),
-                    "User Management",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                MessageBox.Show(await ReadMessageAsync(response), "User Management", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -98,11 +87,7 @@ public partial class UserManagementWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show(
-                ex.Message,
-                "User Management",
-                MessageBoxButton.OK,
-                MessageBoxImage.Error);
+            MessageBox.Show(ex.Message, "User Management", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
         {
@@ -113,110 +98,69 @@ public partial class UserManagementWindow : Window
     private async void RenameButton_Click(object sender, RoutedEventArgs e)
     {
         if (GetAccount(sender) is not AccountRow account) return;
+        string? username = ShowTextDialog("Change Username", $"New username for {account.Username}", account.Username);
+        if (string.IsNullOrWhiteSpace(username) || username.Trim().Equals(account.Username, StringComparison.OrdinalIgnoreCase)) return;
 
-        string? username = ShowTextDialog(
-            "Change Username",
-            $"New username for {account.Username}",
-            account.Username);
-
-        if (string.IsNullOrWhiteSpace(username) ||
-            username.Trim().Equals(account.Username, StringComparison.OrdinalIgnoreCase))
-            return;
-
-        await SendAsync(
-            HttpMethod.Put,
-            $"api/User/management/{account.UserId}/username",
-            new { Username = username.Trim() },
-            "Username updated successfully.");
+        await SendAsync(HttpMethod.Put, $"api/User/management/{account.UserId}/username", new { Username = username.Trim() }, "Username updated successfully.");
     }
 
     private async void RoleButton_Click(object sender, RoutedEventArgs e)
     {
         if (GetAccount(sender) is not AccountRow account) return;
-
         string? role = ShowRoleDialog(account.Role);
         if (role == null || role == account.Role || account.Status != "Active") return;
 
-        await SendAsync(
-            HttpMethod.Put,
-            $"api/User/management/{account.UserId}/role",
-            new { Role = role },
-            "Role updated successfully.");
+        await SendAsync(HttpMethod.Put, $"api/User/management/{account.UserId}/role", new { Role = role }, "Role updated successfully.");
     }
 
     private async void PasswordButton_Click(object sender, RoutedEventArgs e)
     {
         if (GetAccount(sender) is not AccountRow account) return;
-
         string? password = ShowPasswordDialog(account.Username);
         if (password == null) return;
 
-        await SendAsync(
-            HttpMethod.Put,
-            $"api/User/management/{account.UserId}/password",
-            new { NewPassword = password },
-            "Password reset successfully.");
+        await SendAsync(HttpMethod.Put, $"api/User/management/{account.UserId}/password", new { NewPassword = password }, "Password reset successfully.");
     }
 
     private async void DeleteButton_Click(object sender, RoutedEventArgs e)
     {
         if (GetAccount(sender) is not AccountRow account || account.Status != "Active") return;
 
-        var result = MessageBox.Show(
+        MessageBoxResult result = MessageBox.Show(
             $"Deactivate account '{account.Username}'?\n\nThe account will no longer be able to log in, but its history will be preserved.",
             "Deactivate Account",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning);
 
         if (result != MessageBoxResult.Yes) return;
-
-        await SendAsync(
-            HttpMethod.Delete,
-            $"api/User/management/{account.UserId}",
-            null,
-            "Account deactivated successfully.");
+        await SendAsync(HttpMethod.Delete, $"api/User/management/{account.UserId}", null, "Account deactivated successfully.");
     }
 
     private async void RestoreButton_Click(object sender, RoutedEventArgs e)
     {
         if (GetAccount(sender) is not AccountRow account || account.Status != "Inactive") return;
 
-        var result = MessageBox.Show(
+        MessageBoxResult result = MessageBox.Show(
             $"Restore account '{account.Username}'?",
             "Restore Account",
             MessageBoxButton.YesNo,
             MessageBoxImage.Question);
 
         if (result != MessageBoxResult.Yes) return;
-
-        await SendAsync(
-            HttpMethod.Post,
-            $"api/User/management/{account.UserId}/restore",
-            null,
-            "Account restored successfully.");
+        await SendAsync(HttpMethod.Post, $"api/User/management/{account.UserId}/restore", null, "Account restored successfully.");
     }
 
-    private async Task SendAsync(
-        HttpMethod method,
-        string uri,
-        object? body,
-        string successMessage)
+    private async Task SendAsync(HttpMethod method, string uri, object? body, string successMessage)
     {
         try
         {
             using var request = new HttpRequestMessage(method, uri);
-            if (body != null)
-                request.Content = JsonContent.Create(body);
-
-            using var response = await _httpClient.SendAsync(request);
+            if (body != null) request.Content = JsonContent.Create(body);
+            using HttpResponseMessage response = await _httpClient.SendAsync(request);
 
             if (!response.IsSuccessStatusCode)
             {
-                MessageBox.Show(
-                    await ReadMessageAsync(response),
-                    "User Management",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                MessageBox.Show(await ReadMessageAsync(response), "User Management", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -225,27 +169,20 @@ public partial class UserManagementWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show(
-                ex.Message,
-                "User Management",
-                MessageBoxButton.OK,
-                MessageBoxImage.Error);
+            MessageBox.Show(ex.Message, "User Management", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
     private static async Task<string> ReadMessageAsync(HttpResponseMessage response)
     {
         string text = await response.Content.ReadAsStringAsync();
-
         try
         {
-            using var json = JsonDocument.Parse(text);
-            if (json.RootElement.TryGetProperty("message", out var message))
+            using JsonDocument json = JsonDocument.Parse(text);
+            if (json.RootElement.TryGetProperty("message", out JsonElement message))
                 return message.GetString() ?? text;
         }
-        catch
-        {
-        }
+        catch { }
 
         return string.IsNullOrWhiteSpace(text)
             ? $"Request failed ({(int)response.StatusCode})."
@@ -257,85 +194,23 @@ public partial class UserManagementWindow : Window
 
     private static string? ShowTextDialog(string title, string label, string value)
     {
-        var dialog = new Window
-        {
-            Title = title,
-            Width = 430,
-            Height = 210,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            ResizeMode = ResizeMode.NoResize,
-            Background = Brushes.White
-        };
+        var dialog = CreateDialog(title, 430, 210);
+        var panel = CreatePanel();
+        panel.Children.Add(new TextBlock { Text = label, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 8) });
 
-        var panel = new StackPanel { Margin = new Thickness(20) };
-        panel.Children.Add(new TextBlock
-        {
-            Text = label,
-            FontWeight = FontWeights.SemiBold,
-            Foreground = Brushes.Black,
-            Margin = new Thickness(0, 0, 0, 8)
-        });
-
-        var box = new TextBox
-        {
-            Text = value,
-            Height = 34,
-            Padding = new Thickness(7)
-        };
+        var box = new TextBox { Text = value, Height = 34, Padding = new Thickness(7) };
         panel.Children.Add(box);
-
-        var buttons = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Right,
-            Margin = new Thickness(0, 16, 0, 0)
-        };
-
-        string? result = null;
-        var cancel = new Button
-        {
-            Content = "CANCEL",
-            Width = 90,
-            Height = 32,
-            Margin = new Thickness(0, 0, 8, 0)
-        };
-        var save = new Button { Content = "SAVE", Width = 90, Height = 32 };
-
-        cancel.Click += (_, _) => dialog.Close();
-        save.Click += (_, _) =>
-        {
-            result = box.Text;
-            dialog.Close();
-        };
-
-        buttons.Children.Add(cancel);
-        buttons.Children.Add(save);
-        panel.Children.Add(buttons);
+        panel.Children.Add(CreateDialogButtons(dialog, "SAVE", () => box.Text, out Func<string?>? getResult));
         dialog.Content = panel;
         dialog.ShowDialog();
-        return result;
+        return getResult();
     }
 
     private static string? ShowRoleDialog(string current)
     {
-        var dialog = new Window
-        {
-            Title = "Change Role",
-            Width = 380,
-            Height = 210,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            ResizeMode = ResizeMode.NoResize,
-            Background = Brushes.White
-        };
-
-        var panel = new StackPanel { Margin = new Thickness(20) };
-        panel.Children.Add(new TextBlock
-        {
-            Text = "Select new role",
-            FontWeight = FontWeights.SemiBold,
-            Foreground = Brushes.Black,
-            Margin = new Thickness(0, 0, 0, 8)
-        });
+        var dialog = CreateDialog("Change Role", 380, 210);
+        var panel = CreatePanel();
+        panel.Children.Add(new TextBlock { Text = "Select new role", FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 8) });
 
         var combo = new ComboBox { Height = 34 };
         combo.Items.Add("Student");
@@ -343,72 +218,31 @@ public partial class UserManagementWindow : Window
         combo.Items.Add("Admin");
         combo.SelectedItem = current;
         panel.Children.Add(combo);
-
-        var buttons = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Right,
-            Margin = new Thickness(0, 16, 0, 0)
-        };
-
-        string? result = null;
-        var cancel = new Button
-        {
-            Content = "CANCEL",
-            Width = 90,
-            Height = 32,
-            Margin = new Thickness(0, 0, 8, 0)
-        };
-        var save = new Button { Content = "SAVE", Width = 90, Height = 32 };
-
-        cancel.Click += (_, _) => dialog.Close();
-        save.Click += (_, _) =>
-        {
-            result = combo.SelectedItem?.ToString();
-            dialog.Close();
-        };
-
-        buttons.Children.Add(cancel);
-        buttons.Children.Add(save);
-        panel.Children.Add(buttons);
+        panel.Children.Add(CreateDialogButtons(dialog, "SAVE", () => combo.SelectedItem?.ToString(), out Func<string?>? getResult));
         dialog.Content = panel;
         dialog.ShowDialog();
-        return result;
+        return getResult();
     }
 
     private static string? ShowPasswordDialog(string username)
     {
-        var dialog = new Window
-        {
-            Title = $"Reset Password - {username}",
-            Width = 400,
-            Height = 240,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            ResizeMode = ResizeMode.NoResize,
-            Background = Brushes.White
-        };
+        var dialog = CreateDialog($"Reset Password - {username}", 400, 240);
+        var panel = CreatePanel();
+        panel.Children.Add(new TextBlock { Text = "New password", FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 8) });
 
-        var panel = new StackPanel { Margin = new Thickness(20) };
-        panel.Children.Add(new TextBlock
-        {
-            Text = "New password",
-            FontWeight = FontWeights.SemiBold,
-            Foreground = Brushes.Black,
-            Margin = new Thickness(0, 0, 0, 8)
-        });
-
-        var box = new PasswordBox
-        {
-            Height = 36,
-            Padding = new Thickness(7)
-        };
+        var box = new PasswordBox { Height = 36, Padding = new Thickness(7) };
         panel.Children.Add(box);
-        panel.Children.Add(new TextBlock
-        {
-            Text = "Minimum 6 characters",
-            Foreground = Brushes.Gray,
-            Margin = new Thickness(0, 5, 0, 0)
-        });
+        panel.Children.Add(new TextBlock { Text = "Minimum 6 characters", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
+        panel.Children.Add(CreateDialogButtons(dialog, "RESET", () => box.Password.Length >= 6 ? box.Password : null, out Func<string?>? getResult));
+        dialog.Content = panel;
+        dialog.ShowDialog();
+        return getResult();
+    }
+
+    private static UIElement CreateDialogButtons(Window dialog, string action, Func<string?> valueFactory, out Func<string?> resultFactory)
+    {
+        string? result = null;
+        resultFactory = () => result;
 
         var buttons = new StackPanel
         {
@@ -417,102 +251,63 @@ public partial class UserManagementWindow : Window
             Margin = new Thickness(0, 16, 0, 0)
         };
 
-        string? result = null;
-        var cancel = new Button
-        {
-            Content = "CANCEL",
-            Width = 90,
-            Height = 32,
-            Margin = new Thickness(0, 0, 8, 0)
-        };
-        var save = new Button { Content = "RESET", Width = 90, Height = 32 };
+        var cancel = new Button { Content = "CANCEL", Width = 90, Height = 32, Margin = new Thickness(0, 0, 8, 0) };
+        var save = new Button { Content = action, Width = 90, Height = 32 };
 
         cancel.Click += (_, _) => dialog.Close();
         save.Click += (_, _) =>
         {
-            if (box.Password.Length < 6)
+            string? value = valueFactory();
+            if (value == null)
             {
                 MessageBox.Show(
-                    "Password must be at least 6 characters.",
+                    action == "RESET" ? "Password must be at least 6 characters." : "Select a value.",
                     "User Management",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
                 return;
             }
 
-            result = box.Password;
+            result = value;
             dialog.Close();
         };
 
         buttons.Children.Add(cancel);
         buttons.Children.Add(save);
-        panel.Children.Add(buttons);
-        dialog.Content = panel;
-        dialog.ShowDialog();
-        return result;
+        return buttons;
     }
 
-    private static (Window Dialog, TextBox Username, PasswordBox Password, ComboBox Role)? BuildAccountDialog(
-        string title,
-        string action)
+    private static Window CreateDialog(string title, double width, double height) => new()
     {
-        var dialog = new Window
-        {
-            Title = title,
-            Width = 440,
-            Height = 360,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            ResizeMode = ResizeMode.NoResize,
-            Background = Brushes.White
-        };
+        Title = title,
+        Width = width,
+        Height = height,
+        WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        ResizeMode = ResizeMode.NoResize,
+        Background = Brushes.White
+    };
 
-        var panel = new StackPanel { Margin = new Thickness(20) };
-        panel.Children.Add(new TextBlock
-        {
-            Text = title,
-            FontSize = 20,
-            FontWeight = FontWeights.Bold,
-            Foreground = Brushes.Black,
-            Margin = new Thickness(0, 0, 0, 15)
-        });
+    private static StackPanel CreatePanel() => new() { Margin = new Thickness(20) };
 
-        var username = new TextBox
-        {
-            Height = 34,
-            Padding = new Thickness(7)
-        };
-        panel.Children.Add(new TextBlock { Text = "Username", Foreground = Brushes.Black });
-        panel.Children.Add(username);
+    private static (Window Dialog, TextBox Username, PasswordBox Password, ComboBox Role)? BuildAccountDialog(string title, string action)
+    {
+        var dialog = CreateDialog(title, 440, 360);
+        var panel = CreatePanel();
+        panel.Children.Add(new TextBlock { Text = title, FontSize = 20, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 0, 15) });
 
-        var password = new PasswordBox
-        {
-            Height = 34,
-            Padding = new Thickness(7),
-            Margin = new Thickness(0, 8, 0, 0)
-        };
-        panel.Children.Add(new TextBlock
-        {
-            Text = "Password",
-            Foreground = Brushes.Black,
-            Margin = new Thickness(0, 10, 0, 0)
-        });
-        panel.Children.Add(password);
-
-        var role = new ComboBox
-        {
-            Height = 34,
-            Margin = new Thickness(0, 8, 0, 0)
-        };
+        var username = new TextBox { Height = 34, Padding = new Thickness(7) };
+        var password = new PasswordBox { Height = 34, Padding = new Thickness(7), Margin = new Thickness(0, 8, 0, 0) };
+        var role = new ComboBox { Height = 34, Margin = new Thickness(0, 8, 0, 0) };
         role.Items.Add("Student");
         role.Items.Add("Teacher");
         role.Items.Add("Admin");
         role.SelectedIndex = 0;
-        panel.Children.Add(new TextBlock
-        {
-            Text = "Role",
-            Foreground = Brushes.Black,
-            Margin = new Thickness(0, 10, 0, 0)
-        });
+
+        panel.Children.Add(new TextBlock { Text = "Username" });
+        panel.Children.Add(username);
+        panel.Children.Add(new TextBlock { Text = "Password", Margin = new Thickness(0, 10, 0, 0) });
+        panel.Children.Add(password);
+        panel.Children.Add(new TextBlock { Text = "Role", Margin = new Thickness(0, 10, 0, 0) });
         panel.Children.Add(role);
 
         var buttons = new StackPanel
@@ -522,30 +317,18 @@ public partial class UserManagementWindow : Window
             Margin = new Thickness(0, 16, 0, 0)
         };
 
-        var cancel = new Button
-        {
-            Content = "CANCEL",
-            Width = 90,
-            Height = 32,
-            Margin = new Thickness(0, 0, 8, 0)
-        };
+        var cancel = new Button { Content = "CANCEL", Width = 90, Height = 32, Margin = new Thickness(0, 0, 8, 0) };
         var save = new Button { Content = action, Width = 90, Height = 32 };
-
         cancel.Click += (_, _) => dialog.Close();
         save.Click += (_, _) =>
         {
             if (string.IsNullOrWhiteSpace(username.Text) || password.Password.Length < 6)
             {
-                MessageBox.Show(
-                    "Enter a username and a password with at least 6 characters.",
-                    "User Management",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                MessageBox.Show("Enter a username and a password with at least 6 characters.", "User Management", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
             dialog.DialogResult = true;
-            dialog.Close();
         };
 
         buttons.Children.Add(cancel);
@@ -554,14 +337,10 @@ public partial class UserManagementWindow : Window
         dialog.Content = panel;
         dialog.ShowDialog();
 
-        return dialog.DialogResult == true
-            ? (dialog, username, password, role)
-            : null;
+        return dialog.DialogResult == true ? (dialog, username, password, role) : null;
     }
 
-    private static void SetBusy(
-        (Window Dialog, TextBox Username, PasswordBox Password, ComboBox Role) fields,
-        bool busy)
+    private static void SetBusy((Window Dialog, TextBox Username, PasswordBox Password, ComboBox Role) fields, bool busy)
     {
         fields.Username.IsEnabled = !busy;
         fields.Password.IsEnabled = !busy;
@@ -572,8 +351,12 @@ public partial class UserManagementWindow : Window
     {
         public int UserId { get; set; }
         public string Username { get; set; } = string.Empty;
+        public string? StudentNumber { get; set; }
+        public string? FullName { get; set; }
         public string Role { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
+        public bool MustChangePassword { get; set; }
+        public string PasswordStatus => MustChangePassword ? "CHANGE REQUIRED" : "SET";
         public DateTime CreatedAt { get; set; }
     }
 }

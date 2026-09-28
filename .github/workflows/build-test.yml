@@ -2,7 +2,7 @@ name: SmartLab Build and Test
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, capstone-hardening-20260917 ]
   pull_request:
     branches: [ main ]
 
@@ -41,5 +41,18 @@ jobs:
         working-directory: SmartLab.Server
         run: dotnet ef migrations has-pending-model-changes --configuration Release --no-build
 
-      - name: Test
-        run: dotnet test SmartLabSystem.sln --configuration Release --no-build
+      - name: Start isolated SQL Server test instance
+        shell: pwsh
+        run: sqllocaldb start MSSQLLocalDB
+
+      - name: Test including SQL Server integration
+        env:
+          SMARTLAB_TEST_SQLSERVER: 'Server=(localdb)\MSSQLLocalDB;Database=master;Integrated Security=true;TrustServerCertificate=true;'
+        run: dotnet test SmartLabSystem.sln --configuration Release --no-build --logger "trx;LogFileName=hardening.trx" --results-directory TestResults
+
+      - name: Preserve test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hardening-test-results
+          path: TestResults/*.trx
