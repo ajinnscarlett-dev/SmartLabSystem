@@ -74,13 +74,10 @@ namespace SmartLab.Server.Controllers
 
             const int maxFrameBytes = 2 * 1024 * 1024;
             if (Request.ContentLength.HasValue && Request.ContentLength.Value > maxFrameBytes) return BadRequest(new { message = "Teacher screen frame is too large." });
-            using MemoryStream stream = new();
-            await Request.Body.CopyToAsync(stream, HttpContext.RequestAborted);
-            if (stream.Length == 0) return BadRequest(new { message = "Teacher screen frame is empty." });
-            if (stream.Length > maxFrameBytes) return BadRequest(new { message = "Teacher screen frame is too large." });
-
+            byte[]? image = await BoundedFrameReader.ReadAsync(Request.Body, maxFrameBytes, HttpContext.RequestAborted);
+            if (image == null || image.Length == 0) return BadRequest(new { message = "Teacher screen frame is empty or exceeds the size limit." });
             long version = Interlocked.Increment(ref _frameVersion);
-            share.LatestFrame = stream.ToArray();
+            share.LatestFrame = image;
             share.Version = version;
             share.UpdatedAt = DateTime.Now;
             return Ok(new { message = "Teacher screen frame uploaded.", laboratoryId, version, size = share.LatestFrame.Length });

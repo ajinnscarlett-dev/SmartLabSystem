@@ -77,12 +77,8 @@ namespace SmartLab.Server.Controllers
             if (Request.ContentLength.HasValue && (Request.ContentLength.Value <= 0 || Request.ContentLength.Value > MaxFrameBytes))
                 return BadRequest(new { message = $"Screen image must be between 1 byte and {MaxFrameBytes:N0} bytes." });
 
-            using MemoryStream stream = new();
-            await Request.Body.CopyToAsync(stream, HttpContext.RequestAborted);
-            if (stream.Length == 0) return BadRequest(new { message = "Screen image is empty." });
-            if (stream.Length > MaxFrameBytes) return BadRequest(new { message = $"Screen image exceeds the {MaxFrameBytes:N0}-byte limit." });
-
-            byte[] image = stream.ToArray();
+            byte[]? image = await BoundedFrameReader.ReadAsync(Request.Body, MaxFrameBytes, HttpContext.RequestAborted);
+            if (image == null || image.Length == 0) return BadRequest(new { message = "Screen image is empty or exceeds the size limit." });
             long version = Interlocked.Increment(ref _globalFrameVersion);
             LatestFrames[pcId] = new ScreenFrame(image, version, DateTime.Now);
             return Ok(new { message = "Screen uploaded successfully.", pcId, version, size = image.Length });
@@ -151,14 +147,14 @@ namespace SmartLab.Server.Controllers
 
         private async Task<bool> CanAccessPcAsync(int pcId)
         {
-            if (User.IsInRole("Admin")) return true;
+            if (User.IsInRole("Admin")) return await _context.PCs.AnyAsync(p => p.PCId == pcId);
             if (User.IsInRole("Teacher")) return await CanTeacherAccessPcAsync(pcId);
             return await CanStudentAccessPcAsync(pcId);
         }
 
         private async Task<bool> CanStaffAccessPcAsync(int pcId)
         {
-            if (User.IsInRole("Admin")) return true;
+            if (User.IsInRole("Admin")) return await _context.PCs.AnyAsync(p => p.PCId == pcId);
             if (User.IsInRole("Teacher")) return await CanTeacherAccessPcAsync(pcId);
             return false;
         }

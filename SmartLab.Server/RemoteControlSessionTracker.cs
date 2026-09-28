@@ -17,6 +17,10 @@ internal static class RemoteControlSessionTracker
             LastSeenUtc[pcId] = DateTime.UtcNow;
     }
 
+    public static bool IsActive(int pcId, int userId) =>
+        TryGetSessions(out var sessions) && sessions.TryGetValue(pcId, out int owner) && owner == userId &&
+        LastSeenUtc.TryGetValue(pcId, out var seen) && seen >= DateTime.UtcNow.AddSeconds(-20);
+
     public static int CleanupExpired(TimeSpan ttl, ISet<int>? offlinePcIds = null)
     {
         if (!TryGetSessions(out ConcurrentDictionary<int, int> sessions))

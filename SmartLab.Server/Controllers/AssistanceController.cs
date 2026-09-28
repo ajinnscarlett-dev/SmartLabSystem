@@ -159,8 +159,7 @@ namespace SmartLab.Server.Controllers
                 if (!TryGetUserId(out int teacherId))
                     return Unauthorized();
 
-                var authorizedLabs = await _context.TeacherLaboratoryAuthorizations
-                    .Where(a => a.TeacherUserId == teacherId)
+                var authorizedLabs = await new TeacherScheduleService(_context).GetCurrentSchedules().Where(a => a.TeacherUserId == teacherId)
                     .Select(a => a.LaboratoryId)
                     .ToListAsync();
 
@@ -234,9 +233,7 @@ namespace SmartLab.Server.Controllers
                     return Unauthorized();
 
                 if (!assistance.LaboratoryId.HasValue ||
-                    !await _context.TeacherLaboratoryAuthorizations.AnyAsync(a =>
-                        a.TeacherUserId == teacherId &&
-                        a.LaboratoryId == assistance.LaboratoryId.Value))
+                    !await new TeacherScheduleService(_context).IsTeacherScheduledAsync(teacherId, assistance.LaboratoryId.Value))
                 {
                     return Forbid();
                 }

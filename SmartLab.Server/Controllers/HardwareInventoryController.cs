@@ -33,9 +33,7 @@ namespace SmartLab.Server.Controllers
                     return Unauthorized();
                 }
 
-                var authorizedLabs = await _context.TeacherLaboratoryAuthorizations
-                    .AsNoTracking()
-                    .Where(a => a.TeacherUserId == teacherId)
+                var authorizedLabs = await new TeacherScheduleService(_context).GetCurrentSchedules().Where(a => a.TeacherUserId == teacherId)
                     .Select(a => a.LaboratoryId)
                     .ToListAsync();
 
@@ -86,9 +84,7 @@ namespace SmartLab.Server.Controllers
                     return Unauthorized();
 
                 bool authorized = item.PC?.LaboratoryId.HasValue == true &&
-                    await _context.TeacherLaboratoryAuthorizations.AnyAsync(a =>
-                        a.TeacherUserId == teacherId &&
-                        a.LaboratoryId == item.PC.LaboratoryId.Value);
+                    await new TeacherScheduleService(_context).IsTeacherScheduledAsync(teacherId, item.PC.LaboratoryId.Value);
 
                 if (!authorized)
                     return Forbid();
