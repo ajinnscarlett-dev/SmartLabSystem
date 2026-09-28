@@ -18,14 +18,15 @@ namespace SmartLab.Server.Controllers
 
         private sealed class ScreenFrame
         {
+            public long SessionId { get; }
             public byte[] Image { get; }
             public long Version { get; }
             public DateTime UpdatedAt { get; }
-            public ScreenFrame(byte[] image, long version, DateTime updatedAt) { Image = image; Version = version; UpdatedAt = updatedAt; }
+            public ScreenFrame(byte[] image, long version, DateTime updatedAt, long sessionId) { Image = image; Version = version; UpdatedAt = updatedAt; SessionId = sessionId; }
         }
 
         private static readonly ConcurrentDictionary<int, ScreenFrame> LatestFrames = new();
-        private static readonly ConcurrentDictionary<int, bool> MonitoringStates = new();
+        private static readonly ConcurrentDictionary<int, DateTime> MonitoringStates = new();
         private static long _globalFrameVersion;
 
         public ScreenMonitorController(AppDbContext context, TeacherScheduleService scheduleService)
@@ -40,7 +41,7 @@ namespace SmartLab.Server.Controllers
         {
             CleanupStaleFrames();
             if (!await CanAccessPcAsync(pcId)) return Forbid();
-            bool enabled = MonitoringStates.TryGetValue(pcId, out bool state) && state;
+            bool enabled = MonitoringStates.TryGetValue(pcId, out DateTime state) && state >= DateTime.UtcNow.AddSeconds(-30);
             return Ok(new { pcId, monitoring = enabled });
         }
 
@@ -50,7 +51,7 @@ namespace SmartLab.Server.Controllers
         {
             CleanupStaleFrames();
             if (!await CanStaffAccessPcAsync(pcId)) return Forbid();
-            MonitoringStates[pcId] = true;
+            MonitoringStates[pcId] = DateTime.UtcNow;
             return Ok(new { message = "Screen monitoring started.", pcId, monitoring = true });
         }
 
@@ -60,7 +61,7 @@ namespace SmartLab.Server.Controllers
         {
             CleanupStaleFrames();
             if (!await CanStaffAccessPcAsync(pcId)) return Forbid();
-            MonitoringStates[pcId] = false;
+            MonitoringStates.TryRemove(pcId, out _);
             LatestFrames.TryRemove(pcId, out _);
             return Ok(new { message = "Screen monitoring stopped.", pcId, monitoring = false });
         }
@@ -71,7 +72,7 @@ namespace SmartLab.Server.Controllers
         {
             CleanupStaleFrames();
             if (!await CanStudentAccessPcAsync(pcId)) return Forbid();
-            if (!MonitoringStates.TryGetValue(pcId, out bool enabled) || !enabled)
+            if (!MonitoringStates.TryGetValue(pcId, out DateTime renewed) || renewed < DateTime.UtcNow.AddSeconds(-30))
                 return StatusCode(StatusCodes.Status403Forbidden, new { message = "Screen monitoring is not enabled." });
 
             if (Request.ContentLength.HasValue && (Request.ContentLength.Value <= 0 || Request.ContentLength.Value > MaxFrameBytes))
@@ -79,8 +80,10 @@ namespace SmartLab.Server.Controllers
 
             byte[]? image = await BoundedFrameReader.ReadAsync(Request.Body, MaxFrameBytes, HttpContext.RequestAborted);
             if (image == null || image.Length == 0) return BadRequest(new { message = "Screen image is empty or exceeds the size limit." });
+            var session = await _context.PcUsageHistory.AsNoTracking().SingleOrDefaultAsync(s => s.PCId == pcId && s.LogoutTime == null);
+            if (session == null) return Conflict(new { message = "No active workstation session." });
             long version = Interlocked.Increment(ref _globalFrameVersion);
-            LatestFrames[pcId] = new ScreenFrame(image, version, DateTime.Now);
+            LatestFrames[pcId] = new ScreenFrame(image, version, DateTime.Now, session.SessionId);
             return Ok(new { message = "Screen uploaded successfully.", pcId, version, size = image.Length });
         }
 
@@ -91,6 +94,7 @@ namespace SmartLab.Server.Controllers
             CleanupStaleFrames();
             if (!await CanStaffAccessPcAsync(pcId)) return Forbid();
             if (!LatestFrames.TryGetValue(pcId, out ScreenFrame? frame)) return NotFound(new { message = "No current screen image is available for this PC." });
+            if (!await _context.PcUsageHistory.AnyAsync(s => s.SessionId == frame.SessionId && s.PCId == pcId && s.LogoutTime == null)) return NotFound(new { message = "The preview belongs to an expired session." });
             TouchRemoteViewerLease(pcId);
             return Ok(new { pcId, version = frame.Version, updatedAt = frame.UpdatedAt });
         }
@@ -102,6 +106,7 @@ namespace SmartLab.Server.Controllers
             CleanupStaleFrames();
             if (!await CanStaffAccessPcAsync(pcId)) return Forbid();
             if (!LatestFrames.TryGetValue(pcId, out ScreenFrame? frame)) return NotFound(new { message = "No current screen image is available for this PC." });
+            if (!await _context.PcUsageHistory.AnyAsync(s => s.SessionId == frame.SessionId && s.PCId == pcId && s.LogoutTime == null)) return NotFound(new { message = "The preview belongs to an expired session." });
 
             // Refresh the remote-control lease even when there is no newer frame.
             TouchRemoteViewerLease(pcId);
@@ -121,7 +126,7 @@ namespace SmartLab.Server.Controllers
             LatestFrames.TryRemove(pcId, out _);
             if (User.IsInRole("Admin") || User.IsInRole("Teacher"))
             {
-                MonitoringStates[pcId] = false;
+                MonitoringStates.TryRemove(pcId, out _);
                 RemoteControlSessionTracker.Remove(pcId);
             }
             return Ok(new { message = "Screen monitoring data removed.", pcId });
@@ -132,6 +137,7 @@ namespace SmartLab.Server.Controllers
             if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out int userId))
                 return;
 
+            MonitoringStates[pcId] = DateTime.UtcNow;
             RemoteControlSessionTracker.Touch(pcId, userId);
         }
 

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Net.Http.Json;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
@@ -240,10 +240,10 @@ namespace SmartLab.Client
                 await HandlePcCommandAsync(
                     command);
             }
-            catch
+            catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+            catch (Exception ex)
             {
-                // Temporary network/server failures should
-                // never terminate the Student session.
+                ClientLog.Write("Warning", "CommandPollingFailed", new { pcId = _pcId }, ex);
             }
             finally
             {
@@ -558,10 +558,10 @@ namespace SmartLab.Client
                         Result = result
                     });
             }
-            catch
+            catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+            catch (Exception ex)
             {
-                // Temporary acknowledgement failure should
-                // not crash or close the Student client.
+                ClientLog.Write("Warning", "CommandAcknowledgementFailed", new { pcId = _pcId, commandId = command.CommandId }, ex);
             }
 
             if (logoffAfterAcknowledgement)

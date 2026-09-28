@@ -5,14 +5,16 @@ namespace SmartLab.Server
     public sealed class PCMonitorService : BackgroundService
     {
         private readonly IServiceScopeFactory _scopeFactory;
+        private readonly ILogger<PCMonitorService> _logger;
         private readonly TimeSpan _timeout;
         private readonly TimeSpan _checkInterval;
 
         public PCMonitorService(
             IServiceScopeFactory scopeFactory,
-            IConfiguration configuration)
+            IConfiguration configuration, ILogger<PCMonitorService>? logger = null)
         {
             _scopeFactory = scopeFactory;
+            _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<PCMonitorService>.Instance;
 
             int timeoutSeconds = configuration.GetValue(
                 "SmartLab:HeartbeatTimeoutSeconds",
@@ -40,7 +42,7 @@ namespace SmartLab.Server
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"PC Monitor Error: {ex.Message}");
+                    _logger.LogError(ex, "PC presence timeout sweep failed");
                 }
 
                 try
@@ -61,7 +63,7 @@ namespace SmartLab.Server
             DateTime cutoff = DateTime.Now - _timeout;
 
             var stalePCs = await context.PCs
-                .Where(p => p.Status != "Maintenance" &&
+                .Where(p => p.Status != "Maintenance" && p.Status != "Offline" &&
                             p.LastSeen != null &&
                             p.LastSeen < cutoff)
                 .ToListAsync(cancellationToken);
@@ -83,7 +85,7 @@ namespace SmartLab.Server
 
                 if (!string.Equals(previousStatus, pc.Status, StringComparison.OrdinalIgnoreCase))
                 {
-                    Console.WriteLine($"[PC MONITOR] {pc.PCNumber}: {previousStatus} -> Offline");
+                    _logger.LogInformation("PC {PCNumber}: {PreviousStatus} -> Offline; ownership retained", pc.PCNumber, previousStatus);
 
                     context.ActivityLogs.Add(new ActivityLog
                     {

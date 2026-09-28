@@ -412,9 +412,10 @@ namespace SmartLab.Client
                     await RemoveScreenFromServer();
                 }
             }
-            catch
+            catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+            catch (Exception ex)
             {
-                // Do not interrupt student's session.
+                ClientLog.Write("Warning", "MonitoringStatusFailed", new { pcId = _pcId }, ex);
             }
         }
 
@@ -532,10 +533,10 @@ namespace SmartLab.Client
                     return;
                 }
             }
-            catch
+            catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+            catch (Exception ex)
             {
-                // Do not close SmartLab if
-                // screen upload temporarily fails.
+                ClientLog.Write("Warning", "ScreenUploadFailed", new { pcId = _pcId }, ex);
             }
             finally
             {
@@ -556,9 +557,10 @@ namespace SmartLab.Client
                     $"api/ScreenMonitor/{_pcId}"
                 );
             }
-            catch
+            catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+            catch (Exception ex)
             {
-                // Ignore temporary server errors.
+                ClientLog.Write("Warning", "ScreenRemovalFailed", new { pcId = _pcId }, ex);
             }
         }
 
@@ -819,10 +821,10 @@ namespace SmartLab.Client
                         latest.AnnouncementId;
                 }
             }
-            catch
+            catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+            catch (Exception ex)
             {
-                // Keep the student session running if
-                // announcements are temporarily unavailable.
+                ClientLog.Write("Warning", "AnnouncementRefreshFailed", exception: ex);
             }
         }
 

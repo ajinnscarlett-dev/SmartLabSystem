@@ -75,6 +75,41 @@ public sealed class CommandAuthorizationTests
         Assert.IsType<OkObjectResult>(await Monitor(1, "Student").GetMonitoringStatus(pcId));
     }
 
+    [Fact]
+    public async Task ChunkedScreenUploadIsBoundedAndOldSessionFrameIsRejected()
+    {
+        await using var db = Create();
+        int pcId = Random.Shared.Next(10000, int.MaxValue);
+        await Seed(db, pcId);
+        var monitor = WithUser(new ScreenMonitorController(db, new(db)), 10, "Admin");
+        await monitor.StartMonitoring(pcId);
+        var student = WithUser(new ScreenMonitorController(db, new(db)), 1, "Student");
+        student.Request.Body = new MemoryStream(new byte[4 * 1024 * 1024 + 1]);
+        Assert.Null(student.Request.ContentLength);
+        Assert.IsType<BadRequestObjectResult>(await student.UploadScreen(pcId));
+        student.Request.Body = new MemoryStream(new byte[] { 1, 2, 3 });
+        Assert.IsType<OkObjectResult>(await student.UploadScreen(pcId));
+        Assert.IsType<OkObjectResult>(await monitor.GetFrameMetadata(pcId));
+        var pc = (await db.PCs.FindAsync(pcId))!;
+        pc.CurrentUserId = null; pc.Status = "Available"; await db.SaveChangesAsync();
+        Assert.IsType<NotFoundObjectResult>(await monitor.GetFrameMetadata(pcId));
+    }
+
+    [Fact]
+    public async Task HardwareReadRequiresCurrentScheduleEvenWithCachedAuthorization()
+    {
+        await using var db = Create();
+        int pcId = Random.Shared.Next(10000, int.MaxValue);
+        await Seed(db, pcId);
+        db.HardwareInventories.Add(new HardwareInventory { PCId = pcId });
+        db.TeacherLaboratoryAuthorizations.Add(new TeacherLaboratoryAuthorization { TeacherUserId = 20, LaboratoryId = 601 });
+        await db.SaveChangesAsync();
+        var teacher = WithUser(new HardwareInventoryController(db), 20, "Teacher");
+        Assert.IsType<ForbidResult>(await teacher.GetOne(pcId));
+        AddSchedule(db, 20); await db.SaveChangesAsync();
+        Assert.IsType<OkObjectResult>(await teacher.GetOne(pcId));
+    }
+
     private static AppDbContext Create() => new(new DbContextOptionsBuilder<AppDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
     private static async Task Seed(AppDbContext db, int pcId)
     {

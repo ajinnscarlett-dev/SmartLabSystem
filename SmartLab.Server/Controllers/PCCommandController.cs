@@ -610,7 +610,7 @@ namespace SmartLab.Server.Controllers
                 return NoContent();
             }
 
-            if (!await IsCommandSessionCurrentAsync(command)) return Conflict(new { message = "The command belongs to an expired workstation session." });
+
 
             return Ok(new
             {

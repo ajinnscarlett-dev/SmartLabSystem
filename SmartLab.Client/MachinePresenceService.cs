@@ -43,7 +43,7 @@ namespace SmartLab.Client
                     IPAddress = identity.IPAddress
                 };
             },
-            () => AuthSession.IsAuthenticated,
+            () => AuthSession.IsAuthenticated && AuthSession.Role == "Student",
             true) { }
 
         internal MachinePresenceService(HttpClient client,
