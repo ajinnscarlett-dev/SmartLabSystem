@@ -16,10 +16,12 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddHostedService<DatabaseMigrationHostedService>();
 builder.Services.AddScoped<TeacherScheduleService>();
 
+builder.Services.AddScoped<WorkstationCredentialFilter>();
 builder.Services.AddScoped<SmartLabAuthorizationFilter>();
 builder.Services.AddScoped<SmartLabRequestIntegrityFilter>();
 builder.Services.AddControllers(options =>
 {
+    options.Filters.AddService<WorkstationCredentialFilter>();
     options.Filters.AddService<SmartLabAuthorizationFilter>();
     options.Filters.AddService<SmartLabRequestIntegrityFilter>();
 });

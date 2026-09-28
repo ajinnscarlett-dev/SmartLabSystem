@@ -105,8 +105,13 @@ namespace SmartLab.Client
 
                 // Reuse the connection pool. Absolute URIs allow rediscovery without
                 // mutating BaseAddress after the first request.
-                using HttpResponseMessage response = await _httpClient.PostAsJsonAsync(
-                    new Uri(server, "api/PC/presence"), request, cancellationToken);
+                using var message = new HttpRequestMessage(HttpMethod.Post, new Uri(server, "api/PC/presence"))
+                {
+                    Content = JsonContent.Create(request)
+                };
+                string? deviceToken = Environment.GetEnvironmentVariable("SMARTLAB_DEVICE_TOKEN");
+                if (!string.IsNullOrWhiteSpace(deviceToken)) message.Headers.Add("X-SmartLab-Device-Token", deviceToken);
+                using HttpResponseMessage response = await _httpClient.SendAsync(message, cancellationToken);
                 if (!response.IsSuccessStatusCode)
                 {
                     string state = response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.NotFound or HttpStatusCode.Conflict
