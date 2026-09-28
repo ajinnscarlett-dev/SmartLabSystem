@@ -10,29 +10,52 @@ namespace SmartLab.Server.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropIndex(
-                name: "IX_PCs_CurrentUserId",
-                table: "PCs");
+            migrationBuilder.Sql("""
+                IF EXISTS (
+                    SELECT 1
+                    FROM sys.indexes
+                    WHERE name = N'IX_PCs_CurrentUserId'
+                      AND object_id = OBJECT_ID(N'dbo.PCs'))
+                BEGIN
+                    DROP INDEX [IX_PCs_CurrentUserId] ON [dbo].[PCs];
+                END;
 
-            migrationBuilder.CreateIndex(
-                name: "IX_PCs_CurrentUserId",
-                table: "PCs",
-                column: "CurrentUserId",
-                unique: true,
-                filter: "[CurrentUserId] IS NOT NULL");
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM sys.indexes
+                    WHERE name = N'IX_PCs_CurrentUserId'
+                      AND object_id = OBJECT_ID(N'dbo.PCs'))
+                BEGIN
+                    CREATE UNIQUE INDEX [IX_PCs_CurrentUserId]
+                        ON [dbo].[PCs] ([CurrentUserId])
+                        WHERE [CurrentUserId] IS NOT NULL;
+                END;
+                """);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropIndex(
-                name: "IX_PCs_CurrentUserId",
-                table: "PCs");
+            migrationBuilder.Sql("""
+                IF EXISTS (
+                    SELECT 1
+                    FROM sys.indexes
+                    WHERE name = N'IX_PCs_CurrentUserId'
+                      AND object_id = OBJECT_ID(N'dbo.PCs'))
+                BEGIN
+                    DROP INDEX [IX_PCs_CurrentUserId] ON [dbo].[PCs];
+                END;
 
-            migrationBuilder.CreateIndex(
-                name: "IX_PCs_CurrentUserId",
-                table: "PCs",
-                column: "CurrentUserId");
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM sys.indexes
+                    WHERE name = N'IX_PCs_CurrentUserId'
+                      AND object_id = OBJECT_ID(N'dbo.PCs'))
+                BEGIN
+                    CREATE INDEX [IX_PCs_CurrentUserId]
+                        ON [dbo].[PCs] ([CurrentUserId]);
+                END;
+                """);
         }
     }
 }
