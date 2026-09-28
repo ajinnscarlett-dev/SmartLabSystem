@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Net.Http;
@@ -3672,6 +3672,7 @@ namespace SmartLab.Client
             RoutedEventArgs e)
         {
             _refreshTimer.Stop();
+            StopScreenMonitoring();
 
 
 
@@ -3698,6 +3699,7 @@ namespace SmartLab.Client
             EventArgs e)
         {
             _refreshTimer.Stop();
+            StopScreenMonitoring();
 
             _httpClient.Dispose();
 

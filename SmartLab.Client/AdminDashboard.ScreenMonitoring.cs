@@ -1,9 +1,10 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -11,502 +12,215 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 
-namespace SmartLab.Client
+namespace SmartLab.Client;
+
+public partial class AdminDashboard
 {
-    // ==========================================================
-    // ADMIN DASHBOARD - STABLE LIVE PC THUMBNAILS
-    // STEP 26
-    //
-    // Root cause addressed:
-    // The previous code treated an old LastSeen value as a reason
-    // to stop screen monitoring. StopMonitoring clears the server's
-    // latest frame. That can leave the Admin with an old cached image
-    // while GET /meta returns 404.
-    //
-    // New rule:
-    // - If a PC is IN USE/OCCUPIED, keep monitoring.
-    // - Do NOT stop monitoring only because LastSeen is temporarily
-    //   stale in the Admin's current PC list.
-    // - Stop monitoring when the PC is no longer occupied.
-    //
-    // This avoids deleting the current frame because of a transient
-    // heartbeat/dashboard refresh delay.
-    // ==========================================================
+    private DispatcherTimer? _screenThumbnailTimer;
+    private readonly CancellationTokenSource _thumbnailLifetime = new();
+    private readonly HashSet<int> _screenInFlight = new();
+    private readonly Dictionary<int, DateTime> _screenAttempts = new();
+    private readonly Dictionary<int, DateTime> _screenStarted = new();
+    private readonly Dictionary<int, DateTime> _screenUpdated = new();
+    private readonly Dictionary<int, int?> _screenOwners = new();
+    private readonly HashSet<int> _screenMonitoringStarted = new();
+    private readonly Dictionary<int, long> _screenVersions = new();
+    private readonly Dictionary<int, byte[]> _latestScreenImages = new();
+    private readonly Dictionary<int, ImageSource> _decodedScreens = new();
+    private readonly Dictionary<int, Image> _screenImageControls = new();
 
-    public partial class AdminDashboard
+    private void InitializeScreenMonitoring()
     {
-        private DispatcherTimer? _screenThumbnailTimer;
-        private bool _screenThumbnailRefreshRunning;
-        private int _screenRefreshIndex;
+        if (_screenThumbnailTimer != null || _thumbnailLifetime.IsCancellationRequested) return;
+        _screenThumbnailTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _screenThumbnailTimer.Tick += ScreenThumbnailTimer_Tick;
+        _screenThumbnailTimer.Start();
+    }
 
-        private readonly HashSet<int>
-            _screenMonitoringStarted =
-                new HashSet<int>();
+    private void StopScreenMonitoring()
+    {
+        _screenThumbnailTimer?.Stop();
+        if (_screenThumbnailTimer != null) _screenThumbnailTimer.Tick -= ScreenThumbnailTimer_Tick;
+        _thumbnailLifetime.Cancel();
+        _screenImageControls.Clear();
+        _latestScreenImages.Clear();
+        _decodedScreens.Clear();
+    }
 
-        private readonly Dictionary<int, long>
-            _screenVersions =
-                new Dictionary<int, long>();
+    private void ScreenThumbnailTimer_Tick(object? sender, EventArgs e) => _ = RefreshScreenMetadataAsync();
 
-        private readonly Dictionary<int, byte[]>
-            _latestScreenImages =
-                new Dictionary<int, byte[]>();
-
-        private readonly Dictionary<int, Image>
-            _screenImageControls =
-                new Dictionary<int, Image>();
-
-        private static readonly TimeSpan
-            ScreenRefreshInterval =
-                TimeSpan.FromMilliseconds(1000);
-
-        private void InitializeScreenMonitoring()
+    private Task RefreshScreenMetadataAsync()
+    {
+        if (!IsLoaded || _thumbnailLifetime.IsCancellationRequested) return Task.CompletedTask;
+        var cards = PcGrid.Children.OfType<Border>().Where(c => c.Tag is PCInfo).ToList();
+        DateTime now = DateTime.UtcNow;
+        foreach (var card in cards)
         {
-            if (_screenThumbnailTimer != null)
+            var pc = (PCInfo)card.Tag;
+            if (!IsPcOccupied(pc) || (_screenOwners.TryGetValue(pc.PcId, out int? owner) && owner != pc.CurrentUserId))
             {
-                return;
+                _latestScreenImages.Remove(pc.PcId);
+                _decodedScreens.Remove(pc.PcId);
+                _screenVersions.Remove(pc.PcId);
+                _screenUpdated.Remove(pc.PcId);
+                _screenStarted.Remove(pc.PcId);
+                _screenImageControls.Remove(pc.PcId);
+                if (FindMonitorFrame(card) is Border frame && frame.Child is Image) frame.Child = null;
             }
-
-            _screenThumbnailTimer =
-                new DispatcherTimer
-                {
-                    Interval =
-                        ScreenRefreshInterval
-                };
-
-            _screenThumbnailTimer.Tick +=
-                ScreenThumbnailTimer_Tick;
-
-            _screenThumbnailTimer.Start();
-
-            _ = RefreshScreenMetadataAsync();
+            _screenOwners[pc.PcId] = pc.CurrentUserId;
+            SetPreviewAge(card, pc.PcId);
         }
-
-        private async void ScreenThumbnailTimer_Tick(
-            object? sender,
-            EventArgs e)
+        var occupied = cards.Where(c => IsPcOccupied((PCInfo)c.Tag)).ToDictionary(c => ((PCInfo)c.Tag).PcId);
+        var candidates = occupied.Where(p => !_screenInFlight.Contains(p.Key)).Select(p =>
+            new ThumbnailRefreshPolicy.Candidate(p.Key, IsCardVisible(p.Value), _screenAttempts.GetValueOrDefault(p.Key)));
+        foreach (int id in ThumbnailRefreshPolicy.Select(candidates, now, Math.Max(0, 4 - _screenInFlight.Count)))
         {
-            await RefreshScreenMetadataAsync();
+            _screenAttempts[id] = now;
+            _screenInFlight.Add(id);
+            _ = RefreshScheduledCardAsync(occupied[id], (PCInfo)occupied[id].Tag);
         }
+        return Task.CompletedTask;
+    }
 
-        private async Task RefreshScreenMetadataAsync()
+    private bool IsCardVisible(Border card)
+    {
+        if (!card.IsVisible) return false;
+        DependencyObject? parent = VisualTreeHelper.GetParent(card);
+        while (parent != null && parent is not ScrollViewer) parent = VisualTreeHelper.GetParent(parent);
+        if (parent is not ScrollViewer viewport) return true;
+        return card.TransformToAncestor(viewport).TransformBounds(new Rect(card.RenderSize))
+            .IntersectsWith(new Rect(viewport.RenderSize));
+    }
+
+    private async Task RefreshScheduledCardAsync(Border card, PCInfo pc)
+    {
+        try { await RefreshOnePcFrameAsync(card, pc); }
+        finally { _screenInFlight.Remove(pc.PcId); }
+    }
+
+    private static bool IsPcOccupied(PCInfo pc) => pc.IsEnabled &&
+        (pc.Status.Equals("Occupied", StringComparison.OrdinalIgnoreCase) || pc.Status.Equals("In Use", StringComparison.OrdinalIgnoreCase));
+
+    private async Task EnsureMonitoringStartedAsync(int pcId)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(_thumbnailLifetime.Token);
+        timeout.CancelAfter(TimeSpan.FromSeconds(3));
+        await EnsureMonitoringStartedAsync(pcId, timeout.Token);
+    }
+
+    private async Task EnsureMonitoringStartedAsync(int pcId, CancellationToken token)
+    {
+        // Renew periodically so a server restart does not leave the client cache saying "started".
+        if (_screenStarted.TryGetValue(pcId, out var started) && DateTime.UtcNow - started < TimeSpan.FromSeconds(10)) return;
+        using var response = await _httpClient.PostAsync($"api/ScreenMonitor/{pcId}/start", null, token);
+        response.EnsureSuccessStatusCode();
+        _screenMonitoringStarted.Add(pcId);
+        _screenStarted[pcId] = DateTime.UtcNow;
+    }
+
+    private async Task RefreshOnePcFrameAsync(Border card, PCInfo pc)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(_thumbnailLifetime.Token);
+        timeout.CancelAfter(TimeSpan.FromSeconds(3));
+        try
         {
-            if (_screenThumbnailRefreshRunning ||
-                !IsLoaded)
+            await EnsureMonitoringStartedAsync(pc.PcId, timeout.Token);
+            var metadata = await _httpClient.GetFromJsonAsync<ScreenFrameMetadata>($"api/ScreenMonitor/{pc.PcId}/meta", timeout.Token);
+            if (metadata == null) return;
+            _screenVersions.TryGetValue(pc.PcId, out long knownVersion);
+            if (metadata.Version != knownVersion || !_latestScreenImages.ContainsKey(pc.PcId))
             {
-                return;
+                // Metadata is a hint; the response header is the authoritative image version.
+                using var response = await _httpClient.GetAsync($"api/ScreenMonitor/{pc.PcId}", timeout.Token);
+                response.EnsureSuccessStatusCode();
+                byte[] bytes = await response.Content.ReadAsByteArrayAsync(timeout.Token);
+                ImageSource? image = await Task.Run(() => DecodeFrozenImage(bytes), timeout.Token);
+                timeout.Token.ThrowIfCancellationRequested();
+                if (image == null || !IsPcOccupied(pc) ||
+                    (_screenOwners.TryGetValue(pc.PcId, out int? owner) && owner != pc.CurrentUserId)) return;
+                _screenVersions[pc.PcId] = response.Headers.TryGetValues("X-SmartLab-Frame-Version", out var versions) &&
+                    long.TryParse(versions.FirstOrDefault(), out long version) ? version : metadata.Version;
+                _latestScreenImages[pc.PcId] = bytes;
+                _decodedScreens[pc.PcId] = image;
+                _screenUpdated[pc.PcId] = metadata.UpdatedAt;
+                ApplyScreenImage(pc.PcId, image);
             }
-
-            _screenThumbnailRefreshRunning = true;
-
-            try
-            {
-                List<(Border Card, PCInfo PC)>
-                    visibleCards =
-                        PcGrid.Children
-                            .OfType<Border>()
-                            .Where(
-                                b => b.Tag is PCInfo)
-                            .Select(
-                                b => (
-                                    b,
-                                    (PCInfo)b.Tag
-                                ))
-                            .ToList();
-
-                if (visibleCards.Count == 0)
-                {
-                    _screenRefreshIndex = 0;
-                    return;
-                }
-
-                if (_screenRefreshIndex >=
-                    visibleCards.Count)
-                {
-                    _screenRefreshIndex = 0;
-                }
-
-                // IMPORTANT:
-                // Monitoring state now follows PC usage state,
-                // not LastSeen freshness.
-                await SynchronizeMonitoringStatesAsync(
-                    visibleCards);
-
-                int attempts =
-                    visibleCards.Count;
-
-                while (attempts-- > 0)
-                {
-                    var item =
-                        visibleCards[
-                            _screenRefreshIndex];
-
-                    _screenRefreshIndex =
-                        (_screenRefreshIndex + 1) %
-                        visibleCards.Count;
-
-                    if (!IsPcOccupied(item.PC))
-                    {
-                        continue;
-                    }
-
-                    await RefreshOnePcFrameAsync(
-                        item.Card,
-                        item.PC);
-
-                    break;
-                }
-            }
-            catch (Exception ex)
-            {
-                ApiStatusText.Text =
-                    $"Screen preview error: {ex.Message}";
-            }
-            finally
-            {
-                _screenThumbnailRefreshRunning =
-                    false;
-            }
+            ApplyCachedScreenToCard(card, pc.PcId);
         }
-
-        // ==========================================================
-        // MONITORING STATE
-        // ==========================================================
-
-        private async Task
-            SynchronizeMonitoringStatesAsync(
-                List<(Border Card, PCInfo PC)>
-                    visibleCards)
+        catch (OperationCanceledException) when (_thumbnailLifetime.IsCancellationRequested) { }
+        catch (OperationCanceledException)
         {
-            foreach (var item in visibleCards)
-            {
-                bool occupied =
-                    IsPcOccupied(item.PC);
-
-                if (occupied)
-                {
-                    // Do not require a fresh LastSeen value here.
-                    // The Student client is the one uploading frames,
-                    // and a temporary dashboard heartbeat delay should
-                    // not cause us to delete the current frame.
-                    await EnsureMonitoringStartedAsync(
-                        item.PC.PcId);
-                }
-                else if (
-                    _screenMonitoringStarted.Contains(
-                        item.PC.PcId))
-                {
-                    await StopMonitoringAsync(
-                        item.PC.PcId);
-                }
-            }
+            ClientLog.Write("Warning", "PreviewTimeout", new { pcId = pc.PcId });
         }
-
-        private static bool IsPcOccupied(
-            PCInfo pc)
+        catch (Exception ex)
         {
-            return
-                pc.Status.Equals(
-                    "Occupied",
-                    StringComparison.OrdinalIgnoreCase)
-                ||
-                pc.Status.Equals(
-                    "In Use",
-                    StringComparison.OrdinalIgnoreCase);
+            _screenStarted.Remove(pc.PcId);
+            ClientLog.Write(ex is HttpRequestException ? "Warning" : "Error", "PreviewRefreshFailed", new { pcId = pc.PcId }, ex);
         }
-
-        private async Task
-            EnsureMonitoringStartedAsync(
-                int pcId)
+        finally
         {
-            if (_screenMonitoringStarted.Contains(
-                pcId))
-            {
-                return;
-            }
-
-            try
-            {
-                HttpResponseMessage response =
-                    await _httpClient.PostAsync(
-                        $"api/ScreenMonitor/{pcId}/start",
-                        null);
-
-                if (response.IsSuccessStatusCode)
-                {
-                    _screenMonitoringStarted.Add(
-                        pcId);
-                }
-            }
-            catch
-            {
-                // Retry on the next cycle.
-            }
+            if (!_thumbnailLifetime.IsCancellationRequested) SetPreviewAge(card, pc.PcId);
         }
+    }
 
-        private async Task
-            StopMonitoringAsync(
-                int pcId)
+    private void SetPreviewAge(Border card, int pcId)
+    {
+        if (FindMonitorFrame(card) is not Border frame) return;
+        double age = _screenUpdated.TryGetValue(pcId, out var updated) ? Math.Max(0, (DateTime.Now - updated).TotalSeconds) : double.PositiveInfinity;
+        string text = double.IsPositiveInfinity(age) ? "No current preview" : $"Last updated: {age:0.0}s ago" + (age > 10 ? " — STALE" : "");
+        frame.ToolTip = text;
+        frame.Opacity = age > 10 ? 0.45 : 1;
+        System.Windows.Automation.AutomationProperties.SetHelpText(frame, text);
+    }
+
+    private static ImageSource? DecodeFrozenImage(byte[] imageBytes)
+    {
+        try
         {
-            try
-            {
-                HttpResponseMessage response =
-                    await _httpClient.PostAsync(
-                        $"api/ScreenMonitor/{pcId}/stop",
-                        null);
-
-                if (response.IsSuccessStatusCode)
-                {
-                    _screenMonitoringStarted.Remove(
-                        pcId);
-
-                    _screenVersions.Remove(
-                        pcId);
-
-                    _latestScreenImages.Remove(
-                        pcId);
-
-                    _screenImageControls.Remove(
-                        pcId);
-                }
-            }
-            catch
-            {
-                // Retry on the next cycle.
-            }
+            using var stream = new MemoryStream(imageBytes);
+            var bitmap = new BitmapImage();
+            bitmap.BeginInit(); bitmap.CacheOption = BitmapCacheOption.OnLoad; bitmap.StreamSource = stream; bitmap.EndInit(); bitmap.Freeze();
+            return bitmap;
         }
-
-        // ==========================================================
-        // GET LATEST FRAME
-        // ==========================================================
-
-        private async Task
-            RefreshOnePcFrameAsync(
-                Border card,
-                PCInfo pc)
+        catch (Exception ex)
         {
-            try
-            {
-                ScreenFrameMetadata? metadata =
-                    await _httpClient
-                        .GetFromJsonAsync<
-                            ScreenFrameMetadata>(
-                                $"api/ScreenMonitor/{pc.PcId}/meta");
-
-                if (metadata == null)
-                {
-                    ApplyCachedScreenToCard(
-                        card,
-                        pc.PcId);
-
-                    return;
-                }
-
-                _screenVersions.TryGetValue(
-                    pc.PcId,
-                    out long knownVersion);
-
-                if (metadata.Version <=
-                    knownVersion)
-                {
-                    ApplyCachedScreenToCard(
-                        card,
-                        pc.PcId);
-
-                    return;
-                }
-
-                byte[] imageBytes =
-                    await _httpClient.GetByteArrayAsync(
-                        $"api/ScreenMonitor/{pc.PcId}" +
-                        $"?version={knownVersion}");
-
-                if (imageBytes.Length == 0)
-                {
-                    return;
-                }
-
-                ImageSource? image =
-                    await Task.Run(
-                        () =>
-                            DecodeFrozenImage(
-                                imageBytes));
-
-                if (image == null)
-                {
-                    return;
-                }
-
-                _screenVersions[pc.PcId] =
-                    metadata.Version;
-
-                _latestScreenImages[pc.PcId] =
-                    imageBytes;
-
-                ApplyScreenImage(
-                    pc.PcId,
-                    image);
-            }
-            catch
-            {
-                // Keep the previous good frame.
-                ApplyCachedScreenToCard(
-                    card,
-                    pc.PcId);
-            }
+            ClientLog.Write("Warning", "PreviewDecodeFailed", exception: ex);
+            return null;
         }
+    }
 
-        // ==========================================================
-        // IMAGE DECODE
-        // ==========================================================
-
-        private static ImageSource?
-            DecodeFrozenImage(
-                byte[] imageBytes)
+    private void ApplyScreenImage(int pcId, ImageSource imageSource)
+    {
+        var card = PcGrid.Children.OfType<Border>().FirstOrDefault(c => c.Tag is PCInfo pc && pc.PcId == pcId);
+        if (card == null || card.Tag is not PCInfo current || !IsPcOccupied(current) ||
+            (_screenOwners.TryGetValue(pcId, out int? owner) && owner != current.CurrentUserId)) return;
+        var frame = FindMonitorFrame(card);
+        if (frame == null) return;
+        // Always resolve the current card: the lab grid can be rebuilt while a request is in flight.
+        if (frame.Child is not Image image)
         {
-            try
-            {
-                BitmapImage bitmap =
-                    new BitmapImage();
-
-                using MemoryStream stream =
-                    new MemoryStream(
-                        imageBytes);
-
-                bitmap.BeginInit();
-
-                bitmap.CacheOption =
-                    BitmapCacheOption.OnLoad;
-
-                bitmap.StreamSource =
-                    stream;
-
-                bitmap.EndInit();
-
-                bitmap.Freeze();
-
-                return bitmap;
-            }
-            catch
-            {
-                return null;
-            }
+            image = new Image { Stretch = Stretch.UniformToFill };
+            frame.Child = image;
         }
+        _screenImageControls[pcId] = image;
+        image.Source = imageSource;
+        SetPreviewAge(card, pcId);
+    }
 
-        // ==========================================================
-        // DISPLAY NEW FRAME
-        // ==========================================================
+    private void ApplyCachedScreenToCard(Border card, int pcId)
+    {
+        if (card.Tag is PCInfo pc && (!IsPcOccupied(pc) ||
+            (_screenOwners.TryGetValue(pcId, out int? owner) && owner != pc.CurrentUserId))) return;
+        if (_decodedScreens.TryGetValue(pcId, out var image)) ApplyScreenImage(pcId, image);
+    }
 
-        private void ApplyScreenImage(
-            int pcId,
-            ImageSource imageSource)
-        {
-            if (!_screenImageControls.TryGetValue(
-                pcId,
-                out Image? imageControl))
-            {
-                Border? card =
-                    PcGrid.Children
-                        .OfType<Border>()
-                        .FirstOrDefault(
-                            border =>
-                                border.Tag is PCInfo pc &&
-                                pc.PcId == pcId);
+    private static Border? FindMonitorFrame(DependencyObject root) =>
+        FindVisualChildren<Border>(root).FirstOrDefault(b => Math.Abs(b.Width - 74) < 0.5 && Math.Abs(b.Height - 47) < 0.5);
 
-                if (card == null)
-                {
-                    return;
-                }
-
-                Border? monitorFrame =
-                    FindMonitorFrame(card);
-
-                if (monitorFrame == null)
-                {
-                    return;
-                }
-
-                imageControl =
-                    new Image
-                    {
-                        Stretch =
-                            Stretch.UniformToFill,
-
-                        HorizontalAlignment =
-                            HorizontalAlignment.Stretch,
-
-                        VerticalAlignment =
-                            VerticalAlignment.Stretch
-                    };
-
-                _screenImageControls[pcId] =
-                    imageControl;
-
-                monitorFrame.Child =
-                    imageControl;
-            }
-
-            imageControl.Source =
-                imageSource;
-        }
-
-        // ==========================================================
-        // DISPLAY CACHED FRAME
-        // ==========================================================
-
-        private void ApplyCachedScreenToCard(
-            Border card,
-            int pcId)
-        {
-            if (!_latestScreenImages.TryGetValue(
-                pcId,
-                out byte[]? imageBytes))
-            {
-                return;
-            }
-
-            ImageSource? image =
-                DecodeFrozenImage(
-                    imageBytes);
-
-            if (image == null)
-            {
-                return;
-            }
-
-            ApplyScreenImage(
-                pcId,
-                image);
-        }
-
-        // ==========================================================
-        // FIND MONITOR FRAME
-        // ==========================================================
-
-        private static Border? FindMonitorFrame(
-            DependencyObject root)
-        {
-            return FindVisualChildren<Border>(
-                    root)
-                .FirstOrDefault(
-                    border =>
-                        Math.Abs(
-                            border.Width - 74) < 0.5
-                        &&
-                        Math.Abs(
-                            border.Height - 47) < 0.5);
-        }
-
-        // ==========================================================
-        // VERSION METADATA MODEL
-        // ==========================================================
-
-        private sealed class ScreenFrameMetadata
-        {
-            public int PcId { get; set; }
-
-            public long Version { get; set; }
-
-            public DateTime UpdatedAt { get; set; }
-        }
+    private sealed class ScreenFrameMetadata
+    {
+        public int PcId { get; set; }
+        public long Version { get; set; }
+        public DateTime UpdatedAt { get; set; }
     }
 }
